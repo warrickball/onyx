@@ -55,3 +55,12 @@ class MPX(Base):
             ("it", "ion_torrent")
         )
     )
+
+
+class COVID(Base):
+    pillar = models.IntegerField(
+        choices=(
+            (1, 1),
+            (2, 2)
+        )
+    )
