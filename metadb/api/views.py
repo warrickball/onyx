@@ -1,81 +1,76 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view
 from django.core.exceptions import FieldError
 import api.serializers
 import data.models
+import inspect
 
 
-def model_exists(func):
+def get_pathogen_model(pathogen_code):
     '''
-    Decorator that converts `model_name` to uppercase and determines whether a model with the name exists.
+    Returns the model of the given `pathogen_code`, or `None` if it doesn't exist.
     '''
-    def wrapped_func(request, model_name, *args, **kwargs):
-        # Use upper-cased version of model name throughout
-        model_name = model_name.upper()
+    members = inspect.getmembers(data.models, inspect.isclass)
+    for name, model in members:
+        if pathogen_code.upper() == name.upper():
+            return model
+    return None    
 
-        # If the model does not exist, return 404
-        if not hasattr(data.models, model_name):
-            return Response(
-                {"detail" : f"model '{model_name}' does not exist"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        return func(request, model_name, *args, **kwargs)
-    
-    return wrapped_func
+
+def no_pathogen_provided_response():
+    return Response(
+        {"detail" : "a pathogen must be provided"}, 
+        status=status.HTTP_400_BAD_REQUEST
+    )
+
+
+def no_model_exists_response(pathogen_code):
+    return Response(
+        {"detail" : f"no model exists for {pathogen_code}"}, 
+        status=status.HTTP_404_NOT_FOUND
+    )
+
+
+def no_cid_exists_response(cid):
+    return Response(
+        {"detail" : f"record with cid '{cid}' does not exist"}, 
+        status=status.HTTP_404_NOT_FOUND
+    )
 
 
 @api_view(["POST"])
 def create(request):
-    model_name = request.data.get("organism")
+    # Check for provided pathogen_code
+    pathogen_code = request.data.get("pathogen_code")
+    if not pathogen_code:
+        return no_pathogen_provided_response()
 
-    if not model_name:
-        return Response(
-            {"detail" : "an organism must be provided"}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    model_name = model_name.upper()
-
-    if not hasattr(data.models, model_name):
-        return Response(
-            {"detail" : f"model '{model_name}' does not exist"}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+    # Get the model
+    pathogen_model = get_pathogen_model(pathogen_code)
+    if not pathogen_model:
+        return no_model_exists_response(pathogen_code)
 
     # Serializer validates input data
-    serializer = getattr(api.serializers, f"{model_name}Serializer")(data=request.data)
-    
+    serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(data=request.data)
+
+    # If data is valid, save to the database. If invalid, return errors
     if serializer.is_valid():
-        # Save data to the database as a new record for the given model
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
     else:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# @api_view(["POST"])
-# @model_exists
-# def create(request, model_name):
-#     # Serializer validates input data
-#     serializer = getattr(api.serializers, f"{model_name}Serializer")(data=request.data)
-    
-#     if serializer.is_valid():
-#         # Save data to the database as a new record for the given model
-#         serializer.save()
-#         return Response(serializer.data, status=status.HTTP_200_OK)
-#     else:
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 @api_view(["GET"])
-@model_exists
-def get(request, model_name):
-    model = getattr(data.models, model_name)
+def get(request, pathogen_code):
+    # Get the model
+    pathogen_model = get_pathogen_model(pathogen_code)
+    if not pathogen_model:
+        return no_model_exists_response(pathogen_code)
     
     # Create queryset of all objects by default
-    instances = model.objects.all()
+    instances = pathogen_model.objects.all()
 
     # For each query param, filter the data
     for field, value in request.query_params.items():
@@ -85,35 +80,33 @@ def get(request, model_name):
             return Response({"detail" : str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
     # Serialize the filtered data and then return it
-    serializer = getattr(api.serializers, f"{model_name}Serializer")(instances, many=True)
-
+    serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instances, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(["PUT", "PATCH"])
-@model_exists
-def update(request, model_name, cid):
-    model = getattr(data.models, model_name)
+def update(request, pathogen_code, cid):
+    # Get the model
+    pathogen_model = get_pathogen_model(pathogen_code)
+    if not pathogen_model:
+        return no_model_exists_response(pathogen_code)
     
-    # The model instance to be updated
-    instance = model.objects.filter(cid=cid).first()
+    # Get the model instance to be updated
+    instance = pathogen_model.objects.filter(cid=cid).first()
     
     # If an incorrect cid has been provided, return an error message
     if not instance:
-        return Response(
-            {"detail" : f"{model.__name__} record with cid '{cid}' does not exist"}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return no_cid_exists_response(cid)
     
     # If a PUT request was sent, check for every field of the model in the request data, and validate each
     # If a POST request was sent, only validate the fields that were provided
     if request.method == "PUT":
-        serializer = getattr(api.serializers, f"{model_name}Serializer")(instance=instance, data=request.data)
+        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data)
     else:
-        serializer = getattr(api.serializers, f"{model_name}Serializer")(instance=instance, data=request.data, partial=True)
+        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
 
+    # If data is valid, update existing record in the database. If invalid, return errors
     if serializer.is_valid():
-        # Update data of the given record in the database
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
     else:
@@ -121,50 +114,59 @@ def update(request, model_name, cid):
 
 
 @api_view(["DELETE"])
-@model_exists
-def delete(request, model_name, cid):
-    model = getattr(data.models, model_name)
-    response = model.objects.filter(cid=cid).delete()
-    return Response(
-        {"detail" : response},
-        status=status.HTTP_200_OK
-    )
+def delete(request, pathogen_code, cid):
+    # Get the model
+    pathogen_model = get_pathogen_model(pathogen_code)
+    if not pathogen_model:
+        return no_model_exists_response(pathogen_code)
+    
+    # Attempt to delete object with the provided cid, and return response
+    response = pathogen_model.objects.filter(cid=cid).delete()
+    return Response({"detail" : response}, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
 def get_cid(request, cid):
-    super_instance = data.models.Organism.objects.filter(cid=cid).first()
+    # Get superclass instance of the object with the given cid
+    super_instance = data.models.Pathogen.objects.get(cid=cid)
     if not super_instance:
-        return Response(
-            {"detail" : f"record with cid '{cid}' does not exist"}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return no_cid_exists_response(cid)
 
-    model = getattr(data.models, super_instance.organism)
-    instance = model.objects.filter(cid=cid).first()
-    serializer = getattr(api.serializers, f"{super_instance.organism}Serializer")(instance)
+    # Get the model for the given cid
+    pathogen_model = get_pathogen_model(super_instance.pathogen_code)
+    if not pathogen_model:
+        return no_model_exists_response(super_instance.pathogen_code)
+
+    # Find subclass instance for the given cid
+    instance = pathogen_model.objects.get(cid=cid)
+
+    # Serialize the instance and return it
+    serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(["PUT", "PATCH"])
 def update_cid(request, cid):
-    super_instance = data.models.Organism.objects.filter(cid=cid).first()
+    # Get superclass instance of the object with the given cid
+    super_instance = data.models.Pathogen.objects.get(cid=cid)
     if not super_instance:
-        return Response(
-            {"detail" : f"record with cid '{cid}' does not exist"}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return no_cid_exists_response(cid)
 
-    model = getattr(data.models, super_instance.organism)
-    instance = model.objects.filter(cid=cid).first()
+    # Get the model for the given cid
+    pathogen_model = get_pathogen_model(super_instance.pathogen_code)
+    if not pathogen_model:
+        return no_model_exists_response(super_instance.pathogen_code)
+
+    # Find subclass instance for the given cid
+    instance = pathogen_model.objects.get(cid=cid)
 
     if request.method == "PUT":
-        serializer = getattr(api.serializers, f"{model.__name__}Serializer")(instance=instance, data=request.data)
+        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data)
     else:
-        serializer = getattr(api.serializers, f"{model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
+        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
 
+    # If data is valid, update existing record in the database. If invalid, return errors
     if serializer.is_valid():
-        # Update data of the given record in the database
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
     else:
@@ -173,16 +175,16 @@ def update_cid(request, cid):
 
 @api_view(["DELETE"])
 def delete_cid(request, cid):
-    super_instance = data.models.Organism.objects.filter(cid=cid).first()
+    # Get superclass instance of the object with the given cid
+    super_instance = data.models.Pathogen.objects.get(cid=cid)
     if not super_instance:
-        return Response(
-            {"detail" : f"record with cid '{cid}' does not exist"}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return no_cid_exists_response(cid)
 
-    model = getattr(data.models, super_instance.organism)
-    response = model.objects.filter(cid=cid).delete()
-    return Response(
-        {"detail" : response},
-        status=status.HTTP_200_OK
-    )
+    # Get the model for the given cid
+    pathogen_model = get_pathogen_model(super_instance.pathogen_code)
+    if not pathogen_model:
+        return no_model_exists_response(super_instance.pathogen_code)
+
+    # Attempt to delete object with the provided cid, and return response
+    response = pathogen_model.objects.filter(cid=cid).delete()
+    return Response({"detail" : response}, status=status.HTTP_200_OK)
