@@ -1,40 +1,6 @@
 from django.db import models
-import secrets
-
-
-pathogen_codes = [
-    ("pathogen", "pathogen"), # Used for testing. TODO: This probably shouldn't be here
-    ("mpx", "mpx"),
-    ("covid", "covid")
-]
-
-uploaders = [
-    ("BIRM", "BIRM")
-]
-
-sample_types = [
-    ("SWAB", "SWAB"),
-    ("SERUM", "SERUM")
-]
-
-seq_platform_choices = [
-    ("ILLUMINA", "ILLUMINA"),
-    ("OXFORD_NANOPORE", "OXFORD_NANOPORE"),
-    ("PACIFIC_BIOSCIENCES", "PACIFIC_BIOSCIENCES"),
-    ("ION_TORRENT", "ION_TORRENT")
-]
-
-
-def generate_cid():
-    # cid = "CLIMB-" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-    cid = "CLIMB-" + "".join(secrets.token_hex(3).upper())
-    if Pathogen.objects.filter(cid=cid).exists():
-        cid = generate_cid()
-    return cid
-
-
-class YearMonthField(models.DateField):
-    pass # TODO
+from data.utils import generate_cid, YearMonthField
+import data.config as config
 
 
 class Pathogen(models.Model):
@@ -47,19 +13,19 @@ class Pathogen(models.Model):
     )
     pathogen_code = models.CharField(
         max_length=8,
-        choices=pathogen_codes
+        choices=config.PATHOGEN_CODES
     )
     uploader = models.CharField(
         max_length=8,
-        choices=uploaders,
+        choices=config.UPLOADERS,
     )
     sender_sample_id = models.CharField(max_length=24)
     run_name = models.CharField(max_length=96)
     fasta_path = models.CharField(max_length=200)
     bam_path = models.TextField(max_length=200)
     is_external = models.BooleanField()
-    collection_date = models.DateField()
-    received_date = models.DateField()
+    collection_date = YearMonthField()
+    received_date = YearMonthField()
     published_date = models.DateField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     
@@ -74,7 +40,7 @@ class Mpx(Pathogen):
     fasta_header = models.CharField(max_length=100)
     seq_platform = models.CharField(
         max_length=50,
-        choices=seq_platform_choices
+        choices=config.SEQ_PLATFORM_CHOICES
     )
 
 
@@ -82,5 +48,5 @@ class Covid(Pathogen):
     fasta_header = models.CharField(max_length=100)
     sample_type = models.CharField(
         max_length=50,
-        choices=sample_types
+        choices=config.SAMPLE_TYPES
     )
