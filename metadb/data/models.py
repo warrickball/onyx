@@ -1,35 +1,36 @@
 from django.db import models
+import secrets
 
 
-mpx = "mpx"
-covid = "covid"
 pathogen_codes = [
-    (mpx, "mpx"),
-    (covid, "covid")
+    ("pathogen", "pathogen"), # Used for testing. TODO: This probably shouldn't be here
+    ("mpx", "mpx"),
+    ("covid", "covid")
 ]
 
-birm = "BIRM"
 uploaders = [
-    (birm, "BIRM")
+    ("BIRM", "BIRM")
 ]
 
-swab = "SWAB"
-serum = "SERUM"
 sample_types = [
-    (swab, "SWAB"),
-    (serum, "SERUM")
+    ("SWAB", "SWAB"),
+    ("SERUM", "SERUM")
 ]
 
-illumina = "ILLUMINA"
-oxford_nanopore = "OXFORD_NANOPORE"
-pacific_biosciences = "PACIFIC_BIOSCIENCES"
-ion_torrent = "ION_TORRENT"
 seq_platform_choices = [
-    (illumina, "ILLUMINA"),
-    (oxford_nanopore, "OXFORD_NANOPORE"),
-    (pacific_biosciences, "PACIFIC_BIOSCIENCES"),
-    (ion_torrent, "ION_TORRENT")
+    ("ILLUMINA", "ILLUMINA"),
+    ("OXFORD_NANOPORE", "OXFORD_NANOPORE"),
+    ("PACIFIC_BIOSCIENCES", "PACIFIC_BIOSCIENCES"),
+    ("ION_TORRENT", "ION_TORRENT")
 ]
+
+
+def generate_cid():
+    # cid = "CLIMB-" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    cid = "CLIMB-" + "".join(secrets.token_hex(3).upper())
+    if Pathogen.objects.filter(cid=cid).exists():
+        cid = generate_cid()
+    return cid
 
 
 class YearMonthField(models.DateField):
@@ -38,9 +39,11 @@ class YearMonthField(models.DateField):
 
 class Pathogen(models.Model):
     cid = models.CharField(
-        max_length=128, 
-        unique=True, 
-        null=True
+        default=generate_cid,
+        max_length=12, 
+        unique=True # Creates index for the field. 
+                    # TODO: this could be removed, and with db_index=True, would go from 2*log(N) to log(N) complexity.
+                    # but is that worth the loss of extra validation from unique=True?
     )
     pathogen_code = models.CharField(
         max_length=8,

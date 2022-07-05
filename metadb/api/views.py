@@ -22,10 +22,13 @@ def get_pathogen_model_or_404(pathogen_code):
 
 @api_view(["POST"])
 def create(request):
+    # If a cid was provided, remove it
+    request.data.pop("cid", None)
+
     # Check for provided pathogen_code
     pathogen_code = request.data.get("pathogen_code")
     if not pathogen_code:
-        return Response({"detail" : "no pathogen was provided"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail" : "no pathogen_code was provided"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Get the model
     pathogen_model = get_pathogen_model_or_404(pathogen_code)
