@@ -1,11 +1,14 @@
+# TODO: Should these all be stored in the database
+
 PATHOGEN_CODES = [
-    ("pathogen", "pathogen"), # Used for testing. TODO: This probably shouldn't be here
-    ("mpx", "mpx"),
-    ("covid", "covid")
+    ("PATHOGEN", "PATHOGEN"), # Used for testing. TODO: This probably shouldn't be here
+    ("MPX", "MPX"),
+    ("COVID", "COVID")
 ]
 
 UPLOADERS = [
-    ("BIRM", "BIRM")
+    ("BIRM", "BIRM"),
+    ("BOOM", "BOOM")
 ]
 
 SAMPLE_TYPES = [

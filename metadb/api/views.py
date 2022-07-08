@@ -1,23 +1,30 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.core.exceptions import FieldError
 from django.shortcuts import get_object_or_404
-from api.utils import get_pathogen_model_or_404
+from api.utils import get_pathogen_model_or_404, Responses
 from data.models import Pathogen
 import api.serializers
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def create(request):
     # If a cid was provided, tell them no
     if request.data.get("cid"):
-        return Response({"detail" : "cids are generated internally and cannot be provided"}, status=status.HTTP_403_FORBIDDEN) 
+        return Responses.cannot_provide_cid
+
+    # Check user is the correct uploader
+    # TODO: Probably a better way to do this involving groups or user permissions
+    if request.user.uploader != request.data.get("uploader"):
+        return Responses.is_not_uploader
 
     # Check for provided pathogen_code
     pathogen_code = request.data.get("pathogen_code")
     if not pathogen_code:
-        return Response({"detail" : "no pathogen_code was provided"}, status=status.HTTP_400_BAD_REQUEST)
+        return Responses.no_pathogen_code
 
     # Get the model
     pathogen_model = get_pathogen_model_or_404(pathogen_code)
@@ -34,6 +41,7 @@ def create(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def get(request, pathogen_code):
     # Get the model
     pathogen_model = get_pathogen_model_or_404(pathogen_code)
@@ -43,7 +51,7 @@ def get(request, pathogen_code):
 
     # If an id was provided as a query parameter, tell them no
     if request.query_params.get("id"):
-        return Response({"detail" : "cannot query id field"}, status=status.HTTP_403_FORBIDDEN) 
+        return Responses.cannot_query_id
 
     # For each query param, filter the data
     for field, value in request.query_params.items():
@@ -57,39 +65,8 @@ def get(request, pathogen_code):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@api_view(["PUT", "PATCH"])
-def update(request, pathogen_code, cid):
-    # Get the model
-    pathogen_model = get_pathogen_model_or_404(pathogen_code)
-    
-    # Get the instance to be updated
-    instance = get_object_or_404(pathogen_model, cid=cid)
-    
-    # If a PUT request was sent, check for every field of the model in the request data, and validate each
-    # If a PATCH request was sent, only validate the fields that were provided
-    if request.method == "PUT":
-        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data)
-    else:
-        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
-
-    # If data is valid, update existing record in the database. If invalid, return errors
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    else:
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(["DELETE"])
-def delete(request, pathogen_code, cid):
-    pathogen_model = get_pathogen_model_or_404(pathogen_code)
-    
-    # Attempt to delete object with the provided cid, and return response
-    response = get_object_or_404(pathogen_model, cid=cid).delete()
-    return Response({"detail" : response}, status=status.HTTP_200_OK)
-
-
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def get_cid(request, cid):
     # Get superclass instance of the object with the given cid
     super_instance = get_object_or_404(Pathogen, cid=cid)
@@ -106,6 +83,35 @@ def get_cid(request, cid):
 
 
 @api_view(["PUT", "PATCH"])
+@permission_classes([IsAuthenticated])
+def update(request, pathogen_code, cid):
+    # Get the model
+    pathogen_model = get_pathogen_model_or_404(pathogen_code)
+    
+    # Get the instance to be updated
+    instance = get_object_or_404(pathogen_model, cid=cid)
+    
+    # Check user is the correct uploader
+    if request.user.uploader != instance.uploader:
+        return Responses.is_not_uploader
+
+    # If a PUT request was sent, check for every field of the model in the request data, and validate each
+    # If a PATCH request was sent, only validate the fields that were provided
+    if request.method == "PUT":
+        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data)
+    else:
+        serializer = getattr(api.serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
+
+    # If data is valid, update existing record in the database. If invalid, return errors
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["PUT", "PATCH"])
+@permission_classes([IsAuthenticated])
 def update_cid(request, cid):
     # Get superclass instance of the object with the given cid
     super_instance = get_object_or_404(Pathogen, cid=cid)
@@ -115,6 +121,10 @@ def update_cid(request, cid):
 
     # Find subclass instance for the given cid
     instance = get_object_or_404(pathogen_model, cid=cid)
+
+    # Check user is the correct uploader
+    if request.user.uploader != instance.uploader:
+        return Responses.is_not_uploader
 
     # If a PUT request was sent, check for every field of the model in the request data, and validate each
     # If a PATCH request was sent, only validate the fields that were provided
@@ -132,6 +142,18 @@ def update_cid(request, cid):
 
 
 @api_view(["DELETE"])
+@permission_classes([IsAdminUser])
+def delete(request, pathogen_code, cid):
+    # Get the model for the given cid
+    pathogen_model = get_pathogen_model_or_404(pathogen_code)
+    
+    # Attempt to delete object with the provided cid, and return response
+    response = get_object_or_404(pathogen_model, cid=cid).delete()
+    return Response({"detail" : response}, status=status.HTTP_200_OK)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAdminUser])
 def delete_cid(request, cid):
     # Get superclass instance of the object with the given cid
     super_instance = get_object_or_404(Pathogen, cid=cid)

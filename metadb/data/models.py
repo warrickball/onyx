@@ -3,6 +3,11 @@ from data.utils import generate_cid, YearMonthField
 import data.config as config
 
 
+class Uploader(models.Model):
+    name = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=8, unique=True)
+
+
 class Pathogen(models.Model):
     cid = models.CharField(
         default=generate_cid,
@@ -15,10 +20,7 @@ class Pathogen(models.Model):
         max_length=8,
         choices=config.PATHOGEN_CODES
     )
-    uploader = models.CharField(
-        max_length=8,
-        choices=config.UPLOADERS,
-    )
+    uploader = models.CharField(max_length=8)
     sender_sample_id = models.CharField(max_length=24)
     run_name = models.CharField(max_length=96)
     fasta_path = models.CharField(max_length=200)

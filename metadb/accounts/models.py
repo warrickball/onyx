@@ -4,4 +4,4 @@ from django.db import models
 # Create your models here.
 
 class User(AbstractUser):
-    pass
+    uploader = models.CharField(max_length=8) # TODO: Was somehow able to make blank despite not being so..?

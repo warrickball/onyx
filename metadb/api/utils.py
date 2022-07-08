@@ -1,8 +1,17 @@
-from rest_framework import serializers
+from rest_framework import serializers, status
+from rest_framework.response import Response
 from django.http import Http404
+from django.db.utils import OperationalError
 from datetime import date
 import data.models
 import inspect
+
+
+class Responses:
+    cannot_provide_cid = Response({"detail" : "cids are generated internally and cannot be provided"}, status=status.HTTP_403_FORBIDDEN)
+    is_not_uploader = Response({"detail" : "user cannot create/modify data for this uploader"}, status=status.HTTP_403_FORBIDDEN)
+    no_pathogen_code = Response({"detail" : "no pathogen_code was provided"}, status=status.HTTP_400_BAD_REQUEST)
+    cannot_query_id = Response({"detail" : "cannot query id field"}, status=status.HTTP_403_FORBIDDEN)
 
 
 def get_pathogen_model_or_404(pathogen_code):
@@ -16,7 +25,15 @@ def get_pathogen_model_or_404(pathogen_code):
     raise Http404
 
 
-# TODO: Improve
+def get_choices(model, field):
+    try:
+        choices = list(model.objects.values_list(field, flat=True))
+    except OperationalError:
+        choices = []
+    return choices
+
+
+# TODO: Improve: needs to raise validation errors
 class YearMonthField(serializers.Field):
     def to_representation(self, value):
         year, month, _ = str(value).split("-")

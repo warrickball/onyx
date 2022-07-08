@@ -1,25 +1,25 @@
 from rest_framework import serializers
-from data.models import Pathogen, Mpx, Covid
-from api.utils import YearMonthField
+from data.models import Uploader, Pathogen, Mpx, Covid
+from api.utils import YearMonthField, get_choices
 
 
 class PathogenSerializer(serializers.ModelSerializer):
-    # TODO: do they need to be defined here..?
     collection_date = YearMonthField()
-    received_date = YearMonthField()
+    received_date = YearMonthField() 
+    uploader = serializers.ChoiceField(choices=get_choices(model=Uploader, field="code"))
 
     class Meta:
         model = Pathogen
-        fields = "__all__"
+        exclude = ("id", )
 
 
 class MpxSerializer(PathogenSerializer):
     class Meta:
         model = Mpx
-        fields = "__all__"
+        exclude = ("id", )
     
 
 class CovidSerializer(PathogenSerializer):
     class Meta:
         model = Covid
-        fields = "__all__"
+        exclude = ("id", )
