@@ -6,11 +6,6 @@ PATHOGEN_CODES = [
     ("COVID", "COVID")
 ]
 
-UPLOADERS = [
-    ("BIRM", "BIRM"),
-    ("BOOM", "BOOM")
-]
-
 SAMPLE_TYPES = [
     ("SWAB", "SWAB"),
     ("SERUM", "SERUM")
