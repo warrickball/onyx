@@ -1,12 +1,16 @@
 from django.core.management import base
-from data.models import Uploader
+from ...models import Uploader
 
 
 class Command(base.BaseCommand):
     help = "Add a new uploader."
 
     def add_arguments(self, parser):
-        parser.add_argument("uploader_code")
+        parser.add_argument("-n", "--name")
+        parser.add_argument("-c", "--code")
 
     def handle(self, *args, **options):
-        Uploader.objects.create(uploader_code=options["uploader_code"])
+        Uploader.objects.create(
+            name=options["name"],
+            code=options["code"]
+        )
