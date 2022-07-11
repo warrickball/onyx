@@ -1,0 +1,9 @@
+name: metadb
+channels:
+  - defaults
+dependencies:
+  - pip
+  - pip:
+    - requests
+    - django
+    - djangorestframework
