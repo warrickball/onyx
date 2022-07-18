@@ -1,55 +1,6 @@
 from django.db import models
-from django.utils.dateparse import parse_date
-from django.utils.translation import gettext_lazy as _
-from django.core.exceptions import ValidationError
-from datetime import date, datetime
+from utils.fields import YearMonthField
 from secrets import token_hex
-from . import config
-
-
-# TODO: Improve and test
-class YearMonthField(models.DateField):
-    '''
-    Minimal override of DateField to support YYYY-MM format.
-    '''
-    default_error_messages = {
-        "invalid": _(
-            "“%(value)s” value has an invalid date format. It must be "
-            "in YYYY-MM format."
-        ),
-        "invalid_date": _(
-            "“%(value)s” value has the correct format (YYYY-MM) "
-            "but it is an invalid date."
-        ),
-    }
-    description = _("Date (without time OR day)")
-
-    def to_python(self, value):
-        if value is None:
-            return value
-
-        if isinstance(value, date):
-            return value
-
-        if isinstance(value, datetime):
-            return value.date()
-
-        if isinstance(value, str):
-            try:
-                parsed = parse_date(value + "-01")
-                if parsed is not None:
-                    return parsed
-            except ValueError:
-                raise ValidationError(
-                    self.error_messages["invalid_date"],
-                    code="invalid_date",
-                    params={"value": value},
-                )
-        raise ValidationError(
-            self.error_messages["invalid"],
-            code="invalid",
-            params={"value": value},
-        )     
 
 
 def generate_cid():
@@ -57,11 +8,6 @@ def generate_cid():
     if Pathogen.objects.filter(cid=cid).exists():
         cid = generate_cid()
     return cid
-
-
-class Uploader(models.Model):
-    name = models.CharField(max_length=20, unique=True)
-    code = models.CharField(max_length=8, unique=True)
 
 
 class Pathogen(models.Model):
@@ -74,9 +20,12 @@ class Pathogen(models.Model):
     )
     pathogen_code = models.CharField(
         max_length=8,
-        choices=config.PATHOGEN_CODES
+        choices=[
+            ("MPX", "MPX"),
+            ("COVID", "COVID")
+        ]
     )
-    uploader = models.CharField(max_length=8)
+    institute = models.CharField(max_length=10)
     sender_sample_id = models.CharField(max_length=24)
     run_name = models.CharField(max_length=96)
     fasta_path = models.CharField(max_length=200)
@@ -98,7 +47,12 @@ class Mpx(Pathogen):
     fasta_header = models.CharField(max_length=100)
     seq_platform = models.CharField(
         max_length=50,
-        choices=config.SEQ_PLATFORM_CHOICES
+        choices=[
+            ("ILLUMINA", "ILLUMINA"),
+            ("OXFORD_NANOPORE", "OXFORD_NANOPORE"),
+            ("PACIFIC_BIOSCIENCES", "PACIFIC_BIOSCIENCES"),
+            ("ION_TORRENT", "ION_TORRENT")
+        ]
     )
 
 
@@ -106,5 +60,10 @@ class Covid(Pathogen):
     fasta_header = models.CharField(max_length=100)
     sample_type = models.CharField(
         max_length=50,
-        choices=config.SAMPLE_TYPES
+        choices=[
+            ("SWAB", "SWAB"),
+            ("SERUM", "SERUM")
+        ]
     )
+
+

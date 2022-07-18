@@ -6,19 +6,19 @@ from django.core.exceptions import FieldError
 from django.shortcuts import get_object_or_404
 from django.http import Http404
 from . import serializers, models # TODO: I think this is slower than a direct import cause it doesn't scan the entire module at this stage
-from accounts.views import IsUploaderApproved
+from accounts.views import IsApproved
 import inspect
 
 
 # TODO: move this
 class Responses:
     # Bad request
-    no_uploader = Response({"detail" : "no uploader was provided"}, status=status.HTTP_400_BAD_REQUEST)
+    no_institute = Response({"detail" : "no institute was provided"}, status=status.HTTP_400_BAD_REQUEST)
     no_pathogen_code = Response({"detail" : "no pathogen_code was provided"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Forbidden
     cannot_provide_cid = Response({"detail" : "cids are generated internally and cannot be provided"}, status=status.HTTP_403_FORBIDDEN)
-    cannot_be_uploader = Response({"detail" : "user cannot create/modify data for this uploader"}, status=status.HTTP_403_FORBIDDEN)
+    cannot_be_institute = Response({"detail" : "user cannot create/modify data for this institute"}, status=status.HTTP_403_FORBIDDEN)
     cannot_query_id = Response({"detail" : "cannot query id field"}, status=status.HTTP_403_FORBIDDEN)
 
 
@@ -34,21 +34,21 @@ def get_pathogen_model_or_404(pathogen_code):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated, IsUploaderApproved])
+@permission_classes([IsAuthenticated, IsApproved])
 def create(request):
     # If a cid was provided, tell them no
     if request.data.get("cid"):
         return Responses.cannot_provide_cid
 
-    # Check if an uploader was provided
-    uploader = request.data.get("uploader")
-    if not uploader:
-        return Responses.no_uploader
+    # Check if an institute was provided
+    institute = request.data.get("institute")
+    if not institute:
+        return Responses.no_institute
 
-    # Check user is the correct uploader
+    # Check user is the correct institute
     # TODO: Probably a better way to do this involving groups or user permissions
-    if request.user.uploader != uploader:
-        return Responses.cannot_be_uploader
+    if request.user.institute != institute:
+        return Responses.cannot_be_institute
 
     # Check for provided pathogen_code
     pathogen_code = request.data.get("pathogen_code")
@@ -70,7 +70,7 @@ def create(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsUploaderApproved])
+@permission_classes([IsAuthenticated, IsApproved])
 def get(request, pathogen_code):
     # Get the model
     pathogen_model = get_pathogen_model_or_404(pathogen_code)
@@ -95,7 +95,7 @@ def get(request, pathogen_code):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsUploaderApproved])
+@permission_classes([IsAuthenticated, IsApproved])
 def get_cid(request, cid):
     # Get superclass instance of the object with the given cid
     super_instance = get_object_or_404(models.Pathogen, cid=cid)
@@ -112,7 +112,7 @@ def get_cid(request, cid):
 
 
 @api_view(["PUT", "PATCH"])
-@permission_classes([IsAuthenticated, IsUploaderApproved])
+@permission_classes([IsAuthenticated, IsApproved])
 def update(request, pathogen_code, cid):
     # Get the model
     pathogen_model = get_pathogen_model_or_404(pathogen_code)
@@ -120,9 +120,9 @@ def update(request, pathogen_code, cid):
     # Get the instance to be updated
     instance = get_object_or_404(pathogen_model, cid=cid)
     
-    # Check user is the correct uploader
-    if request.user.uploader != instance.uploader:
-        return Responses.cannot_be_uploader
+    # Check user is the correct institute
+    if request.user.institute != instance.institute:
+        return Responses.cannot_be_institute
 
     # If a PUT request was sent, check for every field of the model in the request data, and validate each
     # If a PATCH request was sent, only validate the fields that were provided
@@ -140,7 +140,7 @@ def update(request, pathogen_code, cid):
 
 
 @api_view(["PUT", "PATCH"])
-@permission_classes([IsAuthenticated, IsUploaderApproved])
+@permission_classes([IsAuthenticated, IsApproved])
 def update_cid(request, cid):
     # Get superclass instance of the object with the given cid
     super_instance = get_object_or_404(models.Pathogen, cid=cid)
@@ -151,9 +151,9 @@ def update_cid(request, cid):
     # Find subclass instance for the given cid
     instance = get_object_or_404(pathogen_model, cid=cid)
 
-    # Check user is the correct uploader
-    if request.user.uploader != instance.uploader:
-        return Responses.cannot_be_uploader
+    # Check user is the correct institute
+    if request.user.institute != instance.institute:
+        return Responses.cannot_be_institute
 
     # If a PUT request was sent, check for every field of the model in the request data, and validate each
     # If a PATCH request was sent, only validate the fields that were provided

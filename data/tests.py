@@ -7,7 +7,7 @@ class CreatePathogenTestCase(APITestCase):
         Pathogen.objects.create(
             cid="C-01234",
             pathogen_code="pathogen",
-            uploader="BIRM",
+            institute="BIRM",
             sender_sample_id="sample1",
             run_name="run1",
             fasta_path="fastapath",
@@ -24,7 +24,7 @@ class CreatePathogenTestCase(APITestCase):
             {
                 "cid" : "C-56789",
                 "pathogen_code" : "pathogen",
-                "uploader" : "BIRM",
+                "institute" : "BIRM",
                 "sender_sample_id" : "sample2",
                 "run_name" : "run1",
                 "fasta_path" : "fastapath",
@@ -43,7 +43,7 @@ class CreatePathogenTestCase(APITestCase):
             {
                 "cid" : "C-01234",
                 "pathogen_code" : "pathogen",
-                "uploader" : "BIRM",
+                "institute" : "BIRM",
                 "sender_sample_id" : "sample1",
                 "run_name" : "run1",
                 "fasta_path" : "fastapath",
@@ -63,7 +63,7 @@ class GetPathogenTestCase(APITestCase):
         Pathogen.objects.create(
             cid="C-01234",
             pathogen_code="pathogen",
-            uploader="BIRM",
+            institute="BIRM",
             sender_sample_id="sample1",
             run_name="run1",
             fasta_path="fastapath",
@@ -75,7 +75,7 @@ class GetPathogenTestCase(APITestCase):
         Pathogen.objects.create(
             cid="C-56789",
             pathogen_code="pathogen",
-            uploader="BIRM",
+            institute="BIRM",
             sender_sample_id="sample2",
             run_name="run1",
             fasta_path="fastapath",
@@ -99,11 +99,11 @@ class GetPathogenTestCase(APITestCase):
         assert response.status_code == 200
         assert len(response.json()) == 1
 
-        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?uploader=BIRM")
+        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?institute=BIRM")
         assert response.status_code == 200
         assert len(response.json()) == 2
 
-        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?uploader=BIRM&sender_sample_id=sample2")
+        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?institute=BIRM&sender_sample_id=sample2")
         assert response.status_code == 200
         assert len(response.json()) == 1
 
@@ -135,7 +135,7 @@ class UpdatePathogenTestCase(APITestCase):
         Pathogen.objects.create(
             cid="C-01234",
             pathogen_code="pathogen",
-            uploader="BIRM",
+            institute="BIRM",
             sender_sample_id="sample1",
             run_name="run1",
             fasta_path="fastapath",
@@ -237,7 +237,7 @@ class DeletePathogenTestCase(APITestCase):
         Pathogen.objects.create(
             cid="C-01234",
             pathogen_code="pathogen",
-            uploader="BIRM",
+            institute="BIRM",
             sender_sample_id="sample1",
             run_name="run1",
             fasta_path="fastapath",
