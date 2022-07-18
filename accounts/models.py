@@ -4,7 +4,11 @@ from django.db import models
 # Create your models here.
 
 class User(AbstractUser):
-    # TODO: (maybe) Make uploader foreign key
-    uploader = models.CharField(max_length=8) # TODO: Was somehow able to make blank despite not being so..?
-    is_uploader_approved = models.BooleanField(default=False)
-    is_uploader_authority = models.BooleanField(default=False)
+    institute = models.CharField(max_length=10) # TODO: Make foreignkey. At the moment, there is no verification of this code
+    is_approved = models.BooleanField(default=False)
+    is_authority = models.BooleanField(default=False)
+
+
+class Institute(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=10, unique=True)

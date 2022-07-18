@@ -8,56 +8,75 @@ from .serializers import UserSerializer
 
 
 class Responses:
+    # OK
+    user_approved = Response({"detail" : f"user was successfully approved"}, status=status.HTTP_200_OK)
+
     # Forbidden
-    cannot_approve_user_diff_uploader = Response({"detail" : "cannot approve this user. they belong to a different uploader"}, status=status.HTTP_403_FORBIDDEN)
+    different_institute = Response({"detail" : "cannot approve this user. they belong to a different institute"}, status=status.HTTP_403_FORBIDDEN)
 
 
-class IsUploaderApproved(permissions.BasePermission):
+class IsApproved(permissions.BasePermission):
     '''
-    Allows access only to uploader approved users.
+    Allows access only to users that have been approved by an authority for their institute.
     '''
-    message = "You must be uploader approved to perform this action."
+    message = "To perform this action, you need to be approved by an authority from your institute."
 
     def has_permission(self, request, view):
-            return request.user.is_uploader_approved
+            return request.user.is_approved
 
 
-class IsUploaderAuthority(permissions.BasePermission):
+class IsAuthority(permissions.BasePermission):
     '''
-    Allows access only to users that can uploader approve other users.
+    Allows access only to users who are an authority for their institute.
     '''
+    message = "To perform this action, you need to be granted permission by an admin."
+
     def has_permission(self, request, view):
-            return request.user.is_uploader_authority
+            return request.user.is_authority
 
 
 class CreateUserView(CreateAPIView):
+    '''
+    Create a user.
+    '''
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [
-        permissions.AllowAny
-    ]
+    permission_classes = [permissions.AllowAny]
 
 
 class ListUserView(ListAPIView):
+    '''
+    List all users in the institute of the requesting user.
+    '''
     serializer_class = UserSerializer
-    permission_classes = [
-        # permissions.IsAdminUser,
-        permissions.IsAuthenticated,
-        IsUploaderApproved
-    ]
+    permission_classes = [permissions.IsAuthenticated, IsApproved]
 
     def get_queryset(self):
-        return User.objects.filter(uploader=self.request.user.uploader).order_by('-date_joined') # type: ignore
+        return User.objects.filter(institute=self.request.user.institute).order_by('-date_joined') # type: ignore
+
+
+class ListAllUserView(ListAPIView):
+    '''
+    List all users.
+    '''
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return User.objects.order_by('-date_joined')
 
 
 @api_view(["PATCH"])
-@permission_classes([permissions.IsAuthenticated, IsUploaderApproved, IsUploaderAuthority])
+@permission_classes([permissions.IsAuthenticated, IsApproved, IsAuthority])
 def approve(request, username):
-    user = get_object_or_404(User, username=username)
+    # Get user to be approved
+    target_user = get_object_or_404(User, username=username)
 
-    if request.user.uploader != user.uploader:
-        return Responses.cannot_approve_user_diff_uploader
+    # Check that request user is in the same institute as the target user
+    if request.user.institute != target_user.institute:
+        return Responses.different_institute
 
-    user.is_uploader_approved = True
-    user.save()
-    return Response({"detail" : f"{user.username} has been sucessfully approved"}, status=status.HTTP_200_OK)
+    # Approve target user
+    target_user.is_approved = True
+    target_user.save()
+    return Responses.user_approved
