@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.pagination import PageNumberPagination
 from django.core.exceptions import FieldError
 from django.shortcuts import get_object_or_404
 from django.http import Http404
@@ -84,14 +85,25 @@ def get(request, pathogen_code):
 
     # For each query param, filter the data
     for field, value in request.query_params.items():
-        try:
-            instances = instances.filter(**{field : value})
-        except FieldError as e:
-            return Response({"detail" : str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        if field != "page": # TODO: it works but its a bit crude
+            try:
+                instances = instances.filter(**{field : value})
+            except FieldError as e:
+                return Response({"detail" : str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
+    # Ensure results are ordered before paginating
+    # Results are returned in ascending id order
+    instances = instances.order_by("id")
+
+    # Paginate the response
+    paginator = PageNumberPagination()
+    paginator.page_size = 500 # TODO: appropriate page size? Where to keep this?
+    result_page = paginator.paginate_queryset(instances, request)
+
     # Serialize the filtered data and then return it
-    serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(instances, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(result_page, many=True)
+    
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(["GET"])

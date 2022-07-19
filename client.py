@@ -252,10 +252,11 @@ class Client:
         return username, password, tokens
 
 
-    def handle_tokens_request(self, method, url, body, username, password, tokens):
+    def handle_tokens_request(self, method, url, params, body, username, password, tokens):
         response = method(
             url=url,
             headers={"Authorization": "Bearer {}".format(tokens["access"])},
+            params=params,
             json=body
         )
 
@@ -277,6 +278,7 @@ class Client:
             response = method(
                 url=url,
                 headers={"Authorization": "Bearer {}".format(tokens["access"])},
+                params=params,
                 json=body
             )
 
@@ -300,6 +302,7 @@ class Client:
                 response, tokens = self.handle_tokens_request(
                     method=requests.post,
                     url=self.endpoints["create"],
+                    params={},
                     body=record,
                     username=username,
                     password=password,
@@ -315,23 +318,38 @@ class Client:
 
     def get(self):
         username, password, tokens = self.get_login_details()
+        params = {f : v for f, v in self.args.filter}
+        page = 1
+        params["page"] = page # type: ignore
         response, tokens = self.handle_tokens_request(
             method=requests.get,
             url=self.endpoints["get"] + f"{self.args.pathogen_code}/",
+            params=params,
             body={},
             username=username,
             password=password,
             tokens=tokens
         )
-        if response.ok:
-            table = pd.json_normalize(response.json())
-            table = table.reindex(sorted(table.columns), axis=1)
-            print(table.to_csv(index=False, sep='\t'), end='')
-        else:
-            print(self.format_response(response))
+        table = pd.json_normalize(response.json()["results"])
+        print(table.to_csv(index=False, sep='\t'), end='')
+
+        while response.json()["next"] is not None:
+            page += 1
+            params["page"] = page # type: ignore
+            response, tokens = self.handle_tokens_request(
+                method=requests.get,
+                url=self.endpoints["get"] + f"{self.args.pathogen_code}/",
+                params=params,
+                body={},
+                username=username,
+                password=password,
+                tokens=tokens
+            )            
+            table = pd.json_normalize(response.json()["results"])
+            print(table.to_csv(index=False, sep='\t', header=False), end='')
+
         if username in self.config["users"]:
             self.dump_tokens(username, tokens)
-
 
 
 def main():
@@ -348,6 +366,7 @@ def main():
 
     get_parser = command.add_parser("get")
     get_parser.add_argument("pathogen_code")
+    get_parser.add_argument("-f", "--filter", nargs=2, action="append", metavar=("ARGUMENT" "VALUE"))
     get_parser.add_argument("-u", "--user")
 
     args = parser.parse_args()
