@@ -13,8 +13,8 @@ class CreatePathogenTestCase(APITestCase):
             fasta_path="fastapath",
             bam_path="bampath",
             is_external=True,
-            collection_date="2022-01-01",
-            received_date="2022-01-02"
+            collection_month="2022-01-01",
+            received_month="2022-01-02"
         )
         self.endpoint = "/api/create/"
     
@@ -30,8 +30,8 @@ class CreatePathogenTestCase(APITestCase):
                 "fasta_path" : "fastapath",
                 "bam_path" : "bampath",
                 "is_external" : False,
-                "collection_date" : "2022-04-03",
-                "received_date" : "2022-01-09"
+                "collection_month" : "2022-04-03",
+                "received_month" : "2022-01-09"
             },
             format="json"
         )
@@ -49,8 +49,8 @@ class CreatePathogenTestCase(APITestCase):
                 "fasta_path" : "fastapath",
                 "bam_path" : "bampath",
                 "is_external" : True,
-                "collection_date" : "2022-01-01",
-                "received_date" : "2022-01-02"
+                "collection_month" : "2022-01-01",
+                "received_month" : "2022-01-02"
             },
             format="json"
         )
@@ -69,8 +69,8 @@ class GetPathogenTestCase(APITestCase):
             fasta_path="fastapath",
             bam_path="bampath",
             is_external=True,
-            collection_date="2022-01-01",
-            received_date="2022-01-02"
+            collection_month="2022-01-01",
+            received_month="2022-01-02"
         )
         Pathogen.objects.create(
             cid="C-56789",
@@ -81,8 +81,8 @@ class GetPathogenTestCase(APITestCase):
             fasta_path="fastapath",
             bam_path="bampath",
             is_external=False,
-            collection_date="2022-04-03",
-            received_date="2022-01-09"
+            collection_month="2022-04-03",
+            received_month="2022-01-09"
         )
         self.pathogen_endpoint = "/api/get"
         self.cid_endpoint = "/api/cid/get"
@@ -107,15 +107,15 @@ class GetPathogenTestCase(APITestCase):
         assert response.status_code == 200
         assert len(response.json()) == 1
 
-        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?collection_date__lte=2022-04-04")
+        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?collection_month__lte=2022-04-04")
         assert response.status_code == 200
         assert len(response.json()) == 2
 
-        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?collection_date__lte=2022-04-02")
+        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?collection_month__lte=2022-04-02")
         assert response.status_code == 200
         assert len(response.json()) == 1
 
-        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?collection_date__lte=2021-12-31")
+        response = self.client.get(f"{self.pathogen_endpoint}/pathogen/?collection_month__lte=2021-12-31")
         assert response.status_code == 200
         assert len(response.json()) == 0
 
@@ -141,8 +141,8 @@ class UpdatePathogenTestCase(APITestCase):
             fasta_path="fastapath",
             bam_path="bampath",
             is_external=True,
-            collection_date="2022-01-01",
-            received_date="2022-01-02"
+            collection_month="2022-01-01",
+            received_month="2022-01-02"
         )
         self.pathogen_endpoint = "/api/update"
         self.cid_endpoint = "/api/cid/update"
@@ -243,8 +243,8 @@ class DeletePathogenTestCase(APITestCase):
             fasta_path="fastapath",
             bam_path="bampath",
             is_external=True,
-            collection_date="2022-01-01",
-            received_date="2022-01-02"
+            collection_month="2022-01-01",
+            received_month="2022-01-02"
         )
         self.pathogen_endpoint = "/api/delete"
         self.cid_endpoint = "/api/cid/delete"

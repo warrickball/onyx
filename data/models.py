@@ -14,9 +14,7 @@ class Pathogen(models.Model):
     cid = models.CharField(
         default=generate_cid,
         max_length=12, 
-        unique=True # Creates index for the field. 
-                    # TODO: this could be removed, and with db_index=True, would go from 2*log(N) to log(N) complexity.
-                    # but is that worth the loss of extra validation from unique=True?
+        unique=True
     )
     pathogen_code = models.CharField(
         max_length=8,
@@ -31,9 +29,10 @@ class Pathogen(models.Model):
     fasta_path = models.CharField(max_length=200)
     bam_path = models.TextField(max_length=200)
     is_external = models.BooleanField()
-    collection_date = YearMonthField()
-    received_date = YearMonthField()
+    collection_month = YearMonthField()
+    received_month = YearMonthField()
     published_date = models.DateField(auto_now_add=True)
+    created = models.DateTimeField(auto_now_add=True) # TODO: get rid of published_date?
     last_modified = models.DateTimeField(auto_now=True)
     
     class Meta:

@@ -5,23 +5,26 @@ from utils.functions import get_choices
 from utils.fieldserializers import YearMonthField
 
 
+EXCLUDED_FIELDS = ("id", "created", "last_modified")
+
+
 class PathogenSerializer(serializers.ModelSerializer):
-    collection_date = YearMonthField()
-    received_date = YearMonthField() 
+    collection_month = YearMonthField()
+    received_month = YearMonthField() 
     institute = serializers.ChoiceField(choices=get_choices(model=Institute, field="code"))
 
     class Meta:
         model = Pathogen
-        exclude = ("id", )
+        exclude = EXCLUDED_FIELDS
 
 
 class MpxSerializer(PathogenSerializer):
     class Meta:
         model = Mpx
-        exclude = ("id", )
+        exclude = EXCLUDED_FIELDS
     
 
 class CovidSerializer(PathogenSerializer):
     class Meta:
         model = Covid
-        exclude = ("id", )
+        exclude = EXCLUDED_FIELDS

@@ -2,25 +2,15 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import CursorPagination
 from django.core.exceptions import FieldError
 from django.shortcuts import get_object_or_404
 from django.http import Http404
-from . import serializers, models # TODO: I think this is slower than a direct import cause it doesn't scan the entire module at this stage
+from . import serializers, models
+from .models import Pathogen
 from accounts.views import IsApproved
+from utils.responses import Responses
 import inspect
-
-
-# TODO: move this
-class Responses:
-    # Bad request
-    no_institute = Response({"detail" : "no institute was provided"}, status=status.HTTP_400_BAD_REQUEST)
-    no_pathogen_code = Response({"detail" : "no pathogen_code was provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Forbidden
-    cannot_provide_cid = Response({"detail" : "cids are generated internally and cannot be provided"}, status=status.HTTP_403_FORBIDDEN)
-    cannot_be_institute = Response({"detail" : "user cannot create/modify data for this institute"}, status=status.HTTP_403_FORBIDDEN)
-    cannot_query_id = Response({"detail" : "cannot query id field"}, status=status.HTTP_403_FORBIDDEN)
 
 
 def get_pathogen_model_or_404(pathogen_code):
@@ -85,19 +75,18 @@ def get(request, pathogen_code):
 
     # For each query param, filter the data
     for field, value in request.query_params.items():
-        if field != "page": # TODO: it works but its a bit crude
+        if field != "cursor": # TODO: it works but its a bit crude
             try:
                 instances = instances.filter(**{field : value})
             except FieldError as e:
                 return Response({"detail" : str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
-    # Ensure results are ordered before paginating
-    # Results are returned in ascending id order
+    # Paginate the response 
+    # TODO: Read up exactly how cursor pagination works and how it should be done
     instances = instances.order_by("id")
-
-    # Paginate the response
-    paginator = PageNumberPagination()
-    paginator.page_size = 500 # TODO: appropriate page size? Where to keep this?
+    paginator = CursorPagination()
+    paginator.ordering = "created"
+    paginator.page_size = 10000
     result_page = paginator.paginate_queryset(instances, request)
 
     # Serialize the filtered data and then return it
@@ -110,7 +99,7 @@ def get(request, pathogen_code):
 @permission_classes([IsAuthenticated, IsApproved])
 def get_cid(request, cid):
     # Get superclass instance of the object with the given cid
-    super_instance = get_object_or_404(models.Pathogen, cid=cid)
+    super_instance = get_object_or_404(Pathogen, cid=cid)
 
     # Get the model for the given cid
     pathogen_model = get_pathogen_model_or_404(super_instance.pathogen_code)
@@ -155,7 +144,7 @@ def update(request, pathogen_code, cid):
 @permission_classes([IsAuthenticated, IsApproved])
 def update_cid(request, cid):
     # Get superclass instance of the object with the given cid
-    super_instance = get_object_or_404(models.Pathogen, cid=cid)
+    super_instance = get_object_or_404(Pathogen, cid=cid)
 
     # Get the model for the given cid
     pathogen_model = get_pathogen_model_or_404(super_instance.pathogen_code)
@@ -197,7 +186,7 @@ def delete(request, pathogen_code, cid):
 @permission_classes([IsAdminUser])
 def delete_cid(request, cid):
     # Get superclass instance of the object with the given cid
-    super_instance = get_object_or_404(models.Pathogen, cid=cid)
+    super_instance = get_object_or_404(Pathogen, cid=cid)
 
     # Get the model for the given cid
     pathogen_model = get_pathogen_model_or_404(super_instance.pathogen_code)
