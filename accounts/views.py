@@ -1,18 +1,10 @@
-from rest_framework import status, permissions
-from rest_framework.response import Response
+from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import CreateAPIView, ListAPIView
 from django.shortcuts import get_object_or_404
 from .models import User
 from .serializers import UserSerializer
-
-
-class Responses:
-    # OK
-    user_approved = Response({"detail" : f"user was successfully approved"}, status=status.HTTP_200_OK)
-
-    # Forbidden
-    different_institute = Response({"detail" : "cannot approve this user. they belong to a different institute"}, status=status.HTTP_403_FORBIDDEN)
+from utils.responses import Responses
 
 
 class IsApproved(permissions.BasePermission):
