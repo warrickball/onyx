@@ -19,7 +19,7 @@ class Client:
     USER_FIELDS = ["password", "tokens"]
 
     def __init__(self, args):
-        if args.command != "setup":
+        if args.command != "makeconfig":
             # Locate the config
             config_dir_path, config_file_path = self.locate_config()
 
@@ -40,7 +40,7 @@ class Client:
                 "token-pair" : f"{self.url}/auth/token-pair/",
                 "token-refresh" : f"{self.url}/auth/token-refresh/",
                 "register" : f"{self.url}/accounts/register/",
-                "create" : f"{self.url}/data/create/",
+                "upload" : f"{self.url}/data/create/",
                 "get" : f"{self.url}/data/get/"
             }
 
@@ -111,102 +111,6 @@ class Client:
             except ValueError:
                 value = None
         return value
-
-
-    def setup(self):
-        '''
-        Generate the config directory and config file.
-        '''
-        host = self.get_input("host")
-        port = self.get_input("port", type=int)
-        config_dir_location = self.get_input("location to create a config directory")
-        config_dir_location = config_dir_location.replace("~", os.path.expanduser("~"))
-        if not os.path.isdir(config_dir_location):
-            raise FileNotFoundError(f"No such directory: {config_dir_location}")
-
-        config_dir_path = os.path.join(config_dir_location, Client.CONFIG_DIR_NAME)
-        if not os.path.isdir(config_dir_path):
-            os.mkdir(config_dir_path)
-        os.chmod(config_dir_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-        
-        config_file_path = os.path.join(config_dir_path, Client.CONFIG_FILE_NAME)
-        with open(config_file_path, "w") as config_file:
-            json.dump(
-                {
-                    "host" : host,
-                    "port" : port,
-                    "users" : {},
-                    "default_user" : None
-                },
-                config_file, 
-                indent=4
-            )
-        os.chmod(config_file_path, stat.S_IRUSR | stat.S_IWUSR)
-
-        print("")
-        print("Config directory and config file created successfully.")
-        print(f"Please create the following environment variable by typing the following in your shell:") 
-        print("")
-        print(f"export METADB_CONFIG_DIR={config_dir_path}")
-        print("")
-        warning_message = [
-            "Your config directory stores sensitive information such as user passwords and tokens.",
-            "The config directory (and files within) have been created with the permissions needed to keep your information safe.",
-            "DO NOT CHANGE THESE PERMISSIONS. Doing so may allow other users to read your passwords and tokens!"
-        ]
-        message_width = max([len(x) for x in warning_message])
-        print("IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(message_width, "!"))
-        for line in warning_message:
-            print(line)
-        print("!" * message_width)
-
-
-    def register(self):
-        username = self.get_input("username")
-        email = self.get_input("email address")
-        institute = self.get_input("institute code")
-        
-        match = False
-        while not match:
-            password = self.get_input("password", password=True)
-            password2 = self.get_input("password (again)", password=True)
-            if password == password2:
-                match = True
-            else:
-                print("Passwords do not match. Please try again.")
-        
-        response = requests.post(
-            self.endpoints["register"],
-            json={
-                "username" : username,
-                "password" : password, # type: ignore
-                "email" : email,
-                "institute" : institute
-            }
-        )
-
-        print(self.format_response(response))
-        
-        if response.ok:
-            print("Account created successfully.")
-            tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
-            self.config["users"][username] = {
-                "password" : password, # type: ignore
-                "tokens" : tokens_path
-            }
-            if len(self.config["users"]) == 1:
-                self.config["default_user"] = username
-            
-            # TODO: Probably has issues if using the same client in multiple places
-            with open(self.config_file_path, "w") as config:
-                json.dump(self.config, config, indent=4)
-            
-            with open(tokens_path, "w") as tokens:
-                json.dump({"access" : None, "refresh" : None}, tokens, indent=4)
-            
-            os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
-
-            print("The user has been added to the config.")
 
 
     def request_token_pair(self, username, password):
@@ -350,7 +254,110 @@ class Client:
             json.dump(tokens, tokens_file, indent=4)
 
 
-    def create(self):
+    def makeconfig(self):
+        '''
+        Generate the config directory and config file.
+        '''
+        host = self.get_input("host")
+        port = self.get_input("port", type=int)
+        config_dir_location = self.get_input("location to create a config directory")
+        config_dir_location = config_dir_location.replace("~", os.path.expanduser("~"))
+        if not os.path.isdir(config_dir_location):
+            raise FileNotFoundError(f"No such directory: {config_dir_location}")
+
+        config_dir_path = os.path.join(config_dir_location, Client.CONFIG_DIR_NAME)
+        if not os.path.isdir(config_dir_path):
+            os.mkdir(config_dir_path)
+        os.chmod(config_dir_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        
+        config_file_path = os.path.join(config_dir_path, Client.CONFIG_FILE_NAME)
+        with open(config_file_path, "w") as config_file:
+            json.dump(
+                {
+                    "host" : host,
+                    "port" : port,
+                    "users" : {},
+                    "default_user" : None
+                },
+                config_file, 
+                indent=4
+            )
+        os.chmod(config_file_path, stat.S_IRUSR | stat.S_IWUSR)
+
+        print("")
+        print("Config directory and config file created successfully.")
+        print(f"Please create the following environment variable by typing the following in your shell:") 
+        print("")
+        print(f"export METADB_CONFIG_DIR={config_dir_path}")
+        print("")
+        warning_message = [
+            "Your config directory stores sensitive information such as user passwords and tokens.",
+            "The config directory (and files within) have been created with the permissions needed to keep your information safe.",
+            "DO NOT CHANGE THESE PERMISSIONS. Doing so may allow other users to read your passwords and tokens!"
+        ]
+        message_width = max([len(x) for x in warning_message])
+        print("IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(message_width, "!"))
+        for line in warning_message:
+            print(line)
+        print("!" * message_width)
+
+
+    def register(self):
+        '''
+        Create a new user.
+        '''
+        username = self.get_input("username")
+        email = self.get_input("email address")
+        institute = self.get_input("institute code")
+        
+        match = False
+        while not match:
+            password = self.get_input("password", password=True)
+            password2 = self.get_input("password (again)", password=True)
+            if password == password2:
+                match = True
+            else:
+                print("Passwords do not match. Please try again.")
+        
+        response = requests.post(
+            self.endpoints["register"],
+            json={
+                "username" : username,
+                "password" : password, # type: ignore
+                "email" : email,
+                "institute" : institute
+            }
+        )
+
+        print(self.format_response(response))
+        
+        if response.ok:
+            print("Account created successfully.")
+            tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
+            self.config["users"][username] = {
+                "password" : password, # type: ignore
+                "tokens" : tokens_path
+            }
+            if len(self.config["users"]) == 1:
+                self.config["default_user"] = username
+            
+            # TODO: Probably has issues if using the same client in multiple places
+            with open(self.config_file_path, "w") as config:
+                json.dump(self.config, config, indent=4)
+            
+            with open(tokens_path, "w") as tokens:
+                json.dump({"access" : None, "refresh" : None}, tokens, indent=4)
+            
+            os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
+
+            print("The user has been added to the config.")
+
+
+
+    def upload(self):
+        '''
+        Post new records (contained in a `.tsv` file) to the database.
+        '''
         username, password, tokens = self.get_login_details()
         if self.args.tsv == '-':
             tsv = sys.stdin
@@ -361,7 +368,7 @@ class Client:
             for record in reader:
                 response, tokens = self.handle_tokens_request(
                     method=requests.post,
-                    url=self.endpoints["create"],
+                    url=self.endpoints["upload"],
                     params={},
                     body=record,
                     username=username,
@@ -377,6 +384,9 @@ class Client:
 
 
     def get(self):
+        '''
+        Get records from the database. 
+        '''
         username, password, tokens = self.get_login_details()
         
         if self.args.filter is not None:
@@ -423,8 +433,8 @@ def main():
     command = parser.add_subparsers(dest="command")
     setup_parser = command.add_parser("makeconfig")
     register_parser = command.add_parser("register")
-    create_parser = command.add_parser("create", parents=[user_parser])
-    create_parser.add_argument("tsv")
+    upload_parser = command.add_parser("upload", parents=[user_parser])
+    upload_parser.add_argument("tsv")
     get_parser = command.add_parser("get", parents=[user_parser])
     get_parser.add_argument("pathogen_code")
     get_parser.add_argument("-f", "--filter", nargs=2, action="append", metavar=("FIELD", "VALUE"))
