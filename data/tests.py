@@ -2,6 +2,9 @@ from rest_framework.test import APITestCase
 from .models import Pathogen
 
 
+# TODO: These tests are now useless. need new ones
+
+
 class CreatePathogenTestCase(APITestCase):
     def setUp(self):
         Pathogen.objects.create(

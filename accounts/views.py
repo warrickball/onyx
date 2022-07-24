@@ -65,7 +65,7 @@ def approve(request, username):
     target_user = get_object_or_404(User, username=username)
 
     # Check that request user is in the same institute as the target user
-    if request.user.institute != target_user.institute:
+    if request.user.institute.code != target_user.institute.code:
         return Responses.different_institute
 
     # Approve target user

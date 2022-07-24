@@ -38,7 +38,7 @@ def create(request):
 
     # Check user is the correct institute
     # TODO: Probably a better way to do this involving groups or user permissions
-    if request.user.institute != institute:
+    if request.user.institute.code != institute:
         return Responses.cannot_be_institute
 
     # Check for provided pathogen_code
@@ -122,7 +122,7 @@ def update(request, pathogen_code, cid):
     instance = get_object_or_404(pathogen_model, cid=cid)
     
     # Check user is the correct institute
-    if request.user.institute != instance.institute:
+    if request.user.institute.code != instance.institute.code:
         return Responses.cannot_be_institute
 
     # If a PUT request was sent, check for every field of the model in the request data, and validate each
@@ -153,7 +153,7 @@ def update_cid(request, cid):
     instance = get_object_or_404(pathogen_model, cid=cid)
 
     # Check user is the correct institute
-    if request.user.institute != instance.institute:
+    if request.user.institute.code != instance.institute.code:
         return Responses.cannot_be_institute
 
     # If a PUT request was sent, check for every field of the model in the request data, and validate each

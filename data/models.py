@@ -23,7 +23,7 @@ class Pathogen(models.Model):
             ("COVID", "COVID")
         ]
     )
-    institute = models.CharField(max_length=10)
+    institute = models.ForeignKey("accounts.Institute", on_delete=models.CASCADE)
     sender_sample_id = models.CharField(max_length=24)
     run_name = models.CharField(max_length=96)
     fasta_path = models.CharField(max_length=200)

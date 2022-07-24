@@ -1,14 +1,11 @@
 from rest_framework import serializers
 from .models import User, Institute
-from utils.functions import get_choices
 
 
 class UserSerializer(serializers.ModelSerializer):
     # email = serializers.EmailField() # TODO: including this enforces that it is required. Why?
     password = serializers.CharField(write_only=True)
-
-    # TODO: adding a new institute requires the server be restarted for it to be a valid choice. This way of doing it doesn't work!!!!!!!!!!
-    institute = serializers.ChoiceField(choices=get_choices(model=Institute, field="code")) # TODO: Accounts can be made before institute is, so this isn't working properly
+    institute = serializers.SlugRelatedField(queryset=Institute.objects.all(), slug_field="code") # TODO: make tests to check all works
 
     def create(self, validated_data):
         user = User.objects.create_user( # type: ignore

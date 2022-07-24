@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Pathogen, Mpx, Covid
 from accounts.models import Institute
-from utils.functions import get_choices
 from utils.fieldserializers import YearMonthField
 
 
@@ -11,7 +10,7 @@ EXCLUDED_FIELDS = ("id", "created", "last_modified")
 class PathogenSerializer(serializers.ModelSerializer):
     collection_month = YearMonthField()
     received_month = YearMonthField() 
-    institute = serializers.ChoiceField(choices=get_choices(model=Institute, field="code"))
+    institute = serializers.SlugRelatedField(queryset=Institute.objects.all(), slug_field="code")
 
     class Meta:
         model = Pathogen
