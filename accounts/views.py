@@ -66,9 +66,9 @@ def approve(request, username):
 
     # Check that request user is in the same institute as the target user
     if request.user.institute.code != target_user.institute.code:
-        return Responses.different_institute
+        return Responses._403_different_institute
 
     # Approve target user
     target_user.is_approved = True
     target_user.save()
-    return Responses.user_approved
+    return Responses._200_user_approved

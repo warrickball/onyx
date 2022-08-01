@@ -3,14 +3,16 @@ from ...models import Institute
 
 
 class Command(base.BaseCommand):
-    help = "Add a new institute."
+    help = "Add a new institute to the system."
 
     def add_arguments(self, parser):
         parser.add_argument("-n", "--name")
         parser.add_argument("-c", "--code")
 
     def handle(self, *args, **options):
-        Institute.objects.create(
-            name=options["name"],
-            code=options["code"]
-        )
+        name = options["name"]
+        code = options["code"].upper()
+        institute = Institute.objects.create(name=name, code=code)
+        print("Institute created successfully.")
+        print("Institute name:", institute.name)
+        print("Institute code:", institute.code)

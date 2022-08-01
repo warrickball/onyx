@@ -12,7 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
             username=validated_data["username"],
             email=validated_data["email"],
             password=validated_data["password"],
-            institute=validated_data["institute"]
+            institute=validated_data["institute"] # NOTE: this is actually an instance, not a code
         )
         return user
 
@@ -24,3 +24,4 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "institute"
         ]
+

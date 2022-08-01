@@ -13,3 +13,6 @@ class Command(base.BaseCommand):
         user.is_approved = True
         user.is_authority = True
         user.save()
+        user = User.objects.get(username=options["username"])
+        print("User is_approved:", user.is_approved)
+        print("User is_authority:", user.is_authority)
