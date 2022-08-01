@@ -19,22 +19,25 @@ class Pathogen(models.Model):
     pathogen_code = models.CharField(
         max_length=8,
         choices=[
+            ("PATHOGEN", "PATHOGEN"), # TODO: is only here for tests. Find way to make tests work without it
             ("MPX", "MPX"),
             ("COVID", "COVID")
         ]
     )
     institute = models.ForeignKey("accounts.Institute", on_delete=models.CASCADE)
-    sender_sample_id = models.CharField(max_length=24)
+    sender_sample_id = models.CharField(max_length=24) # TODO: Should this + run name not be updateable?
     run_name = models.CharField(max_length=96)
     fasta_path = models.CharField(max_length=200)
     bam_path = models.TextField(max_length=200)
-    is_external = models.BooleanField()
+    is_external = models.BooleanField() # TODO: need to add + test some optional fields, could make this optional (with default false for example)
     collection_month = YearMonthField()
     received_month = YearMonthField()
     published_date = models.DateField(auto_now_add=True)
-    created = models.DateTimeField(auto_now_add=True) # TODO: get rid of published_date?
+    created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
-    
+    # fasta_stats = models.ForeignKey("FastaStats", on_delete=models.CASCADE) # TODO:?
+    # bam_stats = models.ForeignKey("BamStats", on_delete=models.CASCADE) # TODO:?
+
     class Meta:
         unique_together = [
             "sender_sample_id", 

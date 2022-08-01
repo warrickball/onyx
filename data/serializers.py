@@ -14,6 +14,7 @@ class PathogenSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Pathogen
+        # read_only_fields = ()
         exclude = EXCLUDED_FIELDS
 
 
