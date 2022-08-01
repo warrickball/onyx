@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from datetime import date, datetime
 
 
-# TODO: Improve and test
+# TODO: Test
 class YearMonthField(models.DateField):
     '''
     Minimal override of DateField to support YYYY-MM format.
