@@ -7,6 +7,7 @@ import time
 import argparse
 import requests
 import pandas as pd
+from datetime import datetime, timedelta
 from getpass import getpass
 
 
@@ -21,6 +22,41 @@ def timefunc(func):
         print(f"'{func.__name__}' took {round(end - start, 5)} seconds")
         return result
     return timed_func
+
+
+def get_published_week_filters(published_week):
+    filters = {
+        "published_date__gte" : [],
+        "published_date__lte" : []
+    }
+    try:
+        for pub_week in published_week:
+            year, week = pub_week.split("-")
+            start_date = datetime.fromisocalendar(int(year), int(week), 1).date()
+            end_date = datetime.fromisocalendar(int(year), int(week), 7).date()
+            filters["published_date__gte"].append(start_date)
+            filters["published_date__lte"].append(end_date)
+    except ValueError:
+        raise Exception("Invalid published week. Must be a possible week, provided in YYYY-WW format.")
+    return filters
+
+
+def get_published_week_range_filters(published_week_range):
+    filters = {
+        "published_date__gte" : [],
+        "published_date__lte" : []
+    }
+    try:
+        for pub_week_range in published_week_range:
+            s_year, s_week = pub_week_range[0].split("-")
+            e_year, e_week = pub_week_range[1].split("-")
+            start_date = datetime.fromisocalendar(int(s_year), int(s_week), 1).date()
+            end_date = datetime.fromisocalendar(int(e_year), int(e_week), 7).date()
+            filters["published_date__gte"].append(start_date)
+            filters["published_date__lte"].append(end_date)
+    except ValueError:
+        raise Exception("Invalid published week. Must be a possible week, provided in YYYY-WW format.")
+    return filters
 
 
 class Client:
@@ -117,7 +153,6 @@ class Client:
             for field in Client.USER_FIELDS:
                 if field not in ufields:
                     raise KeyError(f"'{field}' key is missing from user '{user}' in the config file")
-
 
 
     @classmethod
@@ -280,7 +315,9 @@ class Client:
             username = Client._get_input("username")
 
         if password is not None:
-            pass
+            if username in self.config["users"]:
+                if password != self.config["users"][username]["password"]:
+                    raise Exception("Provided password for user does not match user password in the config")
         elif username in self.config["users"]:
             password = self.config["users"][username]["password"]
         else:
@@ -394,13 +431,27 @@ class Client:
                 tsv.close()
 
 
-    def get(self, pathogen_code, filters=None):
+    def get(self, pathogen_code, filters=None, published_week=None, published_week_range=None):
         '''
         Get records from the database. 
         '''        
         if filters is None:
             filters = {}
-
+        
+        if published_week:
+            published_week_filters = get_published_week_filters(published_week)
+            for f, v in published_week_filters.items():
+                if filters.get(f) is None:
+                    filters[f] = []
+                filters[f].extend(v)
+        
+        if published_week_range:
+            published_week_range_filters = get_published_week_range_filters(published_week_range)
+            for f, v in published_week_range_filters.items():
+                if filters.get(f) is None:
+                    filters[f] = []
+                filters[f].extend(v)
+        
         response, tokens = self._handle_tokens_request(
             method=requests.get,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
@@ -504,7 +555,8 @@ def main():
     get_parser = command.add_parser("get", parents=[user_parser])
     get_parser.add_argument("pathogen_code")
     get_parser.add_argument("-f", "--filter", nargs=2, action="append", metavar=("FIELD", "VALUE"))
-    # TODO: How to filter by published_week?
+    get_parser.add_argument("--published-week", action="append", metavar="YYYY-WW")
+    get_parser.add_argument("--published-week-range", nargs=2, action="append", metavar=("YYYY-WW", "YYYY-WW"))
 
     update_parser = command.add_parser("update", parents=[user_parser])
     update_parser.add_argument("pathogen_code")
@@ -534,11 +586,14 @@ def main():
                 client.create(args.pathogen_code, args.tsv)
             
             elif args.command == "get":
+                filters = {}
                 if args.filter is not None:
-                    filters = {f : v for f, v in args.filter}
-                else:
-                    filters = {}
-                client.get(args.pathogen_code, filters)
+                    for f, v in args.filter:
+                        if filters.get(f) is None:
+                            filters[f] = []
+                        filters[f].append(v)
+
+                client.get(args.pathogen_code, filters, published_week=args.published_week, published_week_range=args.published_week_range)
             
             elif args.command == "update":
                 if args.update_field is not None:

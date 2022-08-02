@@ -1,6 +1,5 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
@@ -13,8 +12,11 @@ from utils.responses import Responses
 import inspect
 
 
+
 # TODO: Could do with a consistent model for response, no matter errors or not
 # Could have status code, errors and results for every response
+# At the moment, some internal server errors (e.g. updating a collection month to an impossible month) return a HTML response that the client can't read
+
 
 
 def get_pathogen_model_or_404(pathogen_code):
@@ -23,29 +25,49 @@ def get_pathogen_model_or_404(pathogen_code):
     '''
     members = inspect.getmembers(models, inspect.isclass)
     for name, model in members:
-        if pathogen_code.upper() == name.upper():
+        if pathogen_code.upper() == name.upper() and (model == Pathogen or Pathogen in model.__bases__):
             return model
     raise Http404
 
 
-# class PathogenCodeView(APIView):
-#     def get(self, request):
-#         members = inspect.getmembers(models, inspect.isclass)
-#         if 
+
+class PathogenCodeView(APIView):
+    permission_classes = [IsAuthenticated, IsApproved]
+
+    def get(self, request):
+        members = inspect.getmembers(models, inspect.isclass)
+        pathogen_codes = []
+        for name, model in members:
+            if Pathogen in model.__bases__:
+                pathogen_codes.append(name.upper())
+        return Response({"pathogen_codes" : pathogen_codes}, status=status.HTTP_200_OK)
+
 
 
 class CreateGetPathogenView(APIView):
-    permission_classes = [IsAuthenticated, IsApproved] # IsAdminUser for delete?
+    permission_classes = [IsAuthenticated, IsApproved]
 
     def post(self, request, pathogen_code):
+        '''
+        Creates a new record using `request.data`, for the model specified by `pathogen_code`.
+        '''
+
+        pathogen_code = pathogen_code.upper()
+
+        # If a pathogen_code was provided in the body, and it doesn't match the url, tell them to stop it
+        user_request_code = request.data.get("pathogen_code")
+        if user_request_code:
+            user_request_code = user_request_code.upper()
+            if user_request_code != pathogen_code:
+                return Responses._400_mismatch_pathogen_code
+        
+        # Set the pathogen code in the request data
+        request.data["pathogen_code"] = pathogen_code
+
         # If a cid was provided, tell them no
         if request.data.get("cid"):
-            return Responses._403_cannot_provide_cid
+            return Responses._400_cannot_provide_cid
         
-        # If a pathogen_code was provided in the body, tell them no
-        if request.data.get("pathogen_code"):
-            return Responses._400_pathogen_code_in_url_only
-
         # Check if an institute was provided in the body
         institute_code = request.data.get("institute")
         if not institute_code:
@@ -58,9 +80,6 @@ class CreateGetPathogenView(APIView):
         # Get the model
         pathogen_model = get_pathogen_model_or_404(pathogen_code)
 
-        # Set the pathogen code
-        request.data["pathogen_code"] = pathogen_code.upper()
-
         # Serializer validates input data
         serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(data=request.data)
 
@@ -71,17 +90,23 @@ class CreateGetPathogenView(APIView):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
     def get(self, request, pathogen_code):
+        '''
+        Uses `request.query_params` to filter and return data for the given `pathogen_code`.
+        '''
+
         # Get the model
         pathogen_model = get_pathogen_model_or_404(pathogen_code)
         
         # Create queryset of all objects by default
         instances = pathogen_model.objects.all()
 
+        query_param_fields = list(request.query_params.keys())
+
         # If an id was provided (or an id__ field) as a query parameter, tell them no
         # TODO: If you want this behaviour truly enforced, might need some more work
         # Do we even care if filtering by primary key?
-        query_param_fields = list(request.query_params.keys())
         model_fields = {f.name for f in pathogen_model._meta.get_fields()}
         for field in query_param_fields:
             dunder_split = field.split("__")
@@ -90,7 +115,8 @@ class CreateGetPathogenView(APIView):
                     return Responses._403_cannot_query_id
 
         # For each query param, filter the data
-        for field, value in request.query_params.items():
+        for field in query_param_fields:
+            values = request.query_params.getlist(field)
             if field == "cursor":
                 continue
             
@@ -100,7 +126,8 @@ class CreateGetPathogenView(APIView):
                 field = "institute__code"
             
             try:
-                instances = instances.filter(**{field : value})
+                for value in values:
+                    instances = instances.filter(**{field : value})
             except Exception as e:
                 return Response({"detail" : repr(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -118,6 +145,7 @@ class CreateGetPathogenView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+
 class UpdateDeletePathogenView(APIView):
     def get_permissions(self):
         if self.request.method == "PATCH":
@@ -126,7 +154,12 @@ class UpdateDeletePathogenView(APIView):
             permission_classes = [IsAdminUser]
         return [permission() for permission in permission_classes]
 
+
     def patch(self, request, pathogen_code, cid):
+        '''
+        Uses the provided `cid` and `pathogen_code` to update a record with `request.data`.
+        '''
+
         # Get the model
         pathogen_model = get_pathogen_model_or_404(pathogen_code)
         
@@ -146,7 +179,12 @@ class UpdateDeletePathogenView(APIView):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
     def delete(self, request, pathogen_code, cid):
+        '''
+        Uses the provided `cid` and `pathogen_code` to delete a record.
+        '''
+
         # Get the model for the given cid
         pathogen_model = get_pathogen_model_or_404(pathogen_code)
         
