@@ -17,6 +17,8 @@ class Pathogen(models.Model):
         max_length=12, 
         unique=True
     )
+    sender_sample_id = models.CharField(max_length=24)
+    run_name = models.CharField(max_length=96)
     pathogen_code = models.CharField(
         max_length=8,
         choices=[
@@ -31,19 +33,17 @@ class Pathogen(models.Model):
     last_modified = models.DateTimeField(auto_now=True)
 
     # Updatable fields
-    sender_sample_id = models.CharField(max_length=24) # TODO: Should this + run name not be updatable?
-    run_name = models.CharField(max_length=96)
     fasta_path = models.CharField(max_length=200)
     bam_path = models.TextField(max_length=200)
-    is_external = models.BooleanField() # TODO: need to add + test some optional fields, could make this optional (with default false for example)
-    collection_month = YearMonthField()
+    is_external = models.BooleanField()
+    collection_month = YearMonthField() # TODO: make this an optional field for testing
     received_month = YearMonthField()
     # fasta_stats = models.ForeignKey("FastaStats", on_delete=models.CASCADE) # TODO:?
     # bam_stats = models.ForeignKey("BamStats", on_delete=models.CASCADE) # TODO:?
 
     @classmethod
     def readonly_fields(cls):
-        return {"id", "cid", "pathogen_code", "institute", "published_date", "created", "last_modified"}
+        return {"id", "cid", "sender_sample_id", "run_name", "pathogen_code", "institute", "published_date", "created", "last_modified"}
 
     class Meta:
         unique_together = [
@@ -70,7 +70,7 @@ class Covid(Pathogen):
     sample_type = models.CharField(
         max_length=50,
         choices=[
-            ("SWAB", "SWAB"),
+            ("SWAB", "SWAB"), # TODO: Make accept lowercase in choices
             ("SERUM", "SERUM")
         ]
     )

@@ -18,6 +18,16 @@ class PathogenSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("cid is forbidden from being updated.")
         return value
 
+    def validate_sender_sample_id(self, value):                                     
+        if self.instance and value != self.instance.sender_sample_id:
+            raise serializers.ValidationError("sender_sample_id is forbidden from being updated.")
+        return value
+
+    def validate_run_name(self, value):                                     
+        if self.instance and value != self.instance.run_name:
+            raise serializers.ValidationError("run_name is forbidden from being updated.")
+        return value
+
     def validate_pathogen_code(self, value):                                     
         if self.instance and value != self.instance.pathogen_code:
             raise serializers.ValidationError("pathogen_code is forbidden from being updated.")
