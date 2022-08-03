@@ -7,7 +7,7 @@ import time
 import argparse
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from getpass import getpass
 
 
@@ -407,41 +407,65 @@ class Client:
                 print("The user has been added to the config.")
 
 
-    def create(self, pathogen_code, tsv_path):
+    def create(self, pathogen_code, tsv_path=None, fields=None):
         '''
         Post new records to the database.
         '''
-        if tsv_path == '-':
-            tsv = sys.stdin
+        if (tsv_path is not None) and (fields is not None):
+            raise Exception("Cannot provide both a tsv file and fields dict at the same time")
+
+        if (tsv_path is None) and (fields is None):
+            raise Exception("Must provide a tsv file or fields dict")
+
+        if tsv_path is not None:
+            if tsv_path == '-':
+                tsv = sys.stdin
+            else:
+                tsv = open(tsv_path)
+            try:
+                reader = csv.DictReader(tsv, delimiter='\t')
+                response = None
+                tokens = None
+                for record in reader:
+                    response, tokens = self._handle_tokens_request(
+                        method=requests.post,
+                        url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
+                        body=record,
+                        username=self.username,
+                        password=self.password,
+                        tokens=self.tokens
+                    )
+                    print(Client._format_response(response, pretty_print=False))
+                if response and response.ok and tokens:
+                    self.tokens = tokens
+            finally:
+                if tsv is not sys.stdin:
+                    tsv.close()
         else:
-            tsv = open(tsv_path)
-        try:
-            reader = csv.DictReader(tsv, delimiter='\t')
-            response = None
-            tokens = None
-            for record in reader:
-                response, tokens = self._handle_tokens_request(
-                    method=requests.post,
-                    url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-                    body=record,
-                    username=self.username,
-                    password=self.password,
-                    tokens=self.tokens
-                )
-                print(Client._format_response(response, pretty_print=False))
-            if response and response.ok and tokens:
+            response, tokens = self._handle_tokens_request(
+                method=requests.post,
+                url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
+                body=fields,
+                username=self.username,
+                password=self.password,
+                tokens=self.tokens
+            )
+            print(Client._format_response(response, pretty_print=False))
+            if response and response.ok:
                 self.tokens = tokens
-        finally:
-            if tsv is not sys.stdin:
-                tsv.close()
+            
 
-
-    def get(self, pathogen_code, filters=None, published_week=None, published_week_range=None):
+    def get(self, pathogen_code, cid=None, filters=None, published_week=None, published_week_range=None):
         '''
         Get records from the database. 
         '''        
         if filters is None:
             filters = {}
+        
+        if cid is not None:
+            if filters.get("cid") is None:
+                filters["cid"] = []
+            filters["cid"].append(cid)
         
         if published_week:
             published_week_filters = get_published_week_filters(published_week)
@@ -555,10 +579,13 @@ def main():
     
     create_parser = command.add_parser("create", parents=[user_parser])
     create_parser.add_argument("pathogen_code")
-    create_parser.add_argument("tsv")
+    create_type = create_parser.add_mutually_exclusive_group(required=True)
+    create_type.add_argument("--tsv")
+    create_type.add_argument("-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE"))
 
     get_parser = command.add_parser("get", parents=[user_parser])
-    get_parser.add_argument("pathogen_code")
+    get_parser.add_argument("pathogen_code", help="required")
+    get_parser.add_argument("cid", nargs="?", help="optional")
     get_parser.add_argument("-f", "--filter", nargs=2, action="append", metavar=("FIELD", "VALUE"))
     get_parser.add_argument("--published-week", action="append", metavar="YYYY-WW")
     get_parser.add_argument("--published-week-range", nargs=2, action="append", metavar=("YYYY-WW", "YYYY-WW"))
@@ -588,7 +615,11 @@ def main():
             client.prepare_login(username=args.user)
 
             if args.command == "create":
-                client.create(args.pathogen_code, args.tsv)
+                if args.field is not None:
+                    fields = {f : v for f, v in args.field}
+                    client.create(args.pathogen_code, fields=fields)
+                else:
+                    client.create(args.pathogen_code, tsv_path=args.tsv)
             
             elif args.command == "get":
                 filters = {}
@@ -598,7 +629,7 @@ def main():
                             filters[f] = []
                         filters[f].append(v)
 
-                client.get(args.pathogen_code, filters, published_week=args.published_week, published_week_range=args.published_week_range)
+                client.get(args.pathogen_code, args.cid, filters, published_week=args.published_week, published_week_range=args.published_week_range)
             
             elif args.command == "update":
                 if args.update_field is not None:
