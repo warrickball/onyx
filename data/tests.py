@@ -1,10 +1,10 @@
 from rest_framework.test import APITestCase
 from rest_framework import status
-from django.core.management import call_command
 from .models import Pathogen, generate_cid
 from accounts.models import Institute, User
 import secrets
 import random
+import json
 import os
 
 
@@ -41,7 +41,7 @@ def populate_pathogen_table(amount, institute_code):
         pathogen_dict["pathogen_code"] = "PATHOGEN"
         instance = Pathogen.objects.create(**pathogen_dict)
         pathogen_instances.append(instance)
-    return pathogen_instances # NOTE: Future updates to records in db aren't reflected in instances
+    return pathogen_instances # NOTE: (obviously) future updates to records in db aren't reflected in instances
 
 
 def create_input_pathogen_data(amount, institute_code):
@@ -351,7 +351,7 @@ class GetPathogenTestCase(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_paginated_response(self):
-        pass # TODO
+        pass # TODO: Quite a hefty one to test
 
 
 class UpdatePathogenTestCase(BaseAPITestCase):
@@ -407,8 +407,80 @@ class UpdatePathogenTestCase(BaseAPITestCase):
                 self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
                 self.assertEqual(Pathogen.objects.get(cid=cid).is_external, previous_value)
 
-    def test_patch_readonly_field(self):
-        pass # TODO
+    def test_patch_readonly_fields(self):
+        for instance in self.pathogen_db_instances:
+            if instance.institute == self.user.institute:
+                cid = instance.cid
+                instance_before_update = {k : v for k, v in Pathogen.objects.get(cid=cid).__dict__.items() if k != "_state"}
+                for field in list(Pathogen.readonly_fields()):
+                    data={
+                        field : "some-value"
+                    }
+
+                    response = self.client.patch(
+                        os.path.join(self.endpoint, cid + "/"),
+                        data=data
+                    )
+                    instance_after_update = {k : v for k, v in Pathogen.objects.get(cid=cid).__dict__.items() if k != "_state"}
+                    self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                    self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
+                    self.assertEqual(instance_before_update, instance_after_update)
+                    self.assertEqual(json.loads(response.content), {"unknown" : [], "forbidden" : [field]}) # type: ignore
+
+    def test_patch_unknown_fields(self):
+        for instance in self.pathogen_db_instances:
+            if instance.institute == self.user.institute:
+                cid = instance.cid
+                instance_before_update = {k : v for k, v in Pathogen.objects.get(cid=cid).__dict__.items() if k != "_state"}
+                data={
+                    "unknown-field" : "some-value"
+                }
+
+                response = self.client.patch(
+                    os.path.join(self.endpoint, cid + "/"),
+                    data=data
+                )
+                instance_after_update = {k : v for k, v in Pathogen.objects.get(cid=cid).__dict__.items() if k != "_state"}
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
+                self.assertEqual(instance_before_update, instance_after_update)
+                self.assertEqual(json.loads(response.content), {"unknown" : ["unknown-field"], "forbidden" : []}) # type: ignore
+
+    def test_patch_no_fields(self):
+        for instance in self.pathogen_db_instances:
+            if instance.institute == self.user.institute:
+                cid = instance.cid
+                instance_before_update = {k : v for k, v in Pathogen.objects.get(cid=cid).__dict__.items() if k != "_state"}
+                response = self.client.patch(
+                    os.path.join(self.endpoint, cid + "/"),
+                    data={}
+                )
+                instance_after_update = {k : v for k, v in Pathogen.objects.get(cid=cid).__dict__.items() if k != "_state"}
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
+                self.assertEqual(instance_before_update, instance_after_update)
+
+    def test_put(self):
+        for instance in self.pathogen_db_instances:
+            if instance.institute == self.user.institute:
+                cid = instance.cid
+                if instance.is_external == True:
+                    previous_value = True
+                    is_external_replacement = False
+                else:
+                    previous_value = False
+                    is_external_replacement = True
+                data={
+                    "is_external" : is_external_replacement
+                }
+                response = self.client.put(
+                    os.path.join(self.endpoint, cid + "/"),
+                    data=data
+
+                )
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+                self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
+                self.assertEqual(Pathogen.objects.get(cid=cid).is_external, previous_value)
 
 
 class DeletePathogenTestCase(BaseAPITestCase):

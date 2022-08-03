@@ -106,8 +106,8 @@ class CreateGetPathogenView(APIView):
         query_param_fields = list(request.query_params.keys())
 
         # If an id was provided (or an id__ field) as a query parameter, tell them no
-        # TODO: If you want this behaviour truly enforced, might need some more work
-        # Do we even care if filtering by primary key?
+        # NOTE: there is probably extremely cheeky ways around this 
+        # But its not the end of the world if someone can figure out the pk, doesn't even matter really
         model_fields = {f.name for f in pathogen_model._meta.get_fields()}
         for field in query_param_fields:
             dunder_split = field.split("__")
@@ -122,8 +122,8 @@ class CreateGetPathogenView(APIView):
                 continue
             
             if field == "institute":
-                # A regrettably hardcoded default that is much more user friendly
-                # TODO: if there is any way other than this, I will take it
+                # A regrettably hardcoded default that makes queries much more user friendly
+                # TODO: find a better way to do this
                 field = "institute__code"
             
             try:
@@ -178,7 +178,7 @@ class UpdateDeletePathogenView(APIView):
         # I don't want that
         update_fields = list(request.data.keys())
         model_fields = {f.name for f in pathogen_model._meta.get_fields()}
-        readonly_fields = {"id", "cid", "pathogen_code", "institute", "published_date", "created", "last_modified"}
+        readonly_fields = pathogen_model.readonly_fields()
 
         invalid_fields = {
             "unknown" : [],
