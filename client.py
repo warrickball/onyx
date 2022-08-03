@@ -331,7 +331,7 @@ class Client:
             if not tokens.ok:
                 # Something is wrong with the username + password 
                 print(Client._format_response(tokens))
-                tokens.raise_for_status()
+                tokens.raise_for_status() # TODO: change this?
             else:
                 tokens = tokens.json()
         
@@ -381,25 +381,30 @@ class Client:
         
         if response.ok:
             print("Account created successfully.")
-            tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
-            self.config["users"][username] = {
-                "password" : password, # type: ignore
-                "tokens" : tokens_path
-            }
-            if len(self.config["users"]) == 1:
-                self.config["default_user"] = username
+            check = ""
+            while not check:
+                check = input("Would you like to add this account to the config? [y/n]: ").upper()
             
-            # TODO: Probably has issues if using the same client in multiple places
-            with open(self.config_file_path, "w") as config:
-                json.dump(self.config, config, indent=4)
-            
-            with open(tokens_path, "w") as tokens:
-                json.dump({"access" : None, "refresh" : None}, tokens, indent=4)
-            
-            # User read-write only
-            os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
+            if check == "Y":
+                tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
+                self.config["users"][username] = {
+                    "password" : password, # type: ignore
+                    "tokens" : tokens_path
+                }
+                if len(self.config["users"]) == 1:
+                    self.config["default_user"] = username
+                
+                # TODO: Probably has issues if using the same client in multiple places
+                with open(self.config_file_path, "w") as config:
+                    json.dump(self.config, config, indent=4)
+                
+                with open(tokens_path, "w") as tokens:
+                    json.dump({"access" : None, "refresh" : None}, tokens, indent=4)
+                
+                # User read-write only
+                os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
 
-            print("The user has been added to the config.")
+                print("The user has been added to the config.")
 
 
     def create(self, pathogen_code, tsv_path):

@@ -12,9 +12,24 @@ class PathogenSerializer(serializers.ModelSerializer):
     received_month = YearMonthField() 
     institute = serializers.SlugRelatedField(queryset=Institute.objects.all(), slug_field="code")
 
+    # These are the last line of defence in case view validation somehow fails
+    def validate_cid(self, value):                                     
+        if self.instance and value != self.instance.cid:
+            raise serializers.ValidationError("cid is forbidden from being updated.")
+        return value
+
+    def validate_pathogen_code(self, value):                                     
+        if self.instance and value != self.instance.pathogen_code:
+            raise serializers.ValidationError("pathogen_code is forbidden from being updated.")
+        return value
+
+    def validate_institute(self, value):                                     
+        if self.instance and value != self.instance.institute:
+            raise serializers.ValidationError("institute is forbidden from being updated.")
+        return value
+    
     class Meta:
         model = Pathogen
-        # read_only_fields = ()
         exclude = EXCLUDED_FIELDS
 
 

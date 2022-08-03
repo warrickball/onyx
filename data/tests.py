@@ -41,7 +41,7 @@ def populate_pathogen_table(amount, institute_code):
         pathogen_dict["pathogen_code"] = "PATHOGEN"
         instance = Pathogen.objects.create(**pathogen_dict)
         pathogen_instances.append(instance)
-    return pathogen_instances
+    return pathogen_instances # NOTE: Future updates to records in db aren't reflected in instances
 
 
 def create_input_pathogen_data(amount, institute_code):
@@ -103,7 +103,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 data=x,
                 format="json",
             )
-            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
     
     def test_must_provide_institute(self):
@@ -140,10 +140,10 @@ class CreatePathogenTestCase(BaseAPITestCase):
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
             self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
 
-    def test_pathogen_code_in_body(self):
+    def test_mismatch_pathogen_code(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
         for x in input_data:
-            x["pathogen_code"] = "pathogen"
+            x["pathogen_code"] = "different-pathogen"
             response = self.client.post(
                 self.endpoint,
                 data=x,
@@ -168,8 +168,11 @@ class CreatePathogenTestCase(BaseAPITestCase):
 
     def test_sample_or_run_preexisting(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
+        vals = set(range(0, len(self.pathogen_db_instances)))
         for x in input_data:
-            instance = random.choice(self.pathogen_db_instances)
+            chosen_val = random.choice(list(vals))
+            vals.remove(chosen_val)
+            instance = self.pathogen_db_instances[chosen_val]
             coin = random.randint(0, 1)
             if x["run_name"] == instance.run_name: # Prevent test failing if their run_name already matches, which is not unlikely
                 pass
@@ -182,8 +185,6 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 data=x,
                 format="json",
             )
-            if response.status_code != status.HTTP_200_OK:
-                print(x, instance.__dict__)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 1)
     
@@ -364,16 +365,50 @@ class UpdatePathogenTestCase(BaseAPITestCase):
         self.wrong_institute = self.institute_codes[1]
         self.user = self.setup_approved_authed_user("user", self.institute)
 
-    # def test_valid_patch(self):
-    #     for instance in self.pathogen_db_instances:
-    #         cid = instance.cid
-    #         response = self.client.patch(os.path.join(self.endpoint, cid + "/"))
-    #         self.assertEqual(response.status_code, status.HTTP_200_OK)
-    #         self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 0)
+    def test_valid_patch(self):
+        for instance in self.pathogen_db_instances:
+            if instance.institute == self.user.institute:
+                cid = instance.cid
+                if instance.is_external == True:
+                    is_external_replacement = False
+                else:
+                    is_external_replacement = True
+                data={
+                    "is_external" : is_external_replacement
+                }
+                response = self.client.patch(
+                    os.path.join(self.endpoint, cid + "/"),
+                    data=data
 
-    # def test_patch_readonly_field(self):
-    #     # TODO: Do we have some fields be unchangeable?
-    #     pass
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
+                self.assertEqual(Pathogen.objects.get(cid=cid).is_external, is_external_replacement)
+
+    def test_patch_wrong_institute(self):
+        for instance in self.pathogen_db_instances:
+            if instance.institute != self.user.institute:
+                cid = instance.cid
+                if instance.is_external == True:
+                    previous_value = True
+                    is_external_replacement = False
+                else:
+                    previous_value = False
+                    is_external_replacement = True
+                data={
+                    "is_external" : is_external_replacement
+                }
+                response = self.client.patch(
+                    os.path.join(self.endpoint, cid + "/"),
+                    data=data
+
+                )
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+                self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
+                self.assertEqual(Pathogen.objects.get(cid=cid).is_external, previous_value)
+
+    def test_patch_readonly_field(self):
+        pass # TODO
 
 
 class DeletePathogenTestCase(BaseAPITestCase):

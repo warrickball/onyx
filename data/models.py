@@ -11,6 +11,7 @@ def generate_cid():
 
 
 class Pathogen(models.Model):
+    # Non-updateable fields
     cid = models.CharField(
         default=generate_cid,
         max_length=12, 
@@ -25,6 +26,11 @@ class Pathogen(models.Model):
         ]
     )
     institute = models.ForeignKey("accounts.Institute", on_delete=models.CASCADE)
+    published_date = models.DateField(auto_now_add=True)
+    created = models.DateTimeField(auto_now_add=True)
+    last_modified = models.DateTimeField(auto_now=True)
+
+    # Updateable fields
     sender_sample_id = models.CharField(max_length=24) # TODO: Should this + run name not be updateable?
     run_name = models.CharField(max_length=96)
     fasta_path = models.CharField(max_length=200)
@@ -32,9 +38,7 @@ class Pathogen(models.Model):
     is_external = models.BooleanField() # TODO: need to add + test some optional fields, could make this optional (with default false for example)
     collection_month = YearMonthField()
     received_month = YearMonthField()
-    published_date = models.DateField(auto_now_add=True)
-    created = models.DateTimeField(auto_now_add=True)
-    last_modified = models.DateTimeField(auto_now=True)
+
     # fasta_stats = models.ForeignKey("FastaStats", on_delete=models.CASCADE) # TODO:?
     # bam_stats = models.ForeignKey("BamStats", on_delete=models.CASCADE) # TODO:?
 

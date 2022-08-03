@@ -15,7 +15,8 @@ import inspect
 
 # TODO: Could do with a consistent model for response, no matter errors or not
 # Could have status code, errors and results for every response
-# At the moment, some internal server errors (e.g. updating a collection month to an impossible month) return a HTML response that the client can't read
+# TODO: At the moment, some internal server errors (e.g. updating a collection month to an impossible month) return a HTML response that the client can't read
+# This might be fixable in field validation or something
 
 
 
@@ -170,10 +171,39 @@ class UpdateDeletePathogenView(APIView):
         if request.user.institute.code != instance.institute.code:
             return Responses._403_incorrect_institute_for_user
 
+        # Check for unknown fields, and readonly fields
+        # Not a fan of doing it in the view but can't find a solution that gives a more controllable response
+        # E.g. for the actual readonly fields id, published_date, created and last_modified, attempting to update fails
+        # But returns a 200 OK ?? https://github.com/encode/django-rest-framework/issues/1655
+        # I don't want that
+        update_fields = list(request.data.keys())
+        model_fields = {f.name for f in pathogen_model._meta.get_fields()}
+        readonly_fields = {"id", "cid", "pathogen_code", "institute", "published_date", "created", "last_modified"}
+
+        invalid_fields = {
+            "unknown" : [],
+            "forbidden" : []
+        }
+
+        valid_update = True
+        for field in update_fields:
+            if field not in model_fields:
+                invalid_fields["unknown"].append(field)
+                valid_update = False
+            elif field in readonly_fields:
+                invalid_fields["forbidden"].append(field)
+                valid_update = False        
+
+        if not valid_update:
+            return Response(invalid_fields, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
 
         # If data is valid, update existing record in the database. If invalid, return errors
         if serializer.is_valid():
+            if len(serializer.validated_data) == 0:
+                return Responses._400_no_updates_provided
+            
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
