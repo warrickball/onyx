@@ -3,7 +3,7 @@ from .models import User, Institute
 
 
 class UserSerializer(serializers.ModelSerializer):
-    # email = serializers.EmailField() # TODO: should emails be required?
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     institute = serializers.SlugRelatedField(queryset=Institute.objects.all(), slug_field="code") # TODO: make tests to check all works
 

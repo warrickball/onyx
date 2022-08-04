@@ -36,7 +36,7 @@ class Pathogen(models.Model):
     fasta_path = models.CharField(max_length=200)
     bam_path = models.TextField(max_length=200)
     is_external = models.BooleanField()
-    collection_month = YearMonthField() # TODO: make this an optional field for testing
+    collection_month = YearMonthField()
     received_month = YearMonthField()
     # fasta_stats = models.ForeignKey("FastaStats", on_delete=models.CASCADE) # TODO:?
     # bam_stats = models.ForeignKey("BamStats", on_delete=models.CASCADE) # TODO:?
@@ -67,7 +67,7 @@ class Pathogen(models.Model):
         '''
         Fields with restricted choice of input
         '''
-        return {"pathogen_code", "institute"} # TODO: institute here might cause some weird stuff
+        return {"pathogen_code", "institute"} # NOTE: Institute being here may cause some weird stuff
 
     class Meta:
         unique_together = [

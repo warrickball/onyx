@@ -13,7 +13,7 @@ import os
 
 def create_institutes():
     codes = []
-    institute_a = Institute.objects.create(code="UNIA", name="University of A") # TODO: institute codes now have to be capital or everything dies
+    institute_a = Institute.objects.create(code="UNIA", name="University of A") # NOTE: institute codes now have to be capital or everything dies
     codes.append(institute_a.code)
     institute_b = Institute.objects.create(code="DEPTB", name="Department of B")
     codes.append(institute_b.code)
@@ -208,7 +208,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
             self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
     
     def test_optional_field_missing(self):
-        pass # TODO
+        pass # TODO make some optional fields and test them
     
 
 class GetPathogenTestCase(BaseAPITestCase):
