@@ -352,6 +352,29 @@ class Client:
             json.dump(self.tokens, tokens_file, indent=4)
 
 
+    def add_to_config(self, username, password):
+        tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
+        self.config["users"][username] = {
+            "password" : password, # type: ignore
+            "tokens" : tokens_path
+        }
+        if len(self.config["users"]) == 1:
+            self.config["default_user"] = username
+        
+        # NOTE: Probably has issues if using the same client in multiple places
+        # Just don't use the client at the same time with the same config in multiple places
+        with open(self.config_file_path, "w") as config:
+            json.dump(self.config, config, indent=4)
+        
+        with open(tokens_path, "w") as tokens:
+            json.dump({"access" : None, "refresh" : None}, tokens, indent=4)
+        
+        # User read-write only
+        os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
+
+        print("The user has been added to the config.")  
+
+
     def register(self):
         '''
         Create a new user. 
@@ -359,7 +382,7 @@ class Client:
         If the account is created successfully, their details will be added to the config.
         '''
         username = Client._get_input("username")
-        email = Client._get_input("email address", required=False) # TODO: should email be required?
+        email = Client._get_input("email address")
         institute = Client._get_input("institute code").upper()
         
         match = False
@@ -390,26 +413,31 @@ class Client:
                 check = input("Would you like to add this account to the config? [y/n]: ").upper()
             
             if check == "Y":
-                tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
-                self.config["users"][username] = {
-                    "password" : password, # type: ignore
-                    "tokens" : tokens_path
-                }
-                if len(self.config["users"]) == 1:
-                    self.config["default_user"] = username
-                
-                # TODO: Probably has issues if using the same client in multiple places
-                with open(self.config_file_path, "w") as config:
-                    json.dump(self.config, config, indent=4)
-                
-                with open(tokens_path, "w") as tokens:
-                    json.dump({"access" : None, "refresh" : None}, tokens, indent=4)
-                
-                # User read-write only
-                os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
+                self.add_to_config(username, password) # type: ignore
 
-                print("The user has been added to the config.")
 
+    def set_default_user(self, username):
+        self.config["default_user"] = username
+        with open(self.config_file_path, "w") as config:
+            json.dump(self.config, config, indent=4)
+        print(f"'{username}' has been set as the default user.")
+        if username not in self.config["users"]:
+            print(f"NOTE: '{username}' does not have login/token details in the config.")
+
+
+    def get_default_user(self):
+        print(self.config["default_user"])
+    
+
+    def add_user(self, username=None, password=None):
+        if username is None:
+            username = Client._get_input("username")
+
+        if password is None:
+            password = Client._get_input("password", password=True)
+        
+        self.add_to_config(username, password)
+        
 
     def create(self, pathogen_code, tsv_path=None, fields=None):
         '''
@@ -579,9 +607,17 @@ def main():
     parser.add_argument("-t", "--timeit", action="store_true")
     command = parser.add_subparsers(dest="command")
 
-    makeconfig_parser = command.add_parser("makeconfig")
-    
+    makeconfig_parser = command.add_parser("make-config")
+
     register_parser = command.add_parser("register")
+
+    set_default_user_parser = command.add_parser("set-default-user")
+    set_default_user_parser.add_argument("user")
+    
+    get_default_user_parser = command.add_parser("get-default-user")
+    
+    add_user_parser = command.add_parser("add-user")
+    add_user_parser.add_argument("user")
     
     create_parser = command.add_parser("create", parents=[user_parser])
     create_type = create_parser.add_mutually_exclusive_group(required=True)
@@ -605,18 +641,27 @@ def main():
     delete_parser.add_argument("pathogen_code")
     delete_parser.add_argument("cid")
 
-    pathogen_codes_parser = command.add_parser("pathogen_codes", parents=[user_parser])
+    pathogen_codes_parser = command.add_parser("pathogen-codes", parents=[user_parser])
 
     args = parser.parse_args()
 
-    if args.command == "makeconfig":
+    if args.command == "make-config":
         Client.makeconfig()
     else:
         client = Client()
         
         if args.command == "register":
             client.register()
+
+        elif args.command == "set-default-user":
+            client.set_default_user(args.user)
         
+        elif args.command == "get-default-user":
+            client.get_default_user()
+
+        elif args.command == "add-user":
+            client.add_user(args.user)
+
         else:
             client.prepare_login(username=args.user)
 
@@ -646,7 +691,7 @@ def main():
             elif args.command == "delete":
                 client.delete(args.pathogen_code, args.cid)
             
-            elif args.command == "pathogen_codes":
+            elif args.command == "pathogen-codes":
                 client.pathogen_codes()
             
             if client.username in client.config["users"]:
