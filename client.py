@@ -11,6 +11,7 @@ from datetime import datetime
 from getpass import getpass
 
 
+
 def timefunc(func):
     '''
     Decorator for timing a function
@@ -24,8 +25,9 @@ def timefunc(func):
     return timed_func
 
 
-def get_published_week_filters(published_week):
-    filters = {
+
+def get_published_week_fields(published_week):
+    fields = {
         "published_date__gte" : [],
         "published_date__lte" : []
     }
@@ -34,15 +36,16 @@ def get_published_week_filters(published_week):
             year, week = pub_week.split("-")
             start_date = datetime.fromisocalendar(int(year), int(week), 1).date()
             end_date = datetime.fromisocalendar(int(year), int(week), 7).date()
-            filters["published_date__gte"].append(start_date)
-            filters["published_date__lte"].append(end_date)
+            fields["published_date__gte"].append(start_date)
+            fields["published_date__lte"].append(end_date)
     except ValueError:
         raise Exception("Invalid published week. Must be a possible week, provided in YYYY-WW format.")
-    return filters
+    return fields
 
 
-def get_published_week_range_filters(published_week_range):
-    filters = {
+
+def get_published_week_range_fields(published_week_range):
+    fields = {
         "published_date__gte" : [],
         "published_date__lte" : []
     }
@@ -52,11 +55,12 @@ def get_published_week_range_filters(published_week_range):
             e_year, e_week = pub_week_range[1].split("-")
             start_date = datetime.fromisocalendar(int(s_year), int(s_week), 1).date()
             end_date = datetime.fromisocalendar(int(e_year), int(e_week), 7).date()
-            filters["published_date__gte"].append(start_date)
-            filters["published_date__lte"].append(end_date)
+            fields["published_date__gte"].append(start_date)
+            fields["published_date__lte"].append(end_date)
     except ValueError:
         raise Exception("Invalid published week. Must be a possible week, provided in YYYY-WW format.")
-    return filters
+    return fields
+
 
 
 class Client:
@@ -435,7 +439,7 @@ class Client:
                         password=self.password,
                         tokens=self.tokens
                     )
-                    print(Client._format_response(response, pretty_print=False))
+                    print(Client._format_response(response))
                 if response and response.ok and tokens:
                     self.tokens = tokens
             finally:
@@ -450,41 +454,41 @@ class Client:
                 password=self.password,
                 tokens=self.tokens
             )
-            print(Client._format_response(response, pretty_print=False))
+            print(Client._format_response(response))
             if response and response.ok:
                 self.tokens = tokens
             
 
-    def get(self, pathogen_code, cid=None, filters=None, published_week=None, published_week_range=None):
+    def get(self, pathogen_code, cid=None, fields=None, published_week=None, published_week_range=None):
         '''
         Get records from the database. 
         '''        
-        if filters is None:
-            filters = {}
+        if fields is None:
+            fields = {}
         
         if cid is not None:
-            if filters.get("cid") is None:
-                filters["cid"] = []
-            filters["cid"].append(cid)
+            if fields.get("cid") is None:
+                fields["cid"] = []
+            fields["cid"].append(cid)
         
         if published_week:
-            published_week_filters = get_published_week_filters(published_week)
-            for f, v in published_week_filters.items():
-                if filters.get(f) is None:
-                    filters[f] = []
-                filters[f].extend(v)
+            published_week_fields = get_published_week_fields(published_week)
+            for f, v in published_week_fields.items():
+                if fields.get(f) is None:
+                    fields[f] = []
+                fields[f].extend(v)
         
         if published_week_range:
-            published_week_range_filters = get_published_week_range_filters(published_week_range)
-            for f, v in published_week_range_filters.items():
-                if filters.get(f) is None:
-                    filters[f] = []
-                filters[f].extend(v)
+            published_week_range_fields = get_published_week_range_fields(published_week_range)
+            for f, v in published_week_range_fields.items():
+                if fields.get(f) is None:
+                    fields[f] = []
+                fields[f].extend(v)
         
         response, tokens = self._handle_tokens_request(
             method=requests.get,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-            params=filters,
+            params=fields,
             username=self.username,
             password=self.password,
             tokens=self.tokens
@@ -504,26 +508,27 @@ class Client:
                 )            
                 if response.ok:
                     self.tokens = tokens
+                    next = response.json()["next"]
                     table = pd.json_normalize(response.json()["results"])
                     print(table.to_csv(index=False, sep='\t', header=False), end='')
-                    next = response.json()["next"]
                 else:
+                    next = None
                     print(Client._format_response(response))
         else:
             print(Client._format_response(response))
 
 
-    def update(self, pathogen_code, cid, update_fields=None):
+    def update(self, pathogen_code, cid, fields=None):
         '''
         Update a record in the database.
         '''        
-        if update_fields is None:
-            update_fields = {}
+        if fields is None:
+            fields = {}
 
         response, tokens = self._handle_tokens_request(
             method=requests.patch,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
-            body=update_fields,
+            body=fields,
             username=self.username,
             password=self.password,
             tokens=self.tokens
@@ -565,6 +570,7 @@ class Client:
         print(Client._format_response(response))
 
 
+
 def main():
     user_parser = argparse.ArgumentParser(add_help=False)
     user_parser.add_argument("-u", "--user")
@@ -578,22 +584,22 @@ def main():
     register_parser = command.add_parser("register")
     
     create_parser = command.add_parser("create", parents=[user_parser])
-    create_parser.add_argument("pathogen_code")
     create_type = create_parser.add_mutually_exclusive_group(required=True)
-    create_type.add_argument("--tsv")
+    create_parser.add_argument("pathogen_code")
     create_type.add_argument("-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE"))
+    create_type.add_argument("--tsv")
 
     get_parser = command.add_parser("get", parents=[user_parser])
     get_parser.add_argument("pathogen_code", help="required")
     get_parser.add_argument("cid", nargs="?", help="optional")
-    get_parser.add_argument("-f", "--filter", nargs=2, action="append", metavar=("FIELD", "VALUE"))
+    get_parser.add_argument("-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE"))
     get_parser.add_argument("--published-week", action="append", metavar="YYYY-WW")
     get_parser.add_argument("--published-week-range", nargs=2, action="append", metavar=("YYYY-WW", "YYYY-WW"))
 
     update_parser = command.add_parser("update", parents=[user_parser])
     update_parser.add_argument("pathogen_code")
     update_parser.add_argument("cid")
-    update_parser.add_argument("-uf", "--update-field", nargs=2, action="append", metavar=("FIELD", "VALUE"))
+    update_parser.add_argument("-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE"))
 
     delete_parser = command.add_parser("delete", parents=[user_parser])
     delete_parser.add_argument("pathogen_code")
@@ -622,21 +628,20 @@ def main():
                     client.create(args.pathogen_code, tsv_path=args.tsv)
             
             elif args.command == "get":
-                filters = {}
-                if args.filter is not None:
-                    for f, v in args.filter:
-                        if filters.get(f) is None:
-                            filters[f] = []
-                        filters[f].append(v)
-
-                client.get(args.pathogen_code, args.cid, filters, published_week=args.published_week, published_week_range=args.published_week_range)
+                fields = {}
+                if args.field is not None:
+                    for f, v in args.field:
+                        if fields.get(f) is None:
+                            fields[f] = []
+                        fields[f].append(v)
+                client.get(args.pathogen_code, args.cid, fields, published_week=args.published_week, published_week_range=args.published_week_range)
             
             elif args.command == "update":
-                if args.update_field is not None:
-                    update_fields = {f : v for f, v in args.update_field}
+                if args.field is not None:
+                    fields = {f : v for f, v in args.field}
                 else:
-                    update_fields = {}
-                client.update(args.pathogen_code, args.cid, update_fields)
+                    fields = {}
+                client.update(args.pathogen_code, args.cid, fields)
 
             elif args.command == "delete":
                 client.delete(args.pathogen_code, args.cid)

@@ -5,7 +5,9 @@ from django.utils.translation import gettext_lazy as _
 from datetime import date, datetime
 
 
-# TODO: Test
+# TODO: Improve and test
+# https://stackoverflow.com/questions/1110153/what-is-the-most-efficient-way-to-store-a-list-in-the-django-models
+# Might help with making custom types
 class YearMonthField(models.DateField):
     '''
     Minimal override of DateField to support YYYY-MM format.

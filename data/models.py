@@ -42,13 +42,38 @@ class Pathogen(models.Model):
     # bam_stats = models.ForeignKey("BamStats", on_delete=models.CASCADE) # TODO:?
 
     @classmethod
+    def all_fields(cls):
+        '''
+        All fields of the model
+        '''
+        return {f.name for f in cls._meta.get_fields()}
+
+    @classmethod
+    def internal_fields(cls):
+        '''
+        Fields that cannot be user-submitted on creation of a model instance
+        '''
+        return {"id", "cid", "published_date", "created", "last_modified"}
+
+    @classmethod
     def readonly_fields(cls):
+        '''
+        Fields that cannot be user-submitted on updating of a model instance
+        '''
         return {"id", "cid", "sender_sample_id", "run_name", "pathogen_code", "institute", "published_date", "created", "last_modified"}
+    
+    @classmethod
+    def choice_fields(cls):
+        '''
+        Fields with restricted choice of input
+        '''
+        return {"pathogen_code", "institute"} # TODO: institute here might cause some weird stuff
 
     class Meta:
         unique_together = [
             "sender_sample_id", 
-            "run_name"
+            "run_name",
+            "pathogen_code"
         ]
 
 
@@ -64,13 +89,21 @@ class Mpx(Pathogen):
         ]
     )
 
+    @classmethod
+    def choice_fields(cls):
+        return super().choice_fields() | {"seq_platform"}
+
 
 class Covid(Pathogen):
     fasta_header = models.CharField(max_length=100)
     sample_type = models.CharField(
         max_length=50,
         choices=[
-            ("SWAB", "SWAB"), # TODO: Make accept lowercase in choices
+            ("SWAB", "SWAB"),
             ("SERUM", "SERUM")
         ]
     )
+
+    @classmethod
+    def choice_fields(cls):
+        return super().choice_fields() | {"sample_type"}

@@ -8,11 +8,14 @@ import json
 import os
 
 
+# TODO: Tests for choice fields
+
+
 def create_institutes():
     codes = []
-    institute_a = Institute.objects.create(code="InstituteA", name="University of A")
+    institute_a = Institute.objects.create(code="UNIA", name="University of A") # TODO: institute codes now have to be capital or everything dies
     codes.append(institute_a.code)
-    institute_b = Institute.objects.create(code="InstituteB", name="Department of B")
+    institute_b = Institute.objects.create(code="DEPTB", name="Department of B")
     codes.append(institute_b.code)
     return codes
 
@@ -24,6 +27,7 @@ def generate_pathogen_dict(institute_code):
         "institute" : institute_code,
         "sender_sample_id" : sender_sample_id,
         "run_name" : run_name,
+        "pathogen_code" : "PATHOGEN",
         "fasta_path" : f"{sender_sample_id}.{run_name}.fasta",
         "bam_path" : f"{sender_sample_id}.{run_name}.bam",
         "is_external" : random.choice([True, False]),
@@ -286,7 +290,7 @@ class GetPathogenTestCase(BaseAPITestCase):
                     "id" : i
                 }
             )
-            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_id_provided_for_filtering_sneaky(self):
         for i in range(10):
@@ -297,7 +301,7 @@ class GetPathogenTestCase(BaseAPITestCase):
                     "id__gte" : i
                 }
             )
-            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         for i in range(10):
             response = self.client.get(
                 self.endpoint,
@@ -305,7 +309,7 @@ class GetPathogenTestCase(BaseAPITestCase):
                     "institute_id__gte" : i
                 }
             )
-            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         for i in range(10):
             response = self.client.get(
                 self.endpoint,
@@ -313,7 +317,7 @@ class GetPathogenTestCase(BaseAPITestCase):
                     "institute__id__lte" : i
                 }
             )
-            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_filtering_field_ending_with_id_but_its_not_database_id_so_its_ok(self):
         for i in range(10):

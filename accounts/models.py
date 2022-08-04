@@ -8,7 +8,6 @@ class Institute(models.Model):
 
 
 class User(AbstractUser):
-    # TODO: what to do with users if institute is deleted?
     institute = models.ForeignKey("Institute", on_delete=models.CASCADE) 
     is_approved = models.BooleanField(default=False)
     is_authority = models.BooleanField(default=False)

@@ -15,8 +15,6 @@ import inspect
 
 # TODO: Could do with a consistent model for response, no matter errors or not
 # Could have status code, errors and results for every response
-# TODO: At the moment, some internal server errors (e.g. updating a collection month to an impossible month) return a HTML response that the client can't read
-# This might be fixable in field validation or something
 
 
 
@@ -29,6 +27,38 @@ def get_pathogen_model_or_404(pathogen_code):
         if pathogen_code.upper() == name.upper() and (model == Pathogen or Pathogen in model.__bases__):
             return model
     raise Http404
+
+
+
+def convert_choice_fields(choice_fields, data):
+    for field in data:
+        if field in choice_fields:
+            # TODO: find way to get choice values out of model, and use instead of capitalising
+            # Want to check if the input shares characters with a choice, then convert it to that choice if so
+            data[field] = data[field].upper()
+
+
+
+def check_unknown_forbidden_fields(all_fields, forbidden_fields, data):
+    # Not a fan of this but can't find a consistent solution that avoids stuff like the following issue
+    # https://github.com/encode/django-rest-framework/issues/1655
+    invalid_fields = {
+        "unknown" : [],
+        "forbidden" : []
+    }
+    valid = True
+    for field in data:
+        if field not in all_fields:
+            invalid_fields["unknown"].append(field)
+            valid = False
+        elif field in forbidden_fields:
+            invalid_fields["forbidden"].append(field)
+            valid = False
+
+    if valid:
+        return None
+    else:
+        return invalid_fields 
 
 
 
@@ -53,33 +83,30 @@ class CreateGetPathogenView(APIView):
         Creates a new record using `request.data`, for the model specified by `pathogen_code`.
         '''
 
-        pathogen_code = pathogen_code.upper()
-
-        # If a pathogen_code was provided in the body, and it doesn't match the url, tell them to stop it
-        user_request_code = request.data.get("pathogen_code")
-        if user_request_code:
-            user_request_code = user_request_code.upper()
-            if user_request_code != pathogen_code:
-                return Responses._400_mismatch_pathogen_code
-        
-        # Set the pathogen code in the request data
-        request.data["pathogen_code"] = pathogen_code
-
-        # If a cid was provided, tell them no
-        if request.data.get("cid"):
-            return Responses._400_cannot_provide_cid
-        
-        # Check if an institute was provided in the body
-        institute_code = request.data.get("institute")
-        if not institute_code:
-            return Responses._400_no_institute
-
-        # Check user is the correct institute
-        if request.user.institute.code != institute_code:
-            return Responses._403_incorrect_institute_for_user
-
         # Get the model
         pathogen_model = get_pathogen_model_or_404(pathogen_code)
+
+        # If a pathogen_code was provided in the body, and it doesn't match the url, tell them to stop it
+        request_pathogen_code = request.data.get("pathogen_code")
+        if request_pathogen_code and request_pathogen_code.upper() != pathogen_code.upper():
+            return Responses._400_mismatch_pathogen_code
+        
+        # If an institute was provided, check it matches the user's institute
+        request_institute_code = request.data.get("institute")
+        if request_institute_code and request_institute_code.upper() != request.user.institute.code: 
+            return Responses._403_incorrect_institute_for_user
+
+        # Check for unknown fields, and internal fields
+        invalid_fields = check_unknown_forbidden_fields(
+            all_fields=pathogen_model.all_fields(), 
+            forbidden_fields=pathogen_model.internal_fields(), 
+            data=request.data
+        )
+        if invalid_fields:
+            return Response(invalid_fields, status=status.HTTP_400_BAD_REQUEST)
+
+        # Convert input choice values to correct case
+        convert_choice_fields(pathogen_model.choice_fields(), request.data)
 
         # Serializer validates input data
         serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(data=request.data)
@@ -100,23 +127,46 @@ class CreateGetPathogenView(APIView):
         # Get the model
         pathogen_model = get_pathogen_model_or_404(pathogen_code)
         
-        # Create queryset of all objects by default
-        instances = pathogen_model.objects.all()
-
-        query_param_fields = list(request.query_params.keys())
-
-        # If an id was provided (or an id__ field) as a query parameter, tell them no
-        # NOTE: there is probably extremely cheeky ways around this 
+        # Check for unknown fields and 'forbidden' fields
+        invalid_fields = check_unknown_forbidden_fields(
+            all_fields=pathogen_model.all_fields(), 
+            forbidden_fields={}, 
+            data=[f.split("__")[0] for f in request.query_params if f != "cursor"]
+        )
+        # If an id was provided (or an id__ field) as a query parameter, reject
+        # NOTE: there is probably numerous cheeky ways around this 
         # But its not the end of the world if someone can figure out the pk, doesn't even matter really
-        model_fields = {f.name for f in pathogen_model._meta.get_fields()}
-        for field in query_param_fields:
+        model_fields = pathogen_model.all_fields()
+        forbidden = []
+        for field in request.query_params:
             dunder_split = field.split("__")
             for f in dunder_split:
                 if f == "id" or (f.endswith("_id") and f[:-len("_id")] in model_fields):
-                    return Responses._403_cannot_query_id
+                    forbidden.append(f)
+        if forbidden:
+            if not invalid_fields:
+                invalid_fields = {
+                    "unknown" : [],
+                    "forbidden" : forbidden
+                }
+            else:
+                invalid_fields["forbidden"].extend(forbidden)
+                invalid_fields["forbidden"] = list(set(invalid_fields["forbidden"]))
+                invalid_fields["unknown"] = list(set(invalid_fields["unknown"]).difference(set(forbidden)))
+        if invalid_fields:
+            return Response(invalid_fields, status=status.HTTP_400_BAD_REQUEST)
+
+        # Convert input choice values to correct case
+        _mutable = request.query_params._mutable
+        request.query_params._mutable = True
+        convert_choice_fields(pathogen_model.choice_fields(), request.query_params)
+        request.query_params._mutable = _mutable
+
+        # Create queryset of all objects by default
+        instances = pathogen_model.objects.all()
 
         # For each query param, filter the data
-        for field in query_param_fields:
+        for field in request.query_params:
             values = request.query_params.getlist(field)
             if field == "cursor":
                 continue
@@ -172,30 +222,16 @@ class UpdateDeletePathogenView(APIView):
             return Responses._403_incorrect_institute_for_user
 
         # Check for unknown fields, and readonly fields
-        # Not a fan of doing it in the view but can't find a solution that gives a more controllable response
-        # E.g. for the actual readonly fields id, published_date, created and last_modified, attempting to update fails
-        # But returns a 200 OK ?? https://github.com/encode/django-rest-framework/issues/1655
-        # I don't want that
-        update_fields = list(request.data.keys())
-        model_fields = {f.name for f in pathogen_model._meta.get_fields()}
-        readonly_fields = pathogen_model.readonly_fields()
-
-        invalid_fields = {
-            "unknown" : [],
-            "forbidden" : []
-        }
-
-        valid_update = True
-        for field in update_fields:
-            if field not in model_fields:
-                invalid_fields["unknown"].append(field)
-                valid_update = False
-            elif field in readonly_fields:
-                invalid_fields["forbidden"].append(field)
-                valid_update = False        
-
-        if not valid_update:
+        invalid_fields = check_unknown_forbidden_fields(
+            all_fields=pathogen_model.all_fields(), 
+            forbidden_fields=pathogen_model.readonly_fields(), 
+            data=request.data
+        )
+        if invalid_fields:
             return Response(invalid_fields, status=status.HTTP_400_BAD_REQUEST)
+
+        # Convert input choice values to correct case
+        convert_choice_fields(pathogen_model.choice_fields(), request.data)
 
         serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
 
@@ -215,7 +251,7 @@ class UpdateDeletePathogenView(APIView):
         Uses the provided `cid` and `pathogen_code` to delete a record.
         '''
 
-        # Get the model for the given cid
+        # Get the model
         pathogen_model = get_pathogen_model_or_404(pathogen_code)
         
         # Attempt to delete object with the provided cid, and return response
