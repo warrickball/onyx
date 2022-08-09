@@ -27,6 +27,9 @@ def timefunc(func):
 
 
 def get_published_week_fields(published_week):
+    '''
+    Convert an ISO week of the format `YYYY-WW` into date filters that can be passed to the Django filter function
+    '''
     fields = {
         "published_date__gte" : [],
         "published_date__lte" : []
@@ -45,6 +48,9 @@ def get_published_week_fields(published_week):
 
 
 def get_published_week_range_fields(published_week_range):
+    '''
+    Convert an ISO week range of the format `[YYYY-WW, YYYY-WW]` into date filters that can be passed to the Django filter function
+    '''
     fields = {
         "published_date__gte" : [],
         "published_date__lte" : []
@@ -64,24 +70,27 @@ def get_published_week_range_fields(published_week_range):
 
 
 class Client:
-    # Constants shared across every client
     CONFIG_DIR_ENV_VAR = "METADB_CONFIG_DIR"
     CONFIG_DIR_NAME = "config"
     CONFIG_FILE_NAME = "config.json"
+    PASSWORD_ENV_VAR_FIXES = ["METADB_", "_PASSWORD"]
     TOKENS_FILE_POSTFIX = "_tokens.json"
     CONFIG_FIELDS = ["host", "port", "users", "default_user"]
-    USER_FIELDS = ["password", "tokens"]
+    USER_FIELDS = ["tokens"]
+    MESSAGE_BAR_WIDTH = 100
 
 
     @classmethod
     def _format_response(cls, response, pretty_print=True):
         '''
-        Make the response look nice
+        Make the response look AMAZING
         '''
         if pretty_print:
-            return f"<[{response.status_code}] {response.reason}>\n{json.dumps(response.json(), indent=4)}"
+            indent = 4
         else:
-            return f"<[{response.status_code}] {response.reason}>\n{json.dumps(response.json())}"
+            indent = None
+        status_code = f"<[{response.status_code}] {response.reason}>".center(Client.MESSAGE_BAR_WIDTH, "=")
+        return f"{status_code}\n{json.dumps(response.json(), indent=indent)}"
 
 
     @classmethod
@@ -97,6 +106,7 @@ class Client:
         else:
             input_func = input
         try:
+            # Take user input, strip it and convert to required type
             value = type(input_func(f"{field[0].upper()}{field[1:].lower()}: ").strip())
         except ValueError:
             value = None
@@ -147,7 +157,7 @@ class Client:
     @classmethod
     def _validate_config(cls, config):
         '''
-        Avoid a million KeyErrors due to the config file.
+        Avoid a million KeyErrors due to problems with the config file.
         '''
         for field in Client.CONFIG_FIELDS:
             if field not in config:
@@ -160,7 +170,7 @@ class Client:
 
 
     @classmethod
-    def makeconfig(cls):
+    def make_config(cls):
         '''
         Generate the config directory and config file.
         '''
@@ -174,6 +184,8 @@ class Client:
         config_dir_path = os.path.join(config_dir_location, Client.CONFIG_DIR_NAME)
         if not os.path.isdir(config_dir_path):
             os.mkdir(config_dir_path)
+        
+        # Read-write-execute for OS user only
         os.chmod(config_dir_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
         
         config_file_path = os.path.join(config_dir_path, Client.CONFIG_FILE_NAME)
@@ -188,6 +200,8 @@ class Client:
                 config_file, 
                 indent=4
             )
+
+        # Read-write for OS user only
         os.chmod(config_file_path, stat.S_IRUSR | stat.S_IWUSR)
 
         print("")
@@ -196,16 +210,15 @@ class Client:
         print("")
         print(f"export METADB_CONFIG_DIR={config_dir_path}")
         print("")
+        print("IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(Client.MESSAGE_BAR_WIDTH, "!"))
         warning_message = [
-            "Your config directory stores sensitive information such as user passwords and tokens.",
-            "The config directory (and files within) have been created with the permissions needed to keep your information safe.",
-            "DO NOT CHANGE THESE PERMISSIONS. Doing so may allow other users to read your passwords and tokens!"
+            "Your config directory (and files within) store sensitive information such as tokens.",
+            "They have been created with the permissions needed to keep your information safe.",
+            "DO NOT CHANGE THESE PERMISSIONS. Doing so may allow other users to read your tokens!"
         ]
-        message_width = max([len(x) for x in warning_message])
-        print("IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(message_width, "!"))
         for line in warning_message:
             print(line)
-        print("!" * message_width)
+        print("".center(Client.MESSAGE_BAR_WIDTH, "!"))
 
 
     def __init__(self, config_dir_path=None):
@@ -225,6 +238,7 @@ class Client:
         self.config_file_path = config_file_path
         self.url = f"http://{self.config['host']}:{self.config['port']}"
 
+        # Define endpoints
         self.endpoints = {
             "token-pair" : f"{self.url}/auth/token-pair/",
             "token-refresh" : f"{self.url}/auth/token-refresh/",
@@ -234,34 +248,36 @@ class Client:
         }
 
 
-    def _request_token_pair(self, username, password):
+    def get_login(self, username=None):
         '''
-        Request an access token and a refresh token.
+        Assign username, tokens and (if stored in an env var) password to the client.
+
+        If no username is provided, the `default_user` in the config is used.
         '''
-        response = requests.post(
-            self.endpoints["token-pair"],
-            json={
-                "username" : username,
-                "password" : password
-            }
-        )
-        return response
+        if username is None:
+            # Attempt to use default_user if no username was provided
+            if self.config["default_user"] is None:
+                raise Exception("No username was provided and there is no default_user in the config. Either provide a username or set a default_user")
+            else:
+                # The default_user must be in the config
+                if self.config["default_user"] not in self.config["users"]:
+                    raise Exception(f"default_user '{self.config['default_user']}' is not in the users list for the config")
+                username = self.config["default_user"]
+        else:
+            # The provided user must be in the config
+            if username not in self.config["users"]:
+                raise KeyError(f"User '{username}' is not in the config. Add them using the add-user command")    
+        self.username = username
+
+        # Grab a password from the env var, if it exists
+        self.password = os.getenv(Client.PASSWORD_ENV_VAR_FIXES[0] + self.username.upper() + Client.PASSWORD_ENV_VAR_FIXES[1])
+        
+        # Open the tokens file for the user and assign their tokens
+        with open(self.config["users"][username]["tokens"]) as tokens_file:
+            self.tokens = json.load(tokens_file) 
 
 
-    def _request_access_token(self, refresh_token):
-        '''
-        Use the refresh token to request a new access token.
-        '''
-        response = requests.post(
-            self.endpoints["token-refresh"], 
-            json={
-                "refresh" : refresh_token,
-            }
-        )
-        return response
-
-
-    def _handle_tokens_request(self, method, url, username, password, tokens, params=None, body=None):
+    def _handle_tokens_request(self, method, url, params=None, body=None):
         '''
         Carry out a given request, refreshing tokens if required.
         '''
@@ -274,7 +290,7 @@ class Client:
         # Make request with the current access token
         response = method(
             url=url,
-            headers={"Authorization": "Bearer {}".format(tokens["access"])},
+            headers={"Authorization": "Bearer {}".format(self.tokens["access"])},
             params=params,
             json=body
         )
@@ -282,66 +298,46 @@ class Client:
         # Handle token expiry
         if response.status_code == 401:
             # Get a new access token using the refresh token
-            access_token_response = self._request_access_token(tokens["refresh"])
+            access_token_response = requests.post(
+                self.endpoints["token-refresh"], 
+                json={
+                    "refresh" : self.tokens["refresh"],
+                }
+            )
 
+            # Something went wrong with the refresh token
             if not access_token_response.ok:
-                # Assume we have an expired refresh token, so get a new pair using username+password
-                token_pair_response = self._request_token_pair(username, password)
+                # Get the password if it doesn't already exist in the client
+                if self.password is None:
+                    print("Your refresh token is expired or invalid. Please enter your password to request new tokens.")
+                    self.password = Client._get_input("password", password=True)
                 
-                if not token_pair_response.ok:
-                    # Who knows what is happening, return the issue with token pairs back to user
-                    return token_pair_response, tokens
+                # Request a new access-refresh token pair
+                token_pair_response = requests.post(
+                    self.endpoints["token-pair"],
+                    json={
+                        "username" : self.username,
+                        "password" : self.password
+                    }
+                )
+
+                if token_pair_response.ok:
+                    self.tokens = token_pair_response.json()
                 else:
-                    tokens = token_pair_response.json()
+                    # Who knows what is happening, return the issue back to user
+                    return token_pair_response
             else:
-                tokens["access"] = access_token_response.json()["access"]
-        
+                self.tokens["access"] = access_token_response.json()["access"]
+
             # Now that we have our updated tokens, retry the request and return whatever response is given
             response = method(
                 url=url,
-                headers={"Authorization": "Bearer {}".format(tokens["access"])},
+                headers={"Authorization": "Bearer {}".format(self.tokens["access"])},
                 params=params,
                 json=body
             )
 
-        return response, tokens 
-
-
-    def prepare_login(self, username=None, password=None):
-        '''
-        Obtain username, password and tokens, and assign to the client.
-        '''
-        if username is not None:
-            pass
-        elif self.config["default_user"] is not None:
-            username = self.config["default_user"]
-        else:
-            username = Client._get_input("username")
-
-        if password is not None:
-            if username in self.config["users"]:
-                if password != self.config["users"][username]["password"]:
-                    raise Exception("Provided password for user does not match user password in the config")
-        elif username in self.config["users"]:
-            password = self.config["users"][username]["password"]
-        else:
-            password = Client._get_input("password", password=True)
-
-        if username in self.config["users"]:
-            with open(self.config["users"][username]["tokens"]) as tokens_file:
-                tokens = json.load(tokens_file) 
-        else:
-            tokens = self._request_token_pair(username, password)
-            if not tokens.ok:
-                # Something is wrong with the username + password 
-                print(Client._format_response(tokens))
-                tokens.raise_for_status() # TODO: change this?
-            else:
-                tokens = tokens.json()
-        
-        self.username = username
-        self.password = password
-        self.tokens = tokens
+        return response
 
 
     def dump_tokens(self):
@@ -352,34 +348,40 @@ class Client:
             json.dump(self.tokens, tokens_file, indent=4)
 
 
-    def add_to_config(self, username, password):
+    def add_user(self, username=None):
+        '''
+        Add user to the config.
+        '''
+        if username is None:
+            username = Client._get_input("username")
+
         tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
         self.config["users"][username] = {
-            "password" : password, # type: ignore
             "tokens" : tokens_path
         }
+
+        # If this is the only user in the config, make them the default_user
         if len(self.config["users"]) == 1:
             self.config["default_user"] = username
         
+        # Write user details to the config file
         # NOTE: Probably has issues if using the same client in multiple places
-        # Just don't use the client at the same time with the same config in multiple places
         with open(self.config_file_path, "w") as config:
             json.dump(self.config, config, indent=4)
         
+        # Create user tokens file
         with open(tokens_path, "w") as tokens:
             json.dump({"access" : None, "refresh" : None}, tokens, indent=4)
         
-        # User read-write only
+        # Read-write for OS user only
         os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
 
         print("The user has been added to the config.")  
 
 
-    def register(self):
+    def register(self, add_to_config=False):
         '''
         Create a new user. 
-        
-        If the account is created successfully, their details will be added to the config.
         '''
         username = Client._get_input("username")
         email = Client._get_input("email address")
@@ -408,36 +410,36 @@ class Client:
         
         if response.ok:
             print("Account created successfully.")
-            check = ""
-            while not check:
-                check = input("Would you like to add this account to the config? [y/n]: ").upper()
-            
-            if check == "Y":
-                self.add_to_config(username, password) # type: ignore
+
+            if add_to_config:
+                self.add_user(username)
+            else:
+                check = ""
+                while not check:
+                    check = input("Would you like to add this account to the config? [y/n]: ").upper()
+                
+                if check == "Y":
+                    self.add_user(username)
 
 
-    def set_default_user(self, username):
+    def set_default_user(self, username=None):
+        if username is None:
+            username = Client._get_input("username")
+
+        if username not in self.config["users"]:
+            raise KeyError(f"User '{username}' is not in the config. Add them using the add-user command")    
+
         self.config["default_user"] = username
+
         with open(self.config_file_path, "w") as config:
             json.dump(self.config, config, indent=4)
+        
         print(f"'{username}' has been set as the default user.")
-        if username not in self.config["users"]:
-            print(f"NOTE: '{username}' does not have login/token details in the config.")
 
 
     def get_default_user(self):
         print(self.config["default_user"])
     
-
-    def add_user(self, username=None, password=None):
-        if username is None:
-            username = Client._get_input("username")
-
-        if password is None:
-            password = Client._get_input("password", password=True)
-        
-        self.add_to_config(username, password)
-        
 
     def create(self, pathogen_code, tsv_path=None, fields=None):
         '''
@@ -456,38 +458,26 @@ class Client:
                 tsv = open(tsv_path)
             try:
                 reader = csv.DictReader(tsv, delimiter='\t')
-                response = None
-                tokens = None
                 for record in reader:
-                    response, tokens = self._handle_tokens_request(
+                    response = self._handle_tokens_request(
                         method=requests.post,
                         url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-                        body=record,
-                        username=self.username,
-                        password=self.password,
-                        tokens=self.tokens
+                        body=record
                     )
                     print(Client._format_response(response))
-                if response and response.ok and tokens:
-                    self.tokens = tokens
             finally:
                 if tsv is not sys.stdin:
                     tsv.close()
         else:
-            response, tokens = self._handle_tokens_request(
+            response = self._handle_tokens_request(
                 method=requests.post,
                 url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-                body=fields,
-                username=self.username,
-                password=self.password,
-                tokens=self.tokens
+                body=fields
             )
             print(Client._format_response(response))
-            if response and response.ok:
-                self.tokens = tokens
             
 
-    def get(self, pathogen_code, cid=None, fields=None, published_week=None, published_week_range=None):
+    def get(self, pathogen_code, cid=None, fields=None, published_week=None, published_week_range=None, stats=None):
         '''
         Get records from the database. 
         '''        
@@ -513,29 +503,24 @@ class Client:
                     fields[f] = []
                 fields[f].extend(v)
         
-        response, tokens = self._handle_tokens_request(
+        if stats is not None:
+            fields["stats"] = stats
+        
+        response = self._handle_tokens_request(
             method=requests.get,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-            params=fields,
-            username=self.username,
-            password=self.password,
-            tokens=self.tokens
+            params=fields
         )
         if response.ok:
-            self.tokens = tokens
             table = pd.json_normalize(response.json()["results"])
             print(table.to_csv(index=False, sep='\t'), end='')
             next = response.json()["next"]
             while next is not None:
-                response, tokens = self._handle_tokens_request(
+                response = self._handle_tokens_request(
                     method=requests.get,
-                    url=next,
-                    username=self.username,
-                    password=self.password,
-                    tokens=tokens
+                    url=next
                 )            
                 if response.ok:
-                    self.tokens = tokens
                     next = response.json()["next"]
                     table = pd.json_normalize(response.json()["results"])
                     print(table.to_csv(index=False, sep='\t', header=False), end='')
@@ -553,16 +538,11 @@ class Client:
         if fields is None:
             fields = {}
 
-        response, tokens = self._handle_tokens_request(
+        response = self._handle_tokens_request(
             method=requests.patch,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
-            body=fields,
-            username=self.username,
-            password=self.password,
-            tokens=self.tokens
+            body=fields
         )
-        if response.ok:
-            self.tokens = tokens
         print(Client._format_response(response))
 
     
@@ -570,15 +550,10 @@ class Client:
         '''
         Delete a record in the database.
         '''        
-        response, tokens = self._handle_tokens_request(
+        response = self._handle_tokens_request(
             method=requests.delete,
-            url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
-            username=self.username,
-            password=self.password,
-            tokens=self.tokens
+            url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/")
         )
-        if response.ok:
-            self.tokens = tokens
         print(Client._format_response(response))
 
 
@@ -586,15 +561,10 @@ class Client:
         '''
         Get the current pathogens within the database.
         '''        
-        response, tokens = self._handle_tokens_request(
+        response = self._handle_tokens_request(
             method=requests.get,
-            url=self.endpoints["pathogen_codes"],
-            username=self.username,
-            password=self.password,
-            tokens=self.tokens
+            url=self.endpoints["pathogen_codes"]
         )
-        if response.ok:
-            self.tokens = tokens
         print(Client._format_response(response))
 
 
@@ -607,17 +577,17 @@ def main():
     parser.add_argument("-t", "--timeit", action="store_true")
     command = parser.add_subparsers(dest="command")
 
-    makeconfig_parser = command.add_parser("make-config")
+    make_config_parser = command.add_parser("make-config")
 
     register_parser = command.add_parser("register")
 
     set_default_user_parser = command.add_parser("set-default-user")
-    set_default_user_parser.add_argument("user")
+    set_default_user_parser.add_argument("user", nargs="?")
     
     get_default_user_parser = command.add_parser("get-default-user")
     
     add_user_parser = command.add_parser("add-user")
-    add_user_parser.add_argument("user")
+    add_user_parser.add_argument("user", nargs="?")
     
     create_parser = command.add_parser("create", parents=[user_parser])
     create_type = create_parser.add_mutually_exclusive_group(required=True)
@@ -631,6 +601,7 @@ def main():
     get_parser.add_argument("-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE"))
     get_parser.add_argument("--published-week", action="append", metavar="YYYY-WW")
     get_parser.add_argument("--published-week-range", nargs=2, action="append", metavar=("YYYY-WW", "YYYY-WW"))
+    get_parser.add_argument("--stats", action="store_true")
 
     update_parser = command.add_parser("update", parents=[user_parser])
     update_parser.add_argument("pathogen_code")
@@ -646,7 +617,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "make-config":
-        Client.makeconfig()
+        Client.make_config()
     else:
         client = Client()
         
@@ -663,7 +634,7 @@ def main():
             client.add_user(args.user)
 
         else:
-            client.prepare_login(username=args.user)
+            client.get_login(username=args.user)
 
             if args.command == "create":
                 if args.field is not None:
@@ -679,7 +650,7 @@ def main():
                         if fields.get(f) is None:
                             fields[f] = []
                         fields[f].append(v)
-                client.get(args.pathogen_code, args.cid, fields, published_week=args.published_week, published_week_range=args.published_week_range)
+                client.get(args.pathogen_code, args.cid, fields, published_week=args.published_week, published_week_range=args.published_week_range, stats=args.stats)
             
             elif args.command == "update":
                 if args.field is not None:
@@ -694,8 +665,7 @@ def main():
             elif args.command == "pathogen-codes":
                 client.pathogen_codes()
             
-            if client.username in client.config["users"]:
-                client.dump_tokens()
+            client.dump_tokens()
 
 if __name__ == "__main__":
     main()
