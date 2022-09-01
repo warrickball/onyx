@@ -2,10 +2,20 @@ name: metadb
 channels:
   - defaults
 dependencies:
+  # sudo apt-get install postgresql postgresql-contrib
+  # sudo apt-get install rabbitmq-server
+  - gunicorn
+  - pybind11
   - pip
   - pip:
-    - requests
+    - psycopg2
     - django
     - djangorestframework
     - djangorestframework-simplejwt
+    - django-filter
+    - requests
+    - pysam
+    - numpy
     - pandas
+    - git+https://github.com/tombch/basecount@1b809cfe48583d92ce660bec575f8adfce9d51c9
+    - celery

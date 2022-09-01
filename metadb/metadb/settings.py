@@ -135,3 +135,6 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ]
 }
+
+CURSOR_PAGINATION_PAGE_SIZE = 5000
+FIELD_NULL_TOKEN = "-"

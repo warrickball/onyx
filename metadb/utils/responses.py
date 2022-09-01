@@ -8,7 +8,7 @@ class Responses:
 
     # Bad request
     _400_mismatch_pathogen_code = Response({"detail" : "pathogen_code provided in request body does not match pathogen code in URL"}, status=status.HTTP_400_BAD_REQUEST)
-    _400_no_updates_provided = Response({"detail" : "no fields to update were provided"}, status=status.HTTP_400_BAD_REQUEST)
+    _400_no_updates_provided = Response({"detail" : "no fields were provided for update"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Forbidden
     _403_different_institute = Response({"detail" : "cannot approve this user. they belong to a different institute"}, status=status.HTTP_403_FORBIDDEN)

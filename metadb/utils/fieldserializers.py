@@ -8,7 +8,7 @@ class YearMonthField(serializers.Field):
         try:
             year, month, _ = str(value).split("-")
         except ValueError as e:
-            raise ValidationError("must be in YYYY-WW-DD format")
+            raise ValidationError("Must be in YYYY-WW-DD format.")
 
         return year + "-" + month
 
@@ -16,7 +16,7 @@ class YearMonthField(serializers.Field):
         try:
             year, month = str(data).split("-")
         except ValueError as e:
-            raise ValidationError("must be in YYYY-WW format")
+            raise ValidationError("Must be in YYYY-WW format.")
         
         try:
             value = date(int(year), int(month), 1)

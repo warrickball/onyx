@@ -9,6 +9,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 from getpass import getpass
+from metadbclient.version import __version__
 
 
 
@@ -69,7 +70,7 @@ def get_published_week_range_fields(published_week_range):
 
 
 
-class Client:
+class METADBClient:
     CONFIG_DIR_ENV_VAR = "METADB_CONFIG_DIR"
     CONFIG_DIR_NAME = "config"
     CONFIG_FILE_NAME = "config.json"
@@ -89,7 +90,7 @@ class Client:
             indent = 4
         else:
             indent = None
-        status_code = f"<[{response.status_code}] {response.reason}>".center(Client.MESSAGE_BAR_WIDTH, "=")
+        status_code = f"<[{response.status_code}] {response.reason}>".center(METADBClient.MESSAGE_BAR_WIDTH, "=")
         return f"{status_code}\n{json.dumps(response.json(), indent=indent)}"
 
 
@@ -124,7 +125,7 @@ class Client:
         '''
         If a `config_dir` was provided, confirm this is a directory containing a config file.
 
-        Otherwise, use `Client.CONFIG_DIR_ENV_VAR`, and confirm that this is a directory that contains a config file.
+        Otherwise, use `METADBClient.CONFIG_DIR_ENV_VAR`, and confirm that this is a directory that contains a config file.
         '''
         if config_dir_path:
             # Check config dir path is a directory
@@ -132,22 +133,22 @@ class Client:
                 raise FileNotFoundError(f"'{config_dir_path}' does not exist")
             
             # Check config file path is a file
-            config_file_path = os.path.join(config_dir_path, Client.CONFIG_FILE_NAME)
+            config_file_path = os.path.join(config_dir_path, METADBClient.CONFIG_FILE_NAME)
             if not os.path.isfile(config_file_path):
                 raise FileNotFoundError(f"Config file does not exist in directory '{config_dir_path}'")
 
         else:
             # Find the config directory
-            config_dir_path = os.getenv(Client.CONFIG_DIR_ENV_VAR)
+            config_dir_path = os.getenv(METADBClient.CONFIG_DIR_ENV_VAR)
             if config_dir_path is None:
-                raise KeyError(f"Environment variable '{Client.CONFIG_DIR_ENV_VAR}' is not set")
+                raise KeyError(f"Environment variable '{METADBClient.CONFIG_DIR_ENV_VAR}' is not set")
             
             # Check config dir path is a directory
             if not os.path.isdir(config_dir_path):
-                raise FileNotFoundError(f"'{Client.CONFIG_DIR_ENV_VAR}' points to a directory that does not exist")
+                raise FileNotFoundError(f"'{METADBClient.CONFIG_DIR_ENV_VAR}' points to a directory that does not exist")
             
             # Check config file path is a file
-            config_file_path = os.path.join(config_dir_path, Client.CONFIG_FILE_NAME)
+            config_file_path = os.path.join(config_dir_path, METADBClient.CONFIG_FILE_NAME)
             if not os.path.isfile(config_file_path):
                 raise FileNotFoundError(f"Config file does not exist in directory '{config_dir_path}'")
 
@@ -159,12 +160,12 @@ class Client:
         '''
         Avoid a million KeyErrors due to problems with the config file.
         '''
-        for field in Client.CONFIG_FIELDS:
+        for field in METADBClient.CONFIG_FIELDS:
             if field not in config:
                 raise KeyError(f"'{field}' key is missing from the config file")
 
         for user, ufields in config["users"].items():
-            for field in Client.USER_FIELDS:
+            for field in METADBClient.USER_FIELDS:
                 if field not in ufields:
                     raise KeyError(f"'{field}' key is missing from user '{user}' in the config file")
 
@@ -181,14 +182,14 @@ class Client:
         if not os.path.isdir(config_dir_location):
             raise FileNotFoundError(f"No such directory: {config_dir_location}")
 
-        config_dir_path = os.path.join(config_dir_location, Client.CONFIG_DIR_NAME)
+        config_dir_path = os.path.join(config_dir_location, METADBClient.CONFIG_DIR_NAME)
         if not os.path.isdir(config_dir_path):
             os.mkdir(config_dir_path)
         
         # Read-write-execute for OS user only
         os.chmod(config_dir_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
         
-        config_file_path = os.path.join(config_dir_path, Client.CONFIG_FILE_NAME)
+        config_file_path = os.path.join(config_dir_path, METADBClient.CONFIG_FILE_NAME)
         with open(config_file_path, "w") as config_file:
             json.dump(
                 {
@@ -210,7 +211,7 @@ class Client:
         print("")
         print(f"export METADB_CONFIG_DIR={config_dir_path}")
         print("")
-        print("IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(Client.MESSAGE_BAR_WIDTH, "!"))
+        print("IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(METADBClient.MESSAGE_BAR_WIDTH, "!"))
         warning_message = [
             "Your config directory (and files within) store sensitive information such as tokens.",
             "They have been created with the permissions needed to keep your information safe.",
@@ -218,19 +219,19 @@ class Client:
         ]
         for line in warning_message:
             print(line)
-        print("".center(Client.MESSAGE_BAR_WIDTH, "!"))
+        print("".center(METADBClient.MESSAGE_BAR_WIDTH, "!"))
 
 
     def __init__(self, config_dir_path=None):
         # Locate the config
-        config_dir_path, config_file_path = Client._locate_config(config_dir_path=config_dir_path)
+        config_dir_path, config_file_path = METADBClient._locate_config(config_dir_path=config_dir_path)
 
         # Load the config
         with open(config_file_path) as config_file:
             config = json.load(config_file)
 
         # Validate the config
-        Client._validate_config(config)
+        METADBClient._validate_config(config)
 
         # Set up client object
         self.config = config
@@ -270,7 +271,7 @@ class Client:
         self.username = username
 
         # Grab a password from the env var, if it exists
-        self.password = os.getenv(Client.PASSWORD_ENV_VAR_FIXES[0] + self.username.upper() + Client.PASSWORD_ENV_VAR_FIXES[1])
+        self.password = os.getenv(METADBClient.PASSWORD_ENV_VAR_FIXES[0] + self.username.upper() + METADBClient.PASSWORD_ENV_VAR_FIXES[1])
         
         # Open the tokens file for the user and assign their tokens
         with open(self.config["users"][username]["tokens"]) as tokens_file:
@@ -310,7 +311,7 @@ class Client:
                 # Get the password if it doesn't already exist in the client
                 if self.password is None:
                     print("Your refresh token is expired or invalid. Please enter your password to request new tokens.")
-                    self.password = Client._get_input("password", password=True)
+                    self.password = METADBClient._get_input("password", password=True)
                 
                 # Request a new access-refresh token pair
                 token_pair_response = requests.post(
@@ -353,7 +354,7 @@ class Client:
         Add user to the config.
         '''
         if username is None:
-            username = Client._get_input("username")
+            username = METADBClient._get_input("username")
 
         tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
         self.config["users"][username] = {
@@ -383,14 +384,14 @@ class Client:
         '''
         Create a new user. 
         '''
-        username = Client._get_input("username")
-        email = Client._get_input("email address")
-        institute = Client._get_input("institute code").upper()
+        username = METADBClient._get_input("username")
+        email = METADBClient._get_input("email address")
+        institute = METADBClient._get_input("institute code").upper()
         
         match = False
         while not match:
-            password = Client._get_input("password", password=True)
-            password2 = Client._get_input("password (again)", password=True)
+            password = METADBClient._get_input("password", password=True)
+            password2 = METADBClient._get_input("password (again)", password=True)
             if password == password2:
                 match = True
             else:
@@ -406,7 +407,7 @@ class Client:
             }
         )
 
-        print(Client._format_response(response))
+        print(METADBClient._format_response(response))
         
         if response.ok:
             print("Account created successfully.")
@@ -424,7 +425,7 @@ class Client:
 
     def set_default_user(self, username=None):
         if username is None:
-            username = Client._get_input("username")
+            username = METADBClient._get_input("username")
 
         if username not in self.config["users"]:
             raise KeyError(f"User '{username}' is not in the config. Add them using the add-user command")    
@@ -464,7 +465,7 @@ class Client:
                         url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
                         body=record
                     )
-                    print(Client._format_response(response))
+                    print(METADBClient._format_response(response))
             finally:
                 if tsv is not sys.stdin:
                     tsv.close()
@@ -474,7 +475,7 @@ class Client:
                 url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
                 body=fields
             )
-            print(Client._format_response(response))
+            print(METADBClient._format_response(response))
             
 
     def get(self, pathogen_code, cid=None, fields=None, published_week=None, published_week_range=None, stats=None):
@@ -526,9 +527,9 @@ class Client:
                     print(table.to_csv(index=False, sep='\t', header=False), end='')
                 else:
                     next = None
-                    print(Client._format_response(response))
+                    print(METADBClient._format_response(response))
         else:
-            print(Client._format_response(response))
+            print(METADBClient._format_response(response))
 
 
     def update(self, pathogen_code, cid, fields=None):
@@ -543,18 +544,18 @@ class Client:
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
             body=fields
         )
-        print(Client._format_response(response))
+        print(METADBClient._format_response(response))
 
     
-    def delete(self, pathogen_code, cid):
+    def suppress(self, pathogen_code, cid):
         '''
-        Delete a record in the database.
+        Suppress a record in the database.
         '''        
         response = self._handle_tokens_request(
             method=requests.delete,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/")
         )
-        print(Client._format_response(response))
+        print(METADBClient._format_response(response))
 
 
     def pathogen_codes(self):
@@ -565,15 +566,16 @@ class Client:
             method=requests.get,
             url=self.endpoints["pathogen_codes"]
         )
-        print(Client._format_response(response))
+        print(METADBClient._format_response(response))
 
 
 
-def main():
+def run():
     user_parser = argparse.ArgumentParser(add_help=False)
     user_parser.add_argument("-u", "--user")
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--version", action="version", version=__version__)
     parser.add_argument("-t", "--timeit", action="store_true")
     command = parser.add_subparsers(dest="command")
 
@@ -608,64 +610,63 @@ def main():
     update_parser.add_argument("cid")
     update_parser.add_argument("-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE"))
 
-    delete_parser = command.add_parser("delete", parents=[user_parser])
-    delete_parser.add_argument("pathogen_code")
-    delete_parser.add_argument("cid")
+    suppress_parser = command.add_parser("suppress", parents=[user_parser])
+    suppress_parser.add_argument("pathogen_code")
+    suppress_parser.add_argument("cid")
 
     pathogen_codes_parser = command.add_parser("pathogen-codes", parents=[user_parser])
 
     args = parser.parse_args()
 
     if args.command == "make-config":
-        Client.make_config()
+        METADBClient.make_config()
     else:
-        client = Client()
+        client = METADBClient()
         
-        if args.command == "register":
-            client.register()
+        try:
+            if args.command == "register":
+                client.register()
 
-        elif args.command == "set-default-user":
-            client.set_default_user(args.user)
-        
-        elif args.command == "get-default-user":
-            client.get_default_user()
-
-        elif args.command == "add-user":
-            client.add_user(args.user)
-
-        else:
-            client.get_login(username=args.user)
-
-            if args.command == "create":
-                if args.field is not None:
-                    fields = {f : v for f, v in args.field}
-                    client.create(args.pathogen_code, fields=fields)
-                else:
-                    client.create(args.pathogen_code, tsv_path=args.tsv)
+            elif args.command == "set-default-user":
+                client.set_default_user(args.user)
             
-            elif args.command == "get":
-                fields = {}
-                if args.field is not None:
-                    for f, v in args.field:
-                        if fields.get(f) is None:
-                            fields[f] = []
-                        fields[f].append(v)
-                client.get(args.pathogen_code, args.cid, fields, published_week=args.published_week, published_week_range=args.published_week_range, stats=args.stats)
-            
-            elif args.command == "update":
-                if args.field is not None:
-                    fields = {f : v for f, v in args.field}
-                else:
+            elif args.command == "get-default-user":
+                client.get_default_user()
+
+            elif args.command == "add-user":
+                client.add_user(args.user)
+
+            else:
+                client.get_login(username=args.user)
+
+                if args.command == "create":
+                    if args.field is not None:
+                        fields = {f : v for f, v in args.field}
+                        client.create(args.pathogen_code, fields=fields)
+                    else:
+                        client.create(args.pathogen_code, tsv_path=args.tsv)
+                
+                elif args.command == "get":
                     fields = {}
-                client.update(args.pathogen_code, args.cid, fields)
+                    if args.field is not None:
+                        for f, v in args.field:
+                            if fields.get(f) is None:
+                                fields[f] = []
+                            fields[f].append(v)
+                    client.get(args.pathogen_code, args.cid, fields, published_week=args.published_week, published_week_range=args.published_week_range, stats=args.stats)
+                
+                elif args.command == "update":
+                    if args.field is not None:
+                        fields = {f : v for f, v in args.field}
+                    else:
+                        fields = {}
+                    client.update(args.pathogen_code, args.cid, fields)
 
-            elif args.command == "delete":
-                client.delete(args.pathogen_code, args.cid)
+                elif args.command == "suppress":
+                    client.suppress(args.pathogen_code, args.cid)
+                
+                elif args.command == "pathogen-codes":
+                    client.pathogen_codes()
             
-            elif args.command == "pathogen-codes":
-                client.pathogen_codes()
-            
+        finally:
             client.dump_tokens()
-
-if __name__ == "__main__":
-    main()

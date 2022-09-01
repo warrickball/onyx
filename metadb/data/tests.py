@@ -487,6 +487,10 @@ class UpdatePathogenTestCase(BaseAPITestCase):
                 self.assertEqual(Pathogen.objects.get(cid=cid).is_external, previous_value)
 
 
+class SuppressPathogenTestCase(BaseAPITestCase):
+    pass # TODO
+
+
 class DeletePathogenTestCase(BaseAPITestCase):
     def setUp(self):
         self.endpoint = "/data/pathogen/"
@@ -501,7 +505,7 @@ class DeletePathogenTestCase(BaseAPITestCase):
     def test_valid_not_admin(self):
         for instance in self.pathogen_db_instances:
             cid = instance.cid
-            response = self.client.delete(os.path.join(self.endpoint, cid + "/"))
+            response = self.client.delete(os.path.join(self.endpoint, cid + "/delete/"))
             self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
             self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
 
@@ -510,7 +514,7 @@ class DeletePathogenTestCase(BaseAPITestCase):
         self.user.save()
         for instance in self.pathogen_db_instances:
             cid = instance.cid
-            response = self.client.delete(os.path.join(self.endpoint, cid + "/"))
+            response = self.client.delete(os.path.join(self.endpoint, cid + "/delete/"))
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 0)
 
@@ -519,7 +523,7 @@ class DeletePathogenTestCase(BaseAPITestCase):
         self.user.save()
         for _ in range(10):
             cid = generate_cid()
-            response = self.client.delete(os.path.join(self.endpoint, cid + "/"))
+            response = self.client.delete(os.path.join(self.endpoint, cid + "/delete/"))
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_invalid_pathogen_code(self):
@@ -527,6 +531,6 @@ class DeletePathogenTestCase(BaseAPITestCase):
         self.user.save()
         for instance in self.pathogen_db_instances:
             cid = instance.cid
-            response = self.client.delete(os.path.join(f"/data/delete/not-a-pathogen/", cid + "/"))
+            response = self.client.delete(os.path.join(f"/data/delete/not-a-pathogen/", cid + "/delete/"))
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
             self.assertEqual(Pathogen.objects.filter(cid=cid).count(), 1)
