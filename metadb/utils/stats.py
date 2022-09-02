@@ -186,7 +186,7 @@ def calculate_bam_stats(bam_path, decimal_places=None):
     if decimal_places is None:
         decimal_places = 5
     
-    bc = basecount.BaseCount(bam_path, min_base_quality=10, min_mapping_quality=10)
+    bc = basecount.BaseCount(bam_path, min_base_quality=0, min_mapping_quality=0)
 
     pc_coverage = 100 * (len([record["coverage"] for record in bc.records() if record["coverage"] != 0]) / sum(bc.reference_lengths.values()))
     bam_stats = {

@@ -70,6 +70,48 @@ def get_published_week_range_fields(published_week_range):
 
 
 
+def format_response(response, pretty_print=True):
+    '''
+    Make the response look lovely.
+    '''
+    if pretty_print:
+        indent = 4
+    else:
+        indent = None
+    status_code = f"<[{response.status_code}] {response.reason}>"
+    try:
+        return f"{status_code}\n{json.dumps(response.json(), indent=indent)}".center(METADBClient.MESSAGE_BAR_WIDTH, "=")
+    except json.decoder.JSONDecodeError:
+        return f"{status_code}\n{response.text}"
+
+
+
+def get_input(field, password=False, type=None, required=True):
+    '''
+    Get user input/password, ensuring they enter something.
+    '''
+    if type is None:
+        type = str
+    if password:
+        # User input is not displayed to the terminal with getpass
+        input_func = getpass
+    else:
+        input_func = input
+    try:
+        # Take user input, strip it and convert to required type
+        value = type(input_func(f"{field[0].upper()}{field[1:].lower()}: ").strip())
+    except ValueError:
+        value = None
+    if required:
+        while not value:
+            try:
+                value = type(input_func(f"Please enter a valid {field.lower()}: ").strip())
+            except ValueError:
+                value = None
+    return value
+
+
+
 class METADBClient:
     CONFIG_DIR_ENV_VAR = "METADB_CONFIG_DIR"
     CONFIG_DIR_NAME = "config"
@@ -79,45 +121,6 @@ class METADBClient:
     CONFIG_FIELDS = ["host", "port", "users", "default_user"]
     USER_FIELDS = ["tokens"]
     MESSAGE_BAR_WIDTH = 100
-
-
-    @classmethod
-    def _format_response(cls, response, pretty_print=True):
-        '''
-        Make the response look AMAZING
-        '''
-        if pretty_print:
-            indent = 4
-        else:
-            indent = None
-        status_code = f"<[{response.status_code}] {response.reason}>".center(METADBClient.MESSAGE_BAR_WIDTH, "=")
-        return f"{status_code}\n{json.dumps(response.json(), indent=indent)}"
-
-
-    @classmethod
-    def _get_input(cls, field, password=False, type=None, required=True):
-        '''
-        Get user input/password, ensuring they enter something.
-        '''
-        if type is None:
-            type = str
-        if password:
-            # User input is not displayed to the terminal with getpass
-            input_func = getpass
-        else:
-            input_func = input
-        try:
-            # Take user input, strip it and convert to required type
-            value = type(input_func(f"{field[0].upper()}{field[1:].lower()}: ").strip())
-        except ValueError:
-            value = None
-        if required:
-            while not value:
-                try:
-                    value = type(input_func(f"Please enter a valid {field.lower()}: ").strip())
-                except ValueError:
-                    value = None
-        return value
 
 
     @classmethod
@@ -175,9 +178,9 @@ class METADBClient:
         '''
         Generate the config directory and config file.
         '''
-        host = cls._get_input("host")
-        port = cls._get_input("port", type=int)
-        config_dir_location = cls._get_input("location to create a config directory")
+        host = get_input("host")
+        port = get_input("port", type=int)
+        config_dir_location = get_input("location to create a config directory")
         config_dir_location = config_dir_location.replace("~", os.path.expanduser("~"))
         if not os.path.isdir(config_dir_location):
             raise FileNotFoundError(f"No such directory: {config_dir_location}")
@@ -311,7 +314,7 @@ class METADBClient:
                 # Get the password if it doesn't already exist in the client
                 if self.password is None:
                     print("Your refresh token is expired or invalid. Please enter your password to request new tokens.")
-                    self.password = METADBClient._get_input("password", password=True)
+                    self.password = get_input("password", password=True)
                 
                 # Request a new access-refresh token pair
                 token_pair_response = requests.post(
@@ -354,7 +357,7 @@ class METADBClient:
         Add user to the config.
         '''
         if username is None:
-            username = METADBClient._get_input("username")
+            username = get_input("username")
 
         tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
         self.config["users"][username] = {
@@ -384,14 +387,14 @@ class METADBClient:
         '''
         Create a new user. 
         '''
-        username = METADBClient._get_input("username")
-        email = METADBClient._get_input("email address")
-        institute = METADBClient._get_input("institute code").upper()
+        username = get_input("username")
+        email = get_input("email address")
+        institute = get_input("institute code").upper()
         
         match = False
         while not match:
-            password = METADBClient._get_input("password", password=True)
-            password2 = METADBClient._get_input("password (again)", password=True)
+            password = get_input("password", password=True)
+            password2 = get_input("password (again)", password=True)
             if password == password2:
                 match = True
             else:
@@ -407,7 +410,7 @@ class METADBClient:
             }
         )
 
-        print(METADBClient._format_response(response))
+        print(format_response(response))
         
         if response.ok:
             print("Account created successfully.")
@@ -425,7 +428,7 @@ class METADBClient:
 
     def set_default_user(self, username=None):
         if username is None:
-            username = METADBClient._get_input("username")
+            username = get_input("username")
 
         if username not in self.config["users"]:
             raise KeyError(f"User '{username}' is not in the config. Add them using the add-user command")    
@@ -465,7 +468,7 @@ class METADBClient:
                         url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
                         body=record
                     )
-                    print(METADBClient._format_response(response))
+                    print(format_response(response))
             finally:
                 if tsv is not sys.stdin:
                     tsv.close()
@@ -475,7 +478,7 @@ class METADBClient:
                 url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
                 body=fields
             )
-            print(METADBClient._format_response(response))
+            print(format_response(response))
             
 
     def get(self, pathogen_code, cid=None, fields=None, published_week=None, published_week_range=None, stats=None):
@@ -527,9 +530,9 @@ class METADBClient:
                     print(table.to_csv(index=False, sep='\t', header=False), end='')
                 else:
                     next = None
-                    print(METADBClient._format_response(response))
+                    print(format_response(response))
         else:
-            print(METADBClient._format_response(response))
+            print(format_response(response))
 
 
     def update(self, pathogen_code, cid, fields=None):
@@ -544,7 +547,7 @@ class METADBClient:
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
             body=fields
         )
-        print(METADBClient._format_response(response))
+        print(format_response(response))
 
     
     def suppress(self, pathogen_code, cid):
@@ -555,7 +558,7 @@ class METADBClient:
             method=requests.delete,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/")
         )
-        print(METADBClient._format_response(response))
+        print(format_response(response))
 
 
     def pathogen_codes(self):
@@ -566,11 +569,12 @@ class METADBClient:
             method=requests.get,
             url=self.endpoints["pathogen_codes"]
         )
-        print(METADBClient._format_response(response))
+        print(format_response(response))
 
 
 
 def run():
+    # TODO: Return metadata in tsv
     user_parser = argparse.ArgumentParser(add_help=False)
     user_parser.add_argument("-u", "--user")
 
@@ -622,21 +626,21 @@ def run():
         METADBClient.make_config()
     else:
         client = METADBClient()
+
+        if args.command == "register":
+            client.register()
         
-        try:
-            if args.command == "register":
-                client.register()
+        elif args.command == "set-default-user":
+            client.set_default_user(args.user)
+        
+        elif args.command == "get-default-user":
+            client.get_default_user()
 
-            elif args.command == "set-default-user":
-                client.set_default_user(args.user)
-            
-            elif args.command == "get-default-user":
-                client.get_default_user()
+        elif args.command == "add-user":
+            client.add_user(args.user)
 
-            elif args.command == "add-user":
-                client.add_user(args.user)
-
-            else:
+        else:
+            try:                
                 client.get_login(username=args.user)
 
                 if args.command == "create":
@@ -667,6 +671,6 @@ def run():
                 
                 elif args.command == "pathogen-codes":
                     client.pathogen_codes()
-            
-        finally:
-            client.dump_tokens()
+                
+            finally:
+                client.dump_tokens()

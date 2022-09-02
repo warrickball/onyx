@@ -21,15 +21,15 @@ def create_institutes():
 
 
 def generate_pathogen_dict(institute_code):
-    sender_sample_id = f"SAMPLE-{secrets.token_hex(3).upper()}"
+    sample_id = f"SAMPLE-{secrets.token_hex(3).upper()}"
     run_name = f"RUN-{random.randint(1, 100)}"
     pathogen_dict = {
         "institute" : institute_code,
-        "sender_sample_id" : sender_sample_id,
+        "sample_id" : sample_id,
         "run_name" : run_name,
         "pathogen_code" : "PATHOGEN",
-        "fasta_path" : f"{sender_sample_id}.{run_name}.fasta",
-        "bam_path" : f"{sender_sample_id}.{run_name}.bam",
+        "fasta_path" : f"{sample_id}.{run_name}.fasta",
+        "bam_path" : f"{sample_id}.{run_name}.bam",
         "is_external" : random.choice([True, False]),
         "collection_month" : f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}",
         "received_month" : f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
@@ -96,7 +96,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 1)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 1)
     
     def test_cant_provide_cid(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
@@ -108,7 +108,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 0)
     
     def test_must_provide_institute(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
@@ -120,7 +120,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 0)
      
     def test_wrong_institute(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.wrong_institute)
@@ -131,7 +131,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 0)
     
     def test_incorrect_endpoint(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
@@ -142,7 +142,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 0)
 
     def test_mismatch_pathogen_code(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
@@ -154,13 +154,13 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 0)
 
     def test_sample_and_run_preexisting(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
         for x in input_data:
             instance = random.choice(self.pathogen_db_instances)
-            x["sender_sample_id"] = instance.sender_sample_id
+            x["sample_id"] = instance.sample_id
             x["run_name"] = instance.run_name
             response = self.client.post(
                 self.endpoint,
@@ -168,7 +168,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 1)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 1)
 
     def test_sample_or_run_preexisting(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
@@ -181,7 +181,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
             if x["run_name"] == instance.run_name: # Prevent test failing if their run_name already matches, which is not unlikely
                 pass
             elif coin:
-                x["sender_sample_id"] = instance.sender_sample_id
+                x["sample_id"] = instance.sample_id
             else:
                 x["run_name"] = instance.run_name
             response = self.client.post(
@@ -190,7 +190,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 1)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 1)
     
     def test_required_field_missing(self):
         input_data = create_input_pathogen_data(amount=self.user_input_size, institute_code=self.institute)
@@ -205,7 +205,7 @@ class CreatePathogenTestCase(BaseAPITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(Pathogen.objects.filter(sender_sample_id=x["sender_sample_id"]).filter(run_name=x["run_name"]).count(), 0)
+            self.assertEqual(Pathogen.objects.filter(sample_id=x["sample_id"]).filter(run_name=x["run_name"]).count(), 0)
     
     def test_optional_field_missing(self):
         pass # TODO make some optional fields and test them
@@ -324,12 +324,12 @@ class GetPathogenTestCase(BaseAPITestCase):
             response = self.client.get(
                 self.endpoint,
                 data={
-                    "sender_sample_id" : i,
-                    "sender_sample_id__gte" : i
+                    "sample_id" : i,
+                    "sample_id__gte" : i
                 }
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(len(response.json()["results"]), Pathogen.objects.filter(sender_sample_id=i).count())  
+            self.assertEqual(len(response.json()["results"]), Pathogen.objects.filter(sample_id=i).count())  
 
     def test_invalid_filter_params(self):
         response = self.client.get(

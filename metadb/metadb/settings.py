@@ -21,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('METADB_SECRET_KEY')
+SECRET_KEY = os.getenv("DJANGO_METADB_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 # Application definition
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'django_filters',
     'data',
     'accounts'
 ]
@@ -79,10 +80,14 @@ WSGI_APPLICATION = 'metadb.wsgi.application'
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+   'default': {
+       'ENGINE': 'django.db.backends.postgresql',
+       'NAME': 'metadb',
+       'USER': os.getenv("POSTGRES_METADB_USER"),
+       'PASSWORD': os.getenv("POSTGRES_METADB_PASSWORD"),
+       'HOST': 'localhost',
+       'PORT': '5432',
+   }
 }
 
 
@@ -136,5 +141,6 @@ REST_FRAMEWORK = {
     ]
 }
 
+# Custom settings used in the project
 CURSOR_PAGINATION_PAGE_SIZE = 5000
-FIELD_NULL_TOKEN = "-"
+FIELD_NULL_TOKEN = "-" # TODO: Use again?
