@@ -36,7 +36,7 @@ class CreateUserView(CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 
-class ListUserView(ListAPIView):
+class ListInstituteUsersView(ListAPIView):
     '''
     List all users in the institute of the requesting user.
     '''
@@ -47,7 +47,7 @@ class ListUserView(ListAPIView):
         return User.objects.filter(institute=self.request.user.institute).order_by('-date_joined') # type: ignore
 
 
-class ListAllUserView(ListAPIView):
+class ListAllUsersView(ListAPIView):
     '''
     List all users.
     '''
