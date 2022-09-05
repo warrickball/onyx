@@ -96,7 +96,13 @@ class PathogenCodeView(APIView):
 
 
 class CreateGetPathogenView(APIView):
-    permission_classes = [IsAuthenticated, IsApproved]
+    def get_permissions(self):
+        if self.request.method == "POST":
+            permission_classes = [IsAdminUser]
+        else:
+            permission_classes = [IsAuthenticated, IsApproved]
+        return [permission() for permission in permission_classes]
+
 
     def post(self, request, pathogen_code):
         '''
@@ -210,7 +216,7 @@ class CreateGetPathogenView(APIView):
 
 
 class UpdateSuppressPathogenView(APIView):
-    permission_classes = [IsAuthenticated, IsApproved]
+    permission_classes = [IsAdminUser]
 
     def patch(self, request, pathogen_code, cid):
         '''
