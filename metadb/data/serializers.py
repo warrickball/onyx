@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import Pathogen, Mpx, Covid #, FastaStats, BamStats, VAF 
+from .models import Pathogen, Mpx, Covid  # , FastaStats, BamStats, VAF
 from accounts.models import Institute
 from utils.fieldserializers import YearMonthField
 
 
-# class FastaStatsSerializer(serializers.ModelSerializer):    
+# class FastaStatsSerializer(serializers.ModelSerializer):
 #     class Meta:
 #         model = FastaStats
 #         exclude = ("id", "metadata")
@@ -26,24 +26,28 @@ from utils.fieldserializers import YearMonthField
 
 class PathogenSerializer(serializers.ModelSerializer):
     collection_month = YearMonthField(required=False)
-    received_month = YearMonthField(required=False) 
-    institute = serializers.SlugRelatedField(queryset=Institute.objects.all(), slug_field="code")
-    
+    received_month = YearMonthField(required=False)
+    institute = serializers.SlugRelatedField(
+        queryset=Institute.objects.all(), slug_field="code"
+    )
+
     class Meta:
         model = Pathogen
-        exclude = Pathogen.excluded_fields()
+        exclude = Pathogen.hidden_fields()
 
 
 class MpxSerializer(PathogenSerializer):
+    previous_sample_id = serializers.CharField(required=False)
+
     class Meta:
         model = Mpx
-        exclude = Mpx.excluded_fields()
+        exclude = Mpx.hidden_fields()
 
 
 class CovidSerializer(PathogenSerializer):
     class Meta:
         model = Covid
-        exclude = Covid.excluded_fields()
+        exclude = Covid.hidden_fields()
 
 
 # class PathogenStatsSerializer(PathogenSerializer):
