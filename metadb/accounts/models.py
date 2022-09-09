@@ -8,6 +8,7 @@ class Institute(models.Model):
 
 
 class User(AbstractUser):
-    institute = models.ForeignKey("Institute", on_delete=models.CASCADE) 
+    email = models.EmailField(unique=True)
+    institute = models.ForeignKey("Institute", on_delete=models.CASCADE)
     is_approved = models.BooleanField(default=False)
     is_authority = models.BooleanField(default=False)

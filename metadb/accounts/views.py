@@ -8,54 +8,59 @@ from utils.responses import Responses
 
 
 class IsApproved(permissions.BasePermission):
-    '''
+    """
     Allows access only to users that have been approved by an authority for their institute.
-    '''
+    """
+
     message = "To perform this action, you need to be approved by an authority from your institute."
 
     def has_permission(self, request, view):
-            return request.user.is_approved
+        return request.user.is_approved
 
 
 class IsAuthority(permissions.BasePermission):
-    '''
+    """
     Allows access only to users who are an authority for their institute.
-    '''
+    """
+
     message = "To perform this action, you need to be granted permission by an admin."
 
     def has_permission(self, request, view):
-            return request.user.is_authority
+        return request.user.is_authority
 
 
 class CreateUserView(CreateAPIView):
-    '''
+    """
     Create a user.
-    '''
+    """
+
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
 
 class ListInstituteUsersView(ListAPIView):
-    '''
+    """
     List all users in the institute of the requesting user.
-    '''
+    """
+
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated, IsApproved]
 
     def get_queryset(self):
-        return User.objects.filter(institute=self.request.user.institute).order_by('-date_joined') # type: ignore
+        return User.objects.filter(institute=self.request.user.institute).order_by("-date_joined")  # type: ignore
 
 
 class ListAllUsersView(ListAPIView):
-    '''
+    """
     List all users.
-    '''
+    """
+
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        return User.objects.order_by('-date_joined')
+        return User.objects.order_by("-date_joined")
 
 
 @api_view(["PATCH"])
