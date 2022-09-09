@@ -1,4 +1,7 @@
 from django.db import models
+from django.core.validators import MinLengthValidator
+from django.db.models import Field
+from django.db.models.lookups import BuiltinLookup
 from utils.fields import YearMonthField
 from secrets import token_hex
 from accounts.models import Institute
@@ -73,135 +76,137 @@ def generate_cid():
     return cid
 
 
-@models.Field.register_lookup
+@Field.register_lookup
 class NotEqual(models.Lookup):
-    lookup_name = 'ne'
+    lookup_name = "ne"
 
     def as_sql(self, compiler, connection):
         lhs, lhs_params = self.process_lhs(compiler, connection)
         rhs, rhs_params = self.process_rhs(compiler, connection)
         params = lhs_params + rhs_params
-        return '%s <> %s' % (lhs, rhs), params
+        return "%s <> %s" % (lhs, rhs), params
 
 
-# TODO: Structure containing all fields and their create, update, etc status
+@Field.register_lookup
+class IsNull(BuiltinLookup):
+    lookup_name = "isnull"
+    prepare_rhs = False
+
+    def as_sql(self, compiler, connection):
+        if str(self.rhs) in ["0", "false", "False"]:
+            self.rhs = False
+
+        elif str(self.rhs) in ["1", "false", "False"]:
+            self.rhs = True
+
+        if not isinstance(self.rhs, bool):
+            raise ValueError(
+                "The QuerySet value for an isnull lookup must be True or False."
+            )
+
+        sql, params = compiler.compile(self.lhs)
+        if self.rhs:
+            return "%s IS NULL" % sql, params
+        else:
+            return "%s IS NOT NULL" % sql, params
+
+
 class Pathogen(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     suppressed = models.BooleanField(default=False)
 
     cid = models.CharField(default=generate_cid, max_length=12, unique=True)
-    sample_id = models.CharField(max_length=24)
-    run_name = models.CharField(max_length=96)
+    sender_sample_id = models.CharField(
+        max_length=24, validators=[MinLengthValidator(8)]
+    )
+    run_name = models.CharField(max_length=96, validators=[MinLengthValidator(18)])
     pathogen_code = models.CharField(
-        max_length=8,
-        choices=[
-            ("MPX", "MPX"),
-            ("COVID", "COVID")
-        ]
+        max_length=8, choices=[("MPX", "MPX"), ("COVID", "COVID")]
     )
     institute = models.ForeignKey("accounts.Institute", on_delete=models.CASCADE)
     published_date = models.DateField(auto_now_add=True)
 
     fasta_path = models.TextField()
     bam_path = models.TextField()
-    is_external = models.CharField(
-        max_length=1,
-        choices=[
-            ("Y", "Y"),
-            ("N", "N")
-        ]
-    )
+    is_external = models.BooleanField()
     collection_month = YearMonthField(null=True)
     received_month = YearMonthField(null=True)
 
     class Meta:
-        unique_together = [
-            "sample_id", 
-            "run_name",
-            "pathogen_code"
-        ]
-    
-    @classmethod
-    def optional_value_groups(cls):
-        return [
-            ["collection_month", "received_month"]
-        ]
+        unique_together = ["sender_sample_id", "run_name", "pathogen_code"]
+
+    FIELD_PERMISSIONS = {
+        "id": ["hidden"],
+        "created": ["hidden"],
+        "last_modified": ["hidden"],
+        "suppressed": ["hidden"],
+        "cid": ["no create", "no update"],
+        "sender_sample_id": ["create", "no update"],
+        "run_name": ["create", "no update"],
+        "pathogen_code": ["create", "no update"],
+        "institute": ["create", "no update"],
+        "published_date": ["no create", "no update"],
+        "fasta_path": ["create", "update"],
+        "bam_path": ["create", "update"],
+        "is_external": ["create", "update"],
+        "collection_month": ["create", "update"],
+        "received_month": ["create", "update"],
+    }
+
+    FILTER_FIELDS = {
+        "cid": {"type": models.CharField, "choices": False},
+        "sender_sample_id": {"type": models.CharField, "choices": False},
+        "run_name": {"type": models.CharField, "choices": False},
+        "pathogen_code": {"type": models.CharField, "choices": True},
+        "institute__code": {
+            "type": models.CharField,
+            "choices": True,
+            "alias": "institute",
+        },
+        "published_date": {"type": models.DateField, "choices": False},
+        "fasta_path": {"type": models.TextField, "choices": False},
+        "bam_path": {"type": models.TextField, "choices": False},
+        "is_external": {"type": models.BooleanField, "choices": False},
+        "collection_month": {"type": YearMonthField, "choices": False},
+        "received_month": {"type": YearMonthField, "choices": False},
+    }
+
+    OPTIONAL_VALUE_GROUPS = [["collection_month", "received_month"]]
 
     @classmethod
-    def excluded_fields(cls):
-        '''
-        Fields that are excluded when sending data to the client.
-        '''
-        return ["id", "created", "last_modified", "suppressed"]
-    
+    def hidden_fields(cls):
+        return [
+            field for field, perms in cls.FIELD_PERMISSIONS.items() if "hidden" in perms
+        ]
+
     @classmethod
     def create_fields(cls):
-        '''
-        Fields that can be submitted on creation of a model instance.
-        '''
-        return {"sample_id", "run_name", "pathogen_code", "institute", "published_date", "fasta_path", "bam_path", "is_external", "collection_month", "received_month"}
-    
+        return [
+            field for field, perms in cls.FIELD_PERMISSIONS.items() if "create" in perms
+        ]
+
     @classmethod
-    def non_create_fields(cls):
-        '''
-        Fields that cannot be submitted on creation of a model instance.
-        '''
-        return {"cid", "published_date"}
-    
+    def no_create_fields(cls):
+        return [
+            field
+            for field, perms in cls.FIELD_PERMISSIONS.items()
+            if "no create" in perms
+        ]
+
     @classmethod
     def update_fields(cls):
-        '''
-        Fields that can be submitted on update of a model instance.
-        '''
-        return {"fasta_path", "bam_path", "is_external", "collection_month", "received_month"}
+        return [
+            field for field, perms in cls.FIELD_PERMISSIONS.items() if "update" in perms
+        ]
 
     @classmethod
-    def non_update_fields(cls):
-        '''
-        Fields that cannot be submitted on update of a model instance.
-        '''
-        return {"cid", "sample_id", "run_name", "pathogen_code", "institute", "published_date"}
-
-    @classmethod
-    def filter_fields(cls):
-        '''
-        Fields that can be filtered on, and their types.
-        '''
-        return {
-            "cid" : models.CharField,
-            "sample_id" : models.CharField,
-            "run_name" : models.CharField,
-            "pathogen_code" : models.CharField,
-            "institute__code" : models.CharField,
-            "published_date" : models.DateField,
-            "fasta_path" : models.TextField,
-            "bam_path" : models.TextField,
-            "is_external" : models.CharField,
-            "collection_month" : YearMonthField,
-            "received_month" : YearMonthField
-        }
-    
-    @classmethod
-    def choice_filter_fields(cls):
-        '''
-        Fields with a restricted number of options.
-        '''
-        return {"pathogen_code", "institute__code", "is_external"}
-    
-    @classmethod
-    def aliases(cls):
-        '''
-        Fields with alternate names used when filtering.
-        '''
-        return {
-            "institute__code" : "institute"
-        }
-
-    @classmethod
-    def get_institute__code_choices(cls):
-        values = get_field_values(Institute, "code")
-        return zip(values, values)
+    def no_update_fields(cls):
+        return [
+            field
+            for field, perms in cls.FIELD_PERMISSIONS.items()
+            if "no update" in perms
+        ]
 
     @classmethod
     def get_choices(cls, field):
@@ -215,68 +220,88 @@ class Pathogen(models.Model):
             else:
                 return []
 
+    @classmethod
+    def get_institute__code_choices(cls):
+        values = get_field_values(Institute, "code")
+        return zip(values, values)
+
 
 class Mpx(Pathogen):
     fasta_header = models.CharField(max_length=100)
+    # sample_type = models.CharField(max_length=16, validators=[MinLengthValidator(8)]) # TODO: Choices?
+    # run_sequencer = models.CharField(max_length=96)
+    # run_seq_protocol = models.CharField(max_length=96)
+    # run_layout = models.CharField(
+    #     choices=[
+    #         ("SINGLE", "SINGLE"),
+    #         ("PAIRED", "PAIRED"),
+    #     ]
+    # )
+    # run_selection = models.CharField(
+    #     choices=[
+    #         ("PCR", "PCR"),
+    #         ("RANDOM", "RANDOM"),
+    #         ("RANDOM_PCR", "RANDOM_PCR"),
+    #         ("NONE", "NONE"),
+    #         ("OTHER", "OTHER")
+    #     ]
+    # )
+    # seq_approach = models.CharField(
+    #     choices=[
+    #         ("GENOMIC", "GENOMIC"),
+    #         ("METAGENOMIC", "METAGENOMIC"),
+    #         ("METATRANSCRIPTOMIC", "METATRANSCRIPTOMIC"),
+    #         ("TRANSCRIPTOMIC", "TRANSCRIPTOMIC"),
+    #         ("VIRAL_RNA", "VIRAL_RNA"),
+    #         ("OTHER", "OTHER")
+    #     ]
+    # )
+    # seq_strategy = models.CharField(
+    #     choices=[
+    #         ("AMPICON", "AMPLICON"),
+    #         ("TARGETED_CAPTURE", "TARGETED_CAPTURE"),
+    #         ("WGA", "WGA"),
+    #         ("WGS", "WGS"),
+    #         ("OTHER", "OTHER")
+    #     ]
+    # )
     seq_platform = models.CharField(
         max_length=50,
         choices=[
             ("ILLUMINA", "ILLUMINA"),
             ("OXFORD_NANOPORE", "OXFORD_NANOPORE"),
             ("PACIFIC_BIOSCIENCES", "PACIFIC_BIOSCIENCES"),
-            ("ION_TORRENT", "ION_TORRENT")
-        ]
+            ("ION_TORRENT", "ION_TORRENT"),
+        ],
     )
+    # instrument_model = models.CharField(max_length=48)
+    # bioinfo_pipe_name = models.CharField(max_length=96)
+    # bioinfo_pipe_version = models.CharField(max_length=48)
+    # previous_sample_id = models.CharField(null=True, max_length=24, validators=[MinLengthValidator(8)])
 
-    @classmethod
-    def create_fields(cls):
-        return super().create_fields() | {"fasta_header", "seq_platform"}
-    
-    @classmethod
-    def update_fields(cls):
-        return super().update_fields() | {"fasta_header", "seq_platform"}
-    
-    @classmethod
-    def filter_fields(cls):
-        pathogen_fields = super().filter_fields()
-        mpx_fields = {
-            "fasta_header" : models.CharField,
-            "seq_platform" : models.CharField
-        }
-        return pathogen_fields | mpx_fields
+    FIELD_PERMISSIONS = Pathogen.FIELD_PERMISSIONS | {
+        "fasta_header": ["create", "update"],
+        "seq_platform": ["create", "update"],
+    }
 
-    @classmethod
-    def choice_filter_fields(cls):
-        return super().choice_filter_fields() | {"seq_platform"}
+    FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
+        "fasta_header": {"type": models.CharField, "choices": False},
+        "seq_platform": {"type": models.CharField, "choices": True},
+    }
 
 
 class Covid(Pathogen):
     fasta_header = models.CharField(max_length=100)
     sample_type = models.CharField(
-        max_length=50,
-        choices=[
-            ("SWAB", "SWAB"),
-            ("SERUM", "SERUM")
-        ]
+        max_length=50, choices=[("SWAB", "SWAB"), ("SERUM", "SERUM")]
     )
 
-    @classmethod
-    def create_fields(cls):
-        return super().create_fields() | {"fasta_header", "sample_type"}
-    
-    @classmethod
-    def update_fields(cls):
-        return super().update_fields() | {"fasta_header", "sample_type"}
+    FIELD_PERMISSIONS = Pathogen.FIELD_PERMISSIONS | {
+        "fasta_header": ["create", "update"],
+        "sample_type": ["create", "update"],
+    }
 
-    @classmethod
-    def filter_fields(cls):
-        pathogen_fields = super().filter_fields()
-        covid_fields = {
-            "fasta_header" : models.CharField,
-            "sample_type" : models.CharField
-        }
-        return pathogen_fields | covid_fields
-
-    @classmethod
-    def choice_filter_fields(cls):
-        return super().choice_filter_fields() | {"sample_type"}
+    FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
+        "fasta_header": {"type": models.CharField, "choices": False},
+        "sample_type": {"type": models.CharField, "choices": True},
+    }
