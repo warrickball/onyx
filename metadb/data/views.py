@@ -4,39 +4,37 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from django.http import Http404
 from django.conf import settings
 from . import serializers, models
 from .filters import METADBFilter
 from .models import Pathogen
 from accounts.views import IsApproved
-from utils.responses import Responses
 import inspect
 
 
-
-def get_pathogen_model_or_404(pathogen_code, accept_base=True):
-    '''
+def get_pathogen_model_or_404(pathogen_code, accept_base=False):
+    """
     Returns the model for the given `pathogen_code`, raising a `Http404` if it doesn't exist.
-    '''
+    """
     members = inspect.getmembers(models, inspect.isclass)
-    
+
     for name, model in members:
-        if accept_base:
-            if pathogen_code.upper() == name.upper() and (model == Pathogen or Pathogen in model.__bases__):
-                return model
-        else:
-            if pathogen_code.upper() == name.upper() and Pathogen in model.__bases__:
+        # Find model with matching name (case insensitive)
+        if pathogen_code.upper() == name.upper():
+            # Confirm whether the model inherits from the Pathogen class
+            # If accept_base=True, we can also get the Pathogen class itself
+            if Pathogen in model.__bases__ or (accept_base and model == Pathogen):
                 return model
 
-    raise Http404
-
+    return None
 
 
 def enforce_optional_value_groups(data, groups):
-    errors = {
-        "required_fields" : []
-    }
+    """
+    For each group in `groups`, verify that at least one field in the group is contained in `data`.
+    """
+    errors = {"required_fields": []}
+    # A group is a list of field names where at least one of them is required
     for group in groups:
         for field in group:
             if field in data:
@@ -46,266 +44,432 @@ def enforce_optional_value_groups(data, groups):
             # I couldn't help but try a for-else
             # I just found out it can be done, so I did it :)
             errors["required_fields"].append(
-                {
-                    "At least one of the following fields is required." : group
-                }
+                {"At least one of the following fields is required.": group}
             )
-    
+
     if errors["required_fields"]:
         return errors
     else:
         return {}
 
 
-
 def enforce_field_set(data, accepted_fields, rejected_fields):
-    errors = {}
+    """
+    Check `data` for unknown fields, or known fields which cannot be accepted.
+    """
+    rejected = {}
+    unknown = {}
 
     for field in data:
         if field in rejected_fields:
-            errors[field] = [
-                "This field cannot be accepted."
-            ]
+            rejected[field] = ["This field cannot be accepted."]
         elif field not in accepted_fields:
-            errors[field] = [
-                "This field is unknown."
-            ]
-    
-    return errors
+            unknown[field] = ["This field is unknown."]
 
+    return rejected, unknown
+
+
+class CustomCursorPagination(CursorPagination):
+    def add_errors(self, errors):
+        self.errors = errors
+
+    def add_warnings(self, warnings):
+        self.warnings = warnings
+
+    def get_paginated_response(self, data):
+        data = super().get_paginated_response(data).data
+        if data:
+            response = APIResponse()
+            response.next = data["next"]
+            response.previous = data["previous"]
+            response.errors = self.errors
+            response.warnings = self.warnings
+            response.results = data["results"]
+
+            return Response(response.data)
+        else:
+            return Response(data)
+
+
+class APIResponse:
+    # Generic 404 message
+    NOT_FOUND = "not found"
+
+    def __init__(self):
+        self.errors = {}
+        self.warnings = {}
+        self.results = []
+        self.next = None
+        self.previous = None
+
+    @property
+    def data(self):
+        return {
+            "next": self.next,
+            "previous": self.previous,
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "results": self.results,
+        }
 
 
 class PathogenCodeView(APIView):
     permission_classes = [IsAuthenticated, IsApproved]
 
     def get(self, request):
-        members = inspect.getmembers(models, inspect.isclass)
-        pathogen_codes = []
-        
-        for name, model in members:
-            if Pathogen in model.__bases__:
-                pathogen_codes.append(name.upper())
-        
-        return Response(
-            {
-                "pathogen_codes" : pathogen_codes
-            }, 
-            status=status.HTTP_200_OK
-        )
+        """
+        Get a list of `pathogen_codes`, that correspond to tables in the database.
+        """
+        response = APIResponse()
 
+        try:
+            members = inspect.getmembers(models, inspect.isclass)
+            pathogen_codes = []
+
+            # For each model in data.models
+            for name, model in members:
+                # If the model inherits from Pathogen, add it to the list
+                if Pathogen in model.__bases__:
+                    pathogen_codes.append(name.upper())
+
+            response.results.append({"pathogen_codes": pathogen_codes})
+
+            return Response(response.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            response.errors[(type(e)).__name__] = str(e)
+            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CreateGetPathogenView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
+            # Creating data requires being an admin user
             permission_classes = [IsAdminUser]
         else:
+            # Getting data requires being an authenticated, approved user
             permission_classes = [IsAuthenticated, IsApproved]
         return [permission() for permission in permission_classes]
 
-
     def post(self, request, pathogen_code):
-        '''
+        """
         Use `request.data` to save a model instance for the model specified by `pathogen_code`.
-        '''
-        pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=False)
+        """
+        response = APIResponse()
 
-        # If a pathogen_code was provided in the body, and it doesn't match the url, tell them to stop it
-        request_pathogen_code = request.data.get("pathogen_code")
-        if request_pathogen_code and request_pathogen_code.upper() != pathogen_code.upper():
-            return Responses._400_mismatch_pathogen_code
-        
-        # If an institute was provided, check it matches the user's institute
-        request_institute_code = request.data.get("institute")
-        if request_institute_code and request_institute_code.upper() != request.user.institute.code: 
-            return Responses._403_incorrect_institute_for_user
-        
-        errors = {}
+        try:
+            # Get the corresponding model. The base class Pathogen is NOT accepted when creating data
+            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=False)
 
-        # Check the request data contains at least one field from each optional value group
-        errors = errors | enforce_optional_value_groups(
-            data=request.data, 
-            groups=pathogen_model.optional_value_groups()
-        )
-        # Check the request data contains only model fields allowed for creation
-        errors = errors | enforce_field_set(
-            data=request.data, 
-            accepted_fields=pathogen_model.create_fields(), 
-            rejected_fields=pathogen_model.non_create_fields()
-        )
-        # Serializer also carries out validation of input data
-        serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(data=request.data)
+            # If pathogen model does not exist, return error
+            if pathogen_model is None:
+                response.errors[pathogen_code] = response.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
-        # If data is valid, save to the database. If not valid, return errors
-        if serializer.is_valid() and (not errors):
-            serializer.save()
-            return Response(
-                serializer.data, 
-                status=status.HTTP_200_OK
-            )
-        else:
-            errors = errors | dict(serializer.errors)
-            return Response(
-                errors, 
-                status=status.HTTP_400_BAD_REQUEST
+            # If a pathogen_code was provided in the body, and it doesn't match the url, tell them to stop it
+            request_pathogen_code = request.data.get("pathogen_code")
+            if (
+                request_pathogen_code
+                and request_pathogen_code.upper() != pathogen_code.upper()
+            ):
+                response.errors[
+                    pathogen_code
+                ] = "pathogen code provided in request body does not match URL"
+                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check the request data contains at least one field from each optional value group
+            response.errors.update(
+                enforce_optional_value_groups(
+                    data=request.data, groups=pathogen_model.OPTIONAL_VALUE_GROUPS
+                )
             )
 
+            # Check the request data contains only model fields allowed for creation
+            rejected, unknown = enforce_field_set(
+                data=request.data,
+                accepted_fields=pathogen_model.create_fields(),
+                rejected_fields=pathogen_model.no_create_fields(),
+            )
+
+            # Rejected fields (e.g. CID) are not allowed during creation
+            response.errors.update(rejected)
+
+            # Unknown fields will be a warning
+            response.warnings.update(unknown)
+
+            # Serializer also carries out validation of input data
+            serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(
+                data=request.data
+            )
+
+            # If data is valid, save to the database. If not valid, return errors
+            if serializer.is_valid() and not response.errors:
+                serializer.save()
+
+                response.results.append(serializer.data)
+
+                return Response(response.data, status=status.HTTP_200_OK)
+            else:
+                # Combine serializer errors with current errors
+                response.errors.update(serializer.errors)
+
+                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            response.errors[(type(e)).__name__] = str(e)
+            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request, pathogen_code):
-        '''
+        """
         Use `request.query_params` to filter data for the model specified by `pathogen_code`.
-        '''
-        pathogen_model = get_pathogen_model_or_404(pathogen_code)
+        """
+        response = APIResponse()
 
-        # Prepare paginator
-        paginator = CursorPagination()
-        paginator.ordering = "created"
-        paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE  
+        try:
+            # Get the corresponding model. The base class Pathogen is accepted when creating data
+            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
 
-        # Take out the pagination cursor param from the request
-        _mutable = request.query_params._mutable
-        request.query_params._mutable = True
-        cursor = request.query_params.get(paginator.cursor_query_param)
-        if cursor:
-            request.query_params.pop(paginator.cursor_query_param)
-        request.query_params._mutable = _mutable
+            # If pathogen model does not exist, return error
+            if pathogen_model is None:
+                response.errors[pathogen_code] = response.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
-        errors = {}
+            # Prepare paginator
+            paginator = CustomCursorPagination()
+            paginator.ordering = "created"
+            paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
 
-        # Generate filterset
-        filterset = METADBFilter(
-            pathogen_model,
-            pathogen_model.filter_fields(),
-            request.query_params, 
-            queryset=pathogen_model.objects.filter(suppressed=False),
-        )
-
-        # Append unknown fields to error dict
-        for field in request.query_params:
-            if field not in filterset.filters:
-                errors[field] = ["This field is unknown."]
-
-        if not filterset.is_valid():
-            # Append invalid fields to error dict
-            for field, msg in filterset.errors.items():
-                errors[field] = msg
-        
-        if errors:
-            return Response(
-                errors, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Add the pagination cursor param back into the request
-        if cursor is not None:
             _mutable = request.query_params._mutable
             request.query_params._mutable = True
-            request.query_params[paginator.cursor_query_param] = cursor       
+
+            # Remove cursor parameter from the request, as its used for pagination and not filtering
+            cursor = request.query_params.get(paginator.cursor_query_param)
+            if cursor:
+                request.query_params.pop(paginator.cursor_query_param)
+
+            # Remove the distinct parameter from the request, as its not a filter parameter
+            distinct = request.query_params.get("distinct")
+            if distinct:
+                request.query_params.pop("distinct")
+
             request.query_params._mutable = _mutable
 
-        # Paginate the response
-        instances = filterset.qs.order_by("id")    
-        result_page = paginator.paginate_queryset(instances, request)
+            # Generate filterset and validate request query parameters
+            filterset = METADBFilter(
+                pathogen_model,
+                request.query_params,
+                queryset=pathogen_model.objects.filter(suppressed=False),
+            )
+            # Retrieve the resulting queryset, filtered by the query parameters
+            qs = filterset.qs
 
-        # Serialize the results
-        serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(
-            result_page, 
-            many=True
-        )
-        return paginator.get_paginated_response(serializer.data)
+            # Append any unknown fields to error dict
+            for field in request.query_params:
+                if field not in filterset.filters:
+                    response.errors[field] = ["This field is unknown."]
+
+            # Check the distinct field is a known field
+            if distinct and distinct not in filterset.filters:
+                response.errors[distinct] = ["This field is unknown."]
+
+            if not filterset.is_valid():
+                # Append any filterset errors to the errors dict
+                for field, msg in filterset.errors.items():
+                    response.errors[field] = msg
+
+            if response.errors:
+                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+
+            # If a parameter was provided for getting distinct results, apply it
+            if distinct:
+                try:
+                    # I have no idea how this could go wrong at this point
+                    # But hey you never know
+                    qs = qs.distinct(distinct)
+                except Exception as e:
+                    response.errors.update(e.__dict__)
+
+                    return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+
+                # Serialize the results
+                serializer = getattr(
+                    serializers, f"{pathogen_model.__name__}Serializer"
+                )(qs, many=True)
+
+                response.results = serializer.data
+
+                return Response(response.data, status=status.HTTP_200_OK)
+            else:
+                # Non-distinct results have the potential to be quite large
+                # So pagination (splitting the data into multiple pages) is used
+
+                # Add the pagination cursor param back into the request
+                if cursor is not None:
+                    _mutable = request.query_params._mutable
+                    request.query_params._mutable = True
+                    request.query_params[paginator.cursor_query_param] = cursor
+                    request.query_params._mutable = _mutable
+
+                # Paginate the response
+                instances = filterset.qs.order_by("id")
+
+                result_page = paginator.paginate_queryset(instances, request)
+
+                # Serialize the results
+                serializer = getattr(
+                    serializers, f"{pathogen_model.__name__}Serializer"
+                )(result_page, many=True)
+
+                # Make it look like the other responses for consistency
+                # And we might want to change in future to provide some warnings
+                paginator.add_errors(response.errors)
+                paginator.add_warnings(response.warnings)
+                return paginator.get_paginated_response(serializer.data)
+
+        except Exception as e:
+            response.errors[(type(e)).__name__] = str(e)
+            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UpdateSuppressPathogenView(APIView):
     permission_classes = [IsAdminUser]
 
     def patch(self, request, pathogen_code, cid):
-        '''
+        """
         Use `request.data` and a `cid` to update an instance for the model specified by `pathogen_code`.
-        '''
-        pathogen_model = get_pathogen_model_or_404(pathogen_code)
-        
-        # Get the instance to be updated
-        instance = get_object_or_404(pathogen_model.objects.filter(suppressed=False), cid=cid)
-        
-        # Check user is the correct institute
-        if request.user.institute.code != instance.institute.code:
-            return Responses._403_incorrect_institute_for_user
+        """
+        response = APIResponse()
 
-        errors = {}
+        try:
+            # Get the corresponding model. The base class Pathogen is accepted when updating data
+            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
 
-        # Check the request data contains only model fields allowed for updating
-        errors = errors | enforce_field_set(
-            data=request.data, 
-            accepted_fields=pathogen_model.update_fields(), 
-            rejected_fields=pathogen_model.non_update_fields()
-        )
-        # Serializer also carries out validation of input data
-        serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(instance=instance, data=request.data, partial=True)
+            # If pathogen model does not exist, return error
+            if pathogen_model is None:
+                response.errors[pathogen_code] = response.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
-        # If data is valid, update existing record in the database. If not valid, return errors
-        if serializer.is_valid() and (not errors):
-            if not serializer.validated_data:
-                return Responses._400_no_updates_provided
-
-            serializer.save()
-            return Response(
-                serializer.data, 
-                status=status.HTTP_200_OK
-            )
-        else:
-            errors = errors | dict(serializer.errors)
-            return Response(
-                errors, 
-                status=status.HTTP_400_BAD_REQUEST
+            # Get the instance to be updated
+            instance = get_object_or_404(
+                pathogen_model.objects.filter(suppressed=False), cid=cid
             )
 
+            # Check the request data contains only model fields allowed for updating
+            rejected, unknown = enforce_field_set(
+                data=request.data,
+                accepted_fields=pathogen_model.update_fields(),
+                rejected_fields=pathogen_model.no_update_fields(),
+            )
+
+            # Rejected fields (e.g. CID) are not allowed during creation
+            response.errors.update(rejected)
+
+            # Unknown fields will be a warning
+            response.warnings.update(unknown)
+
+            # Serializer also carries out validation of input data
+            serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(
+                instance=instance, data=request.data, partial=True
+            )
+
+            # If data is valid, update existing record in the database. If not valid, return errors
+            if serializer.is_valid() and not response.errors:
+                if not serializer.validated_data:
+                    response.errors.setdefault("non_field_errors", []).append(
+                        "no fields were updated"
+                    )
+
+                    return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+
+                serializer.save()
+
+                response.results.append(serializer.data)
+
+                return Response(response.data, status=status.HTTP_200_OK)
+            else:
+                # Combine serializer errors with current errors
+                response.errors.update(serializer.errors)
+
+                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            response.errors[(type(e)).__name__] = str(e)
+            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request, pathogen_code, cid):
-        '''
+        """
         Use the provided `pathogen_code` and `cid` to suppress a record.
-        '''
-        pathogen_model = get_pathogen_model_or_404(pathogen_code)
+        """
+        response = APIResponse()
 
-        # Get the instance to be suppressed
-        instance = get_object_or_404(pathogen_model, cid=cid)
+        try:
+            # Get the corresponding model. The base class Pathogen is accepted when suppressing data
+            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
 
-        # Check user is the correct institute
-        if request.user.institute.code != instance.institute.code:
-            return Responses._403_incorrect_institute_for_user
+            # If pathogen model does not exist, return error
+            if pathogen_model is None:
+                response.errors[pathogen_code] = response.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
-        # Suppress and save
-        instance.suppressed = True
-        instance.save(update_fields=["suppressed"])
-        
-        # Just to double check
-        instance = get_object_or_404(pathogen_model, cid=cid)
-        
-        # Return the details
-        return Response(
-            {
-                "detail" : {
-                    "cid" : cid,
-                    "suppressed" : instance.suppressed
-                }
-            },
-            status=status.HTTP_200_OK
-        )
+            try:
+                # Get the instance to be suppressed
+                instance = pathogen_model.objects.filter(suppressed=False, cid=cid)
+            except pathogen_model.DoesNotExist:
+                # If cid did not exist, return error
+                response.errors[cid] = response.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
+            # Suppress and save
+            instance.suppressed = True
+            instance.save(update_fields=["suppressed"])
+
+            # Just to double check
+            instance = get_object_or_404(pathogen_model, cid=cid)
+
+            response = APIResponse()
+            response.results.append({"cid": cid, "suppressed": instance.suppressed})
+
+            # Return the details
+            return Response(
+                response.data,
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            response.errors[(type(e)).__name__] = str(e)
+            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class DeletePathogenView(APIView):
     permission_classes = [IsAdminUser]
 
     def delete(self, request, pathogen_code, cid):
-        '''
+        """
         Use the provided `pathogen_code` and `cid` to permanently delete a record.
-        '''
-        pathogen_model = get_pathogen_model_or_404(pathogen_code)
-        
-        # Attempt to delete object with the provided cid, and return response
-        response = get_object_or_404(pathogen_model, cid=cid).delete()
-        
-        return Response(
-            {"detail" : response}, 
-            status=status.HTTP_200_OK
-        )
+        """
+        response = APIResponse()
+
+        try:
+            # Get the corresponding model. The base class Pathogen is accepted when deleting data
+            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
+
+            # If pathogen model does not exist, return error
+            if pathogen_model is None:
+                response.errors[pathogen_code] = response.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+
+            try:
+                # Attempt to delete object with the provided cid
+                pathogen_model.objects.get(cid=cid).delete()
+            except pathogen_model.DoesNotExist:
+                # If cid did not exist, return error
+                response.errors[cid] = response.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+
+            deleted = not pathogen_model.objects.filter(cid=cid).exists()
+            response.results.append({"cid": cid, "deleted": deleted})
+            return Response(response.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            response.errors[(type(e)).__name__] = str(e)
+            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
