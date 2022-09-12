@@ -3,7 +3,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
-from django.shortcuts import get_object_or_404
 from django.conf import settings
 from . import serializers, models
 from .filters import METADBFilter
@@ -11,11 +10,21 @@ from .models import Pathogen
 from accounts.views import IsApproved
 from utils.responses import APIResponse
 import inspect
+import logging
+from logging.handlers import RotatingFileHandler
+import traceback
 
 
-# TODO: Return internal server errors to client or not? Starting to think not...
-# The date out of range is annoying but unlikely to get set off
-# And if a client triggers a problem, would like to see the traceback myself
+logger = logging.getLogger("Rotating Log")
+logger.setLevel(logging.ERROR)
+handler = RotatingFileHandler(
+    settings.LOG_FILE,
+    maxBytes=settings.LOG_FILE_MAX_BYTES,
+    backupCount=settings.LOG_FILE_NUM_BACKUPS,
+)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 def get_pathogen_model(pathogen_code, accept_base=False):
@@ -200,6 +209,9 @@ class CreateGetPathogenView(APIView):
                 return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
+            logger.error(str(e))
+            logger.error(traceback.format_exc())
+
             response.errors[(type(e)).__name__] = str(e)
             return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -304,6 +316,9 @@ class CreateGetPathogenView(APIView):
                 return paginator.get_paginated_response(serializer.data)
 
         except Exception as e:
+            logger.error(str(e))
+            logger.error(traceback.format_exc())
+
             response.errors[(type(e)).__name__] = str(e)
             return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -373,6 +388,9 @@ class UpdateSuppressPathogenView(APIView):
                 return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
+            logger.error(str(e))
+            logger.error(traceback.format_exc())
+
             response.errors[(type(e)).__name__] = str(e)
             return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -422,6 +440,9 @@ class UpdateSuppressPathogenView(APIView):
             )
 
         except Exception as e:
+            logger.error(str(e))
+            logger.error(traceback.format_exc())
+
             response.errors[(type(e)).__name__] = str(e)
             return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -457,5 +478,8 @@ class DeletePathogenView(APIView):
             return Response(response.data, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.error(str(e))
+            logger.error(traceback.format_exc())
+
             response.errors[(type(e)).__name__] = str(e)
             return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
