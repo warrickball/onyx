@@ -5,7 +5,7 @@ from rest_framework.generics import CreateAPIView, ListAPIView
 from django.shortcuts import get_object_or_404
 from .models import User
 from .serializers import UserSerializer
-from metadb.utils.responses import Responses
+from utils.responses import Responses
 
 
 class IsApproved(permissions.BasePermission):
