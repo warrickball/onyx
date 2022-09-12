@@ -5,7 +5,7 @@ from rest_framework.generics import CreateAPIView, ListAPIView
 from django.shortcuts import get_object_or_404
 from .models import User
 from .serializers import UserSerializer
-from utils.responses import Responses
+from metadb.utils.responses import Responses
 
 
 class IsApproved(permissions.BasePermission):
@@ -71,7 +71,9 @@ def approve(request, username):
     target_user = get_object_or_404(User, username=username)
 
     # Check that request user is in the same institute as the target user
-    if request.user.institute.code != target_user.institute.code:
+    if (not request.user.is_staff) and (
+        request.user.institute.code != target_user.institute.code
+    ):
         return Responses._403_different_institute
 
     # Approve target user

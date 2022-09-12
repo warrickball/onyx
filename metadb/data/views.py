@@ -9,6 +9,7 @@ from . import serializers, models
 from .filters import METADBFilter
 from .models import Pathogen
 from accounts.views import IsApproved
+from metadb.utils.responses import APIResponse
 import inspect
 
 
@@ -89,28 +90,6 @@ class CustomCursorPagination(CursorPagination):
             return Response(response.data)
         else:
             return Response(data)
-
-
-class APIResponse:
-    # Generic 404 message
-    NOT_FOUND = "not found"
-
-    def __init__(self):
-        self.errors = {}
-        self.warnings = {}
-        self.results = []
-        self.next = None
-        self.previous = None
-
-    @property
-    def data(self):
-        return {
-            "next": self.next,
-            "previous": self.previous,
-            "errors": self.errors,
-            "warnings": self.warnings,
-            "results": self.results,
-        }
 
 
 class PathogenCodeView(APIView):
