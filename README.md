@@ -19,29 +19,29 @@ $ metadbclient get <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALU
 
 | Lookup            | Numeric | Text | Date (YYYY-MM-DD) | Date (YYYY-MM) | True/False |
 | ----------------- | :-----: | :--: | :---------------: | :------------: | :--------: |
-| `ne`              | x       | x    | x                 | x              | x          |
-| `lt`              | x       | x    | x                 | x              | x          |
-| `lte`             | x       | x    | x                 | x              | x          |
-| `gt`              | x       | x    | x                 | x              | x          |
-| `gte`             | x       | x    | x                 | x              | x          |
-| `in`              | x       | x    | x                 | x              | x          |
-| `range`           | x       | x    | x                 | x              | x          |
-| `isnull`          | x       | x    | x                 | x              | x          |
-| `contains`        |         | x    |                   |                |            |
-| `startswith`      |         | x    |                   |                |            | 
-| `endswith`        |         | x    |                   |                |            | 
-| `iexact`          |         | x    |                   |                |            |  
-| `icontains`       |         | x    |                   |                |            | 
-| `istartswith`     |         | x    |                   |                |            | 
-| `iendswith`       |         | x    |                   |                |            | 
-| `regex`           |         | x    |                   |                |            | 
-| `iregex`          |         | x    |                   |                |            | 
-| `iso_year`        |         |      | x                 | x              |            |
-| `iso_year__in`    |         |      | x                 | x              |            |
-| `iso_year__range` |         |      | x                 | x              |            |
-| `iso_week`        |         |      | x                 |                |            |
-| `iso_week__in`    |         |      | x                 |                |            |
-| `iso_week__range` |         |      | x                 |                |            |
+| `ne`              | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `lt`              | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `lte`             | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `gt`              | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `gte`             | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `in`              | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `range`           | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `isnull`          | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `contains`        |         | ✓    |                   |                |            |
+| `startswith`      |         | ✓    |                   |                |            | 
+| `endswith`        |         | ✓    |                   |                |            | 
+| `iexact`          |         | ✓    |                   |                |            |  
+| `icontains`       |         | ✓    |                   |                |            | 
+| `istartswith`     |         | ✓    |                   |                |            | 
+| `iendswith`       |         | ✓    |                   |                |            | 
+| `regex`           |         | ✓    |                   |                |            | 
+| `iregex`          |         | ✓    |                   |                |            | 
+| `iso_year`        |         |      | ✓                 | ✓              |            |
+| `iso_year__in`    |         |      | ✓                 | ✓              |            |
+| `iso_year__range` |         |      | ✓                 | ✓              |            |
+| `iso_week`        |         |      | ✓                 |                |            |
+| `iso_week__in`    |         |      | ✓                 |                |            |
+| `iso_week__range` |         |      | ✓                 |                |            |
 
 ### Examples
 
