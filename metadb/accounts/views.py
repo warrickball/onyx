@@ -1,4 +1,5 @@
 from rest_framework import permissions
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import CreateAPIView, ListAPIView
 from django.shortcuts import get_object_or_404
@@ -36,7 +37,7 @@ class CreateUserView(CreateAPIView):
 
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [AllowAny]
 
 
 class ListInstituteUsersView(ListAPIView):
@@ -45,7 +46,7 @@ class ListInstituteUsersView(ListAPIView):
     """
 
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated, IsApproved]
+    permission_classes = [(IsAuthenticated & IsApproved) | IsAdminUser]
 
     def get_queryset(self):
         return User.objects.filter(institute=self.request.user.institute).order_by("-date_joined")  # type: ignore
@@ -64,7 +65,7 @@ class ListAllUsersView(ListAPIView):
 
 
 @api_view(["PATCH"])
-@permission_classes([permissions.IsAuthenticated, IsApproved, IsAuthority])
+@permission_classes([(IsAuthenticated & IsApproved & IsAuthority) | IsAdminUser])
 def approve(request, username):
     # Get user to be approved
     target_user = get_object_or_404(User, username=username)

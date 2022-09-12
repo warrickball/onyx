@@ -114,7 +114,7 @@ class APIResponse:
 
 
 class PathogenCodeView(APIView):
-    permission_classes = [IsAuthenticated, IsApproved]
+    permission_classes = [(IsAuthenticated & IsApproved) | IsAdminUser]
 
     def get(self, request):
         """
@@ -148,7 +148,7 @@ class CreateGetPathogenView(APIView):
             permission_classes = [IsAdminUser]
         else:
             # Getting data requires being an authenticated, approved user
-            permission_classes = [IsAuthenticated, IsApproved]
+            permission_classes = [(IsAuthenticated & IsApproved) | IsAdminUser]
         return [permission() for permission in permission_classes]
 
     def post(self, request, pathogen_code):
