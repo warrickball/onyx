@@ -40,6 +40,14 @@ class DateRangeFilter(filters.BaseRangeFilter, filters.DateFilter):
     pass
 
 
+class ChoiceRangeFilter(filters.BaseRangeFilter, filters.ChoiceFilter):
+    pass
+
+
+class TypedChoiceRangeFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
+    pass
+
+
 # Lookups shared by all fields
 BASE_LOOKUPS = ["exact", "ne", "lt", "lte", "gt", "gte"]
 
@@ -89,6 +97,9 @@ class METADBFilter(filters.FilterSet):
                 )
                 self.filters[filter_name + "__in"] = ChoiceInFilter(
                     field_name=field, choices=choices, lookup_expr="in"
+                )
+                self.filters[filter_name + "__range"] = ChoiceRangeFilter(
+                    field_name=field, choices=choices, lookup_expr="range"
                 )
                 self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,
@@ -150,6 +161,19 @@ class METADBFilter(filters.FilterSet):
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
                     lookup_expr="isnull",
+                )
+                self.filters[filter_name + "__iso_year"] = filters.NumberFilter(
+                    field_name=field, lookup_expr="iso_year"
+                )
+                self.filters[filter_name + "__iso_year__in"] = NumericInFilter(
+                    field_name=field,
+                    lookup_expr="iso_year__in",
+                )
+                self.filters[
+                    filter_name + "__iso_year__range"
+                ] = filters.NumericRangeFilter(
+                    field_name=field,
+                    lookup_expr="iso_year__range",
                 )
 
                 for lookup in BASE_LOOKUPS:
@@ -214,6 +238,12 @@ class METADBFilter(filters.FilterSet):
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
                     lookup_expr="in",
+                )
+                self.filters[filter_name + "__range"] = TypedChoiceRangeFilter(
+                    field_name=field,
+                    choices=BOOLEAN_CHOICES,
+                    coerce=strtobool,
+                    lookup_expr="range",
                 )
                 self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,

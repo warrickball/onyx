@@ -9,13 +9,18 @@ from . import serializers, models
 from .filters import METADBFilter
 from .models import Pathogen
 from accounts.views import IsApproved
-from metadb.utils.responses import APIResponse
+from utils.responses import APIResponse
 import inspect
 
 
-def get_pathogen_model_or_404(pathogen_code, accept_base=False):
+# TODO: Return internal server errors to client or not? Starting to think not...
+# The date out of range is annoying but unlikely to get set off
+# And if a client triggers a problem, would like to see the traceback myself
+
+
+def get_pathogen_model(pathogen_code, accept_base=False):
     """
-    Returns the model for the given `pathogen_code`, raising a `Http404` if it doesn't exist.
+    Returns the model for the given `pathogen_code`, returning `None` if it doesn't exist.
     """
     members = inspect.getmembers(models, inspect.isclass)
 
@@ -63,9 +68,9 @@ def enforce_field_set(data, accepted_fields, rejected_fields):
 
     for field in data:
         if field in rejected_fields:
-            rejected[field] = ["This field cannot be accepted."]
+            rejected[field] = [APIResponse.NON_ACCEPTED_FIELD]
         elif field not in accepted_fields:
-            unknown[field] = ["This field is unknown."]
+            unknown[field] = [APIResponse.UNKNOWN_FIELD]
 
     return rejected, unknown
 
@@ -138,11 +143,11 @@ class CreateGetPathogenView(APIView):
 
         try:
             # Get the corresponding model. The base class Pathogen is NOT accepted when creating data
-            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=False)
+            pathogen_model = get_pathogen_model(pathogen_code, accept_base=False)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = response.NOT_FOUND
+                response.errors[pathogen_code] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             # If a pathogen_code was provided in the body, and it doesn't match the url, tell them to stop it
@@ -153,7 +158,7 @@ class CreateGetPathogenView(APIView):
             ):
                 response.errors[
                     pathogen_code
-                ] = "pathogen code provided in request body does not match URL"
+                ] = "Pathogen code provided in request body does not match URL."
                 return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
 
             # Check the request data contains at least one field from each optional value group
@@ -206,11 +211,11 @@ class CreateGetPathogenView(APIView):
 
         try:
             # Get the corresponding model. The base class Pathogen is accepted when creating data
-            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
+            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = response.NOT_FOUND
+                response.errors[pathogen_code] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             # Prepare paginator
@@ -245,11 +250,11 @@ class CreateGetPathogenView(APIView):
             # Append any unknown fields to error dict
             for field in request.query_params:
                 if field not in filterset.filters:
-                    response.errors[field] = ["This field is unknown."]
+                    response.errors[field] = [APIResponse.UNKNOWN_FIELD]
 
             # Check the distinct field is a known field
             if distinct and distinct not in filterset.filters:
-                response.errors[distinct] = ["This field is unknown."]
+                response.errors[distinct] = [APIResponse.UNKNOWN_FIELD]
 
             if not filterset.is_valid():
                 # Append any filterset errors to the errors dict
@@ -261,14 +266,7 @@ class CreateGetPathogenView(APIView):
 
             # If a parameter was provided for getting distinct results, apply it
             if distinct:
-                try:
-                    # I have no idea how this could go wrong at this point
-                    # But hey you never know
-                    qs = qs.distinct(distinct)
-                except Exception as e:
-                    response.errors.update(e.__dict__)
-
-                    return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+                qs = qs.distinct(distinct)
 
                 # Serialize the results
                 serializer = getattr(
@@ -290,7 +288,7 @@ class CreateGetPathogenView(APIView):
                     request.query_params._mutable = _mutable
 
                 # Paginate the response
-                instances = filterset.qs.order_by("id")
+                instances = qs.order_by("id")
 
                 result_page = paginator.paginate_queryset(instances, request)
 
@@ -321,17 +319,20 @@ class UpdateSuppressPathogenView(APIView):
 
         try:
             # Get the corresponding model. The base class Pathogen is accepted when updating data
-            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
+            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = response.NOT_FOUND
+                response.errors[pathogen_code] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
-            # Get the instance to be updated
-            instance = get_object_or_404(
-                pathogen_model.objects.filter(suppressed=False), cid=cid
-            )
+            try:
+                # Get the instance to be updated
+                instance = pathogen_model.objects.get(suppressed=False, cid=cid)
+            except pathogen_model.DoesNotExist:
+                # If cid did not exist, return error
+                response.errors[cid] = APIResponse.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             # Check the request data contains only model fields allowed for updating
             rejected, unknown = enforce_field_set(
@@ -355,7 +356,7 @@ class UpdateSuppressPathogenView(APIView):
             if serializer.is_valid() and not response.errors:
                 if not serializer.validated_data:
                     response.errors.setdefault("non_field_errors", []).append(
-                        "no fields were updated"
+                        "No fields were updated."
                     )
 
                     return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
@@ -383,19 +384,19 @@ class UpdateSuppressPathogenView(APIView):
 
         try:
             # Get the corresponding model. The base class Pathogen is accepted when suppressing data
-            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
+            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = response.NOT_FOUND
+                response.errors[pathogen_code] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             try:
                 # Get the instance to be suppressed
-                instance = pathogen_model.objects.filter(suppressed=False, cid=cid)
+                instance = pathogen_model.objects.get(suppressed=False, cid=cid)
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
-                response.errors[cid] = response.NOT_FOUND
+                response.errors[cid] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             # Suppress and save
@@ -403,7 +404,13 @@ class UpdateSuppressPathogenView(APIView):
             instance.save(update_fields=["suppressed"])
 
             # Just to double check
-            instance = get_object_or_404(pathogen_model, cid=cid)
+            try:
+                # Get the instance to be suppressed
+                instance = pathogen_model.objects.get(cid=cid)
+            except pathogen_model.DoesNotExist:
+                # If cid did not exist, return error
+                response.errors[cid] = APIResponse.NOT_FOUND
+                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             response = APIResponse()
             response.results.append({"cid": cid, "suppressed": instance.suppressed})
@@ -430,11 +437,11 @@ class DeletePathogenView(APIView):
 
         try:
             # Get the corresponding model. The base class Pathogen is accepted when deleting data
-            pathogen_model = get_pathogen_model_or_404(pathogen_code, accept_base=True)
+            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = response.NOT_FOUND
+                response.errors[pathogen_code] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             try:
@@ -442,7 +449,7 @@ class DeletePathogenView(APIView):
                 pathogen_model.objects.get(cid=cid).delete()
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
-                response.errors[cid] = response.NOT_FOUND
+                response.errors[cid] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
             deleted = not pathogen_model.objects.filter(cid=cid).exists()
