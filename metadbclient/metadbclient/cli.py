@@ -123,20 +123,53 @@ def execute_command(args):
     if args.command == "make-config":
         utils.make_config()
     else:
-        client = METADBClient(cli=True)
+        client = METADBClient()
 
         # Commands that require a config, but no user login details
         if args.command == "register":
-            client.register()
+            username = utils.get_input("username")
+            email = utils.get_input("email address")
+            institute = utils.get_input("institute code")
+
+            match = False
+            while not match:
+                password = utils.get_input("password", password=True)
+                password2 = utils.get_input("password (again)", password=True)
+                if password == password2:
+                    match = True
+                else:
+                    print("Passwords do not match. Please try again.")
+
+            registration = client.register(
+                username=username, email=email, institute=institute, password=password  # type: ignore
+            )
+
+            print(utils.format_response(registration))
+
+            if registration.ok:
+                print("Account created successfully.")
+                check = ""
+                while not check:
+                    check = input(
+                        "Would you like to add this account to the config? [y/n]: "
+                    ).upper()
+
+                if check == "Y":
+                    username = registration.json()["username"]
+                    client.add_user(username)
+                    print("The user has been added to the config.")
 
         elif args.command == "set-default-user":
             client.set_default_user(args.username)
+            print(f"The user has been set as the default user.")
 
         elif args.command == "get-default-user":
-            client.get_default_user()
+            default_user = client.get_default_user()
+            print(default_user)
 
         elif args.command == "add-user":
             client.add_user(args.username)
+            print("The user has been added to the config.")
 
         else:
             # Commands that require a config and user login details
@@ -145,19 +178,23 @@ def execute_command(args):
             )
 
             if args.command == "approve":
-                client.approve(args.username)
+                approval = client.approve(args.username)
+                print(utils.format_response(approval))
 
             elif args.command == "create":
                 if args.field is not None:
                     fields = {f: v for f, v in args.field}
-                    client.create(args.pathogen_code, fields=fields)
+                    results = client.create(args.pathogen_code, fields=fields)
                 else:
                     if args.csv:
-                        client.create(args.pathogen_code, csv_path=args.csv)
+                        results = client.create(args.pathogen_code, csv_path=args.csv)
                     else:
-                        client.create(
+                        results = client.create(
                             args.pathogen_code, csv_path=args.tsv, delimiter="\t"
                         )
+
+                for result in results:
+                    print(utils.format_response(result))
 
             elif args.command == "get":
                 fields = {}
@@ -167,7 +204,21 @@ def execute_command(args):
                             fields[f] = []
                         fields[f].append(v)
 
-                client.get(args.pathogen_code, args.cid, fields)
+                results = client.get(args.pathogen_code, args.cid, fields)
+
+                result, ok = next(results)
+                if ok:
+                    print(result.to_csv(index=False, sep="\t"), end="")  # type: ignore
+                else:
+                    print(utils.format_response(result))
+
+                for result, ok in results:
+                    if ok:
+                        print(
+                            result.to_csv(index=False, sep="\t", header=False), end=""  # type: ignore
+                        )
+                    else:
+                        print(utils.format_response(result))
 
             elif args.command == "update":
                 if args.field is not None:
@@ -175,19 +226,24 @@ def execute_command(args):
                 else:
                     fields = {}
 
-                client.update(args.pathogen_code, args.cid, fields)
+                updates = client.update(args.pathogen_code, args.cid, fields)
+                print(utils.format_response(updates))
 
             elif args.command == "suppress":
-                client.suppress(args.pathogen_code, args.cid)
+                suppressions = client.suppress(args.pathogen_code, args.cid)
+                print(utils.format_response(suppressions))
 
             elif args.command == "list-pathogen-codes":
-                client.pathogen_codes()
+                pathogen_codes = client.pathogen_codes()
+                print(utils.format_response(pathogen_codes))
 
             elif args.command == "list-institute-users":
-                client.institute_users()
+                institute_users = client.institute_users()
+                print(utils.format_response(institute_users))
 
             elif args.command == "list-all-users":
-                client.all_users()
+                all_users = client.all_users()
+                print(utils.format_response(all_users))
 
 
 def run():

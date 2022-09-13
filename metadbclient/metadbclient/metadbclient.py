@@ -9,7 +9,7 @@ from metadbclient import utils, settings
 
 
 class METADBClient:
-    def __init__(self, config_dir_path=None, cli=False):
+    def __init__(self, config_dir_path=None):
         # Locate the config
         config_dir_path, config_file_path = utils.locate_config(
             config_dir_path=config_dir_path
@@ -42,9 +42,6 @@ class METADBClient:
 
         # No user login details have been assigned to the client yet
         self.has_login_details = False
-
-        # Enables the class to be used as either an importable package or part of a CLI
-        self.cli = cli
 
     def get_login(self, username=None, use_password_env_var=False):
         """
@@ -181,8 +178,6 @@ class METADBClient:
         # Read-write for OS user only
         os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
 
-        print("The user has been added to the config.")
-
     def set_default_user(self, username=None):
         if username is None:
             username = utils.get_input("username")
@@ -197,54 +192,23 @@ class METADBClient:
         with open(self.config_file_path, "w") as config:
             json.dump(self.config, config, indent=4)
 
-        print(f"'{username}' has been set as the default user.")
-
     def get_default_user(self):
-        print(self.config["default_user"])
+        return self.config["default_user"]
 
-    def register(self, add_to_config=False):
+    def register(self, username, email, institute, password):
         """
         Create a new user.
         """
-        username = utils.get_input("username")
-        email = utils.get_input("email address")
-        institute = utils.get_input("institute code")
-
-        match = False
-        while not match:
-            password = utils.get_input("password", password=True)
-            password2 = utils.get_input("password (again)", password=True)
-            if password == password2:
-                match = True
-            else:
-                print("Passwords do not match. Please try again.")
-
         response = requests.post(
             self.endpoints["register"],
             json={
                 "username": username,
-                "password": password,  # type: ignore
+                "password": password,
                 "email": email,
                 "institute": institute,
             },
         )
-
-        print(utils.format_response(response))
-
-        if response.ok:
-            print("Account created successfully.")
-
-            if add_to_config:
-                self.add_user(username)
-            else:
-                check = ""
-                while not check:
-                    check = input(
-                        "Would you like to add this account to the config? [y/n]: "
-                    ).upper()
-
-                if check == "Y":
-                    self.add_user(username)
+        return response
 
     @utils.login_required
     def approve(self, username):
@@ -255,13 +219,7 @@ class METADBClient:
             method=requests.patch,
             url=os.path.join(self.endpoints["approve"], username + "/"),
         )
-        if self.cli:
-            print(utils.format_response(response))
-        else:
-            try:
-                return response.json()
-            except json.decoder.JSONDecodeError:
-                return response.text
+        return response
 
     @utils.login_required
     def create(self, pathogen_code, csv_path=None, fields=None, delimiter=None):
@@ -275,8 +233,6 @@ class METADBClient:
 
         if (csv_path is None) and (fields is None):
             raise Exception("Must provide a csv file or fields dict")
-
-        responses = []
 
         if csv_path is not None:
             if csv_path == "-":
@@ -295,10 +251,8 @@ class METADBClient:
                         url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
                         body=record,
                     )
-                    if self.cli:
-                        print(utils.format_response(response))
-                    else:
-                        responses.append(response)
+                    yield response
+
             finally:
                 if csv_file is not sys.stdin:
                     csv_file.close()
@@ -309,15 +263,7 @@ class METADBClient:
                 url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
                 body=fields,
             )
-            if self.cli:
-                print(utils.format_response(response))
-            else:
-                responses.append(response)
-
-        if self.cli:
-            pass
-        else:
-            return responses
+            yield response
 
     @utils.login_required
     def get(self, pathogen_code, cid=None, fields=None):
@@ -332,8 +278,6 @@ class METADBClient:
                 fields["cid"] = []
             fields["cid"].append(cid)
 
-        data = []
-
         response = self.request(
             method=requests.get,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
@@ -341,11 +285,7 @@ class METADBClient:
         )
         if response.ok:
             table = pd.json_normalize(response.json()["results"])
-
-            if self.cli:
-                print(table.to_csv(index=False, sep="\t"), end="")
-            else:
-                data.extend(table.to_dict("records"))
+            yield table, True
 
             next = response.json()["next"]
             while next is not None:
@@ -353,27 +293,13 @@ class METADBClient:
                 if response.ok:
                     next = response.json()["next"]
                     table = pd.json_normalize(response.json()["results"])
-
-                    if self.cli:
-                        print(table.to_csv(index=False, sep="\t", header=False), end="")
-                    else:
-                        data.extend(table.to_dict("records"))
+                    yield table, True
                 else:
                     next = None
-                    if self.cli:
-                        print(utils.format_response(response))
-                    else:
-                        data.append(response)
-        else:
-            if self.cli:
-                print(utils.format_response(response))
-            else:
-                data.append(response)
+                    yield response, False
 
-        if self.cli:
-            pass
         else:
-            return data
+            yield response, False
 
     # TODO: Update from a csv
     @utils.login_required
@@ -391,11 +317,8 @@ class METADBClient:
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
             body=fields,
         )
-        if self.cli:
-            print(utils.format_response(response))
-        else:
-            responses.append(response)
-            return responses
+        responses.append(response)
+        return responses
 
     # TODO: Suppress from a csv
     @utils.login_required
@@ -409,11 +332,8 @@ class METADBClient:
             method=requests.delete,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
         )
-        if self.cli:
-            print(utils.format_response(response))
-        else:
-            responses.append(response)
-            return responses
+        responses.append(response)
+        return responses
 
     @utils.login_required
     def institute_users(self):
@@ -423,13 +343,7 @@ class METADBClient:
         response = self.request(
             method=requests.get, url=self.endpoints["institute-users"]
         )
-        if self.cli:
-            print(utils.format_response(response))
-        else:
-            try:
-                return response.json()
-            except json.decoder.JSONDecodeError:
-                return response.text
+        return response
 
     @utils.login_required
     def all_users(self):
@@ -437,13 +351,7 @@ class METADBClient:
         Get all users.
         """
         response = self.request(method=requests.get, url=self.endpoints["all-users"])
-        if self.cli:
-            print(utils.format_response(response))
-        else:
-            try:
-                return response.json()
-            except json.decoder.JSONDecodeError:
-                return response.text
+        return response
 
     @utils.login_required
     def pathogen_codes(self):
@@ -453,10 +361,4 @@ class METADBClient:
         response = self.request(
             method=requests.get, url=self.endpoints["pathogen-codes"]
         )
-        if self.cli:
-            print(utils.format_response(response))
-        else:
-            try:
-                return response.json()
-            except json.decoder.JSONDecodeError:
-                return response.text
+        return response
