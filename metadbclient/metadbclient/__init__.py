@@ -1,1 +1,1 @@
-from metadbclient.main import METADBClient
+from metadbclient.metadbclient import METADBClient
