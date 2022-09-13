@@ -14,7 +14,7 @@ $ metadbclient register
 ```
 $ metadbclient create <PATHOGEN_CODE> --tsv <TSV_FILE>
 $ metadbclient create <PATHOGEN_CODE> --csv <CSV_FILE>
-$ metadbclient create <PATHOGEN_CODE> --field <FIELD> --field <FIELD> <VALUE> ...
+$ metadbclient create <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
 ```
 
 ## Filtering data
@@ -34,6 +34,7 @@ $ metadbclient get <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD>
 | `gt`              | ✓       | ✓    | ✓                 | ✓              | ✓          |
 | `gte`             | ✓       | ✓    | ✓                 | ✓              | ✓          |
 | `in`              | ✓       | ✓    | ✓                 | ✓              | ✓          |
+| `notin`           | ✓       | ✓    | ✓                 | ✓              | ✓          |
 | `range`           | ✓       | ✓    | ✓                 | ✓              | ✓          |
 | `isnull`          | ✓       | ✓    | ✓                 | ✓              | ✓          |
 | `contains`        |         | ✓    |                   |                |            |

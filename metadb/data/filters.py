@@ -4,12 +4,10 @@ from utils.fields import YearMonthField
 from distutils.util import strtobool
 
 
-# TODO: Read this entire page
-# https://django-filter.readthedocs.io/en/latest/ref/filters.html
-# Can probably add loads of stuff in
-# Allvaluesfilter - choice field using pre existing fields
-# could replace custom code for matching to pathogen code and institute
-# also TEST
+class AllValuesFilter(filters.AllValuesFilter):
+    def __init__(self, *args, model, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model = model
 
 
 class NumericInFilter(filters.BaseInFilter, filters.NumberFilter):
@@ -28,6 +26,10 @@ class ChoiceInFilter(filters.BaseInFilter, filters.ChoiceFilter):
     pass
 
 
+class AllValuesInFilter(filters.BaseInFilter, AllValuesFilter):
+    pass
+
+
 class TypedChoiceInFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
     pass
 
@@ -41,6 +43,10 @@ class DateRangeFilter(filters.BaseRangeFilter, filters.DateFilter):
 
 
 class ChoiceRangeFilter(filters.BaseRangeFilter, filters.ChoiceFilter):
+    pass
+
+
+class AllValuesRangeFilter(filters.BaseRangeFilter, AllValuesFilter):
     pass
 
 
@@ -82,21 +88,30 @@ class METADBFilter(filters.FilterSet):
             field_type = field_data["type"]
 
             # Boolean determining whether the field is restricted to a set of choices
-            is_choice_field = field_data["choices"]
+            is_choice_field = (
+                field_data["choices"] if "choices" in field_data else False
+            )
+
+            # Boolean determining whether the field is restricted to the pre existing database values
+            is_db_choice_field = (
+                field_data["db_choices"] if "db_choices" in field_data else False
+            )
 
             # Name for the field, used by the user when filtering
             # An alias allows for renaming of fields, e.g. institute__code is renamed to institute
             filter_name = field_data["alias"] if "alias" in field_data else field
 
-            # Fields restricted to choices require different validation
             if is_choice_field:
-                choices = pathogen_model.get_choices(field)
+                choices = pathogen_model._meta.get_field(field).choices
 
                 self.filters[filter_name] = filters.ChoiceFilter(
                     field_name=field, choices=choices
                 )
                 self.filters[filter_name + "__in"] = ChoiceInFilter(
                     field_name=field, choices=choices, lookup_expr="in"
+                )
+                self.filters[filter_name + "__notin"] = ChoiceInFilter(
+                    field_name=field, choices=choices, lookup_expr="in", exclude=True
                 )
                 self.filters[filter_name + "__range"] = ChoiceRangeFilter(
                     field_name=field, choices=choices, lookup_expr="range"
@@ -119,10 +134,50 @@ class METADBFilter(filters.FilterSet):
                             field_name=field, lookup_expr=lookup
                         )
 
+            elif is_db_choice_field:
+                self.filters[filter_name] = AllValuesFilter(
+                    field_name=field,
+                    model=pathogen_model,
+                )
+                self.filters[filter_name + "__in"] = AllValuesInFilter(
+                    field_name=field,
+                    lookup_expr="in",
+                    model=pathogen_model,
+                )
+                self.filters[filter_name + "__notin"] = AllValuesInFilter(
+                    field_name=field,
+                    lookup_expr="in",
+                    exclude=True,
+                    model=pathogen_model,
+                )
+                self.filters[filter_name + "__range"] = AllValuesRangeFilter(
+                    field_name=field, lookup_expr="range", model=pathogen_model
+                )
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
+                    field_name=field,
+                    choices=BOOLEAN_CHOICES,
+                    coerce=strtobool,
+                    lookup_expr="isnull",
+                )
+
+                for lookup in BASE_LOOKUPS:
+                    self.filters[filter_name + "__" + lookup] = AllValuesFilter(
+                        field_name=field, lookup_expr=lookup, model=pathogen_model
+                    )
+
+                if field_type in [models.CharField, models.TextField]:
+                    for lookup in CHAR_LOOKUPS:
+                        self.filters[filter_name + "__" + lookup] = filters.CharFilter(
+                            field_name=field, lookup_expr=lookup
+                        )
+
             elif field_type in [models.CharField, models.TextField]:
                 self.filters[filter_name] = filters.CharFilter(field_name=field)
                 self.filters[filter_name + "__in"] = CharInFilter(
                     field_name=field, lookup_expr="in"
+                )
+                self.filters[filter_name + "__notin"] = CharInFilter(
+                    field_name=field, lookup_expr="in", exclude=True
                 )
                 self.filters[filter_name + "__range"] = CharRangeFilter(
                     field_name=field, lookup_expr="range"
@@ -152,6 +207,12 @@ class METADBFilter(filters.FilterSet):
                     field_name=field,
                     input_formats=["%Y-%m"],
                     lookup_expr="in",
+                )
+                self.filters[filter_name + "__notin"] = DateInFilter(
+                    field_name=field,
+                    input_formats=["%Y-%m"],
+                    lookup_expr="in",
+                    exclude=True,
                 )
                 self.filters[filter_name + "__range"] = DateRangeFilter(
                     field_name=field, input_formats=["%Y-%m"], lookup_expr="range"
@@ -187,6 +248,12 @@ class METADBFilter(filters.FilterSet):
                 )
                 self.filters[filter_name + "__in"] = DateInFilter(
                     field_name=field, input_formats=["%Y-%m-%d"], lookup_expr="in"
+                )
+                self.filters[filter_name + "__notin"] = DateInFilter(
+                    field_name=field,
+                    input_formats=["%Y-%m-%d"],
+                    lookup_expr="in",
+                    exclude=True,
                 )
                 self.filters[filter_name + "__range"] = DateRangeFilter(
                     field_name=field, input_formats=["%Y-%m-%d"], lookup_expr="range"
@@ -238,6 +305,13 @@ class METADBFilter(filters.FilterSet):
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
                     lookup_expr="in",
+                )
+                self.filters[filter_name + "__notin"] = TypedChoiceInFilter(
+                    field_name=field,
+                    choices=BOOLEAN_CHOICES,
+                    coerce=strtobool,
+                    lookup_expr="in",
+                    exclude=True,
                 )
                 self.filters[filter_name + "__range"] = TypedChoiceRangeFilter(
                     field_name=field,

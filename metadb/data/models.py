@@ -4,8 +4,6 @@ from django.db.models import Field
 from django.db.models.lookups import BuiltinLookup
 from utils.fields import YearMonthField
 from secrets import token_hex
-from accounts.models import Institute
-from utils.functions import get_field_values
 
 
 # class FastaStats(models.Model):
@@ -155,21 +153,21 @@ class Pathogen(models.Model):
     }
 
     FILTER_FIELDS = {
-        "cid": {"type": models.CharField, "choices": False},
-        "sender_sample_id": {"type": models.CharField, "choices": False},
-        "run_name": {"type": models.CharField, "choices": False},
-        "pathogen_code": {"type": models.CharField, "choices": True},
+        "cid": {"type": models.CharField},
+        "sender_sample_id": {"type": models.CharField},
+        "run_name": {"type": models.CharField},
+        "pathogen_code": {"type": models.CharField, "db_choices": True},
         "institute__code": {
             "type": models.CharField,
-            "choices": True,
+            "db_choices": True,
             "alias": "institute",
         },
-        "published_date": {"type": models.DateField, "choices": False},
-        "fasta_path": {"type": models.TextField, "choices": False},
-        "bam_path": {"type": models.TextField, "choices": False},
-        "is_external": {"type": models.BooleanField, "choices": False},
-        "collection_month": {"type": YearMonthField, "choices": False},
-        "received_month": {"type": YearMonthField, "choices": False},
+        "published_date": {"type": models.DateField},
+        "fasta_path": {"type": models.TextField},
+        "bam_path": {"type": models.TextField},
+        "is_external": {"type": models.BooleanField},
+        "collection_month": {"type": YearMonthField},
+        "received_month": {"type": YearMonthField},
     }
 
     OPTIONAL_VALUE_GROUPS = [["collection_month", "received_month"]]
@@ -207,23 +205,6 @@ class Pathogen(models.Model):
             for field, perms in cls.FIELD_PERMISSIONS.items()
             if "no update" in perms
         ]
-
-    @classmethod
-    def get_choices(cls, field):
-        # Bit dodgy
-        if hasattr(cls, f"get_{field}_choices"):
-            return getattr(cls, f"get_{field}_choices")()
-        else:
-            choices = cls._meta.get_field(field).choices  # type: ignore
-            if choices:
-                return [choice for choice in choices]
-            else:
-                return []
-
-    @classmethod
-    def get_institute__code_choices(cls):
-        values = get_field_values(Institute, "code")
-        return zip(values, values)
 
 
 class Mpx(Pathogen):
@@ -285,7 +266,7 @@ class Mpx(Pathogen):
     }
 
     FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
-        "fasta_header": {"type": models.CharField, "choices": False},
+        "fasta_header": {"type": models.CharField},
         "seq_platform": {"type": models.CharField, "choices": True},
     }
 
@@ -302,6 +283,6 @@ class Covid(Pathogen):
     }
 
     FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
-        "fasta_header": {"type": models.CharField, "choices": False},
+        "fasta_header": {"type": models.CharField},
         "sample_type": {"type": models.CharField, "choices": True},
     }
