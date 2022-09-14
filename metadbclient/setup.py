@@ -7,5 +7,5 @@ setuptools.setup(
     author="Thomas Brier",
     version=__version__,  # type: ignore
     packages=setuptools.find_packages(),
-    entry_points={"console_scripts": "metadbclient = metadbclient.cli:run"},
+    entry_points={"console_scripts": "metadbclient = metadbclient.cli:main"},
 )

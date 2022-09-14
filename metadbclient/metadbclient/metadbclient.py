@@ -162,12 +162,33 @@ class METADBClient:
         tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
         self.config["users"][username] = {"tokens": tokens_path}
 
-        # If this is the only user in the config, make them the default_user
+        # Reload the config incase its changed
+        # Not perfect but better than just blanket overwriting the file
+        config_dir_path, config_file_path = utils.locate_config(
+            config_dir_path=self.config_dir_path
+        )
+        self.config_dir_path = config_dir_path
+        self.config_file_path = config_file_path
+
+        # Load the config
+        with open(self.config_file_path) as current_config_file:
+            current_config = json.load(current_config_file)
+
+        # Validate the config structure
+        utils.validate_config(current_config)
+
+        # Update the config
+        self.config["host"] = current_config["host"]
+        self.config["port"] = current_config["port"]
+        self.config["users"].update(current_config["users"])
+
+        # If there is only one user in the config, make them the default_user
         if len(self.config["users"]) == 1:
             self.config["default_user"] = username
+        else:
+            self.config["default_user"] = current_config["default_user"]
 
-        # Write user details to the config file
-        # NOTE: Probably has issues if using the same client in multiple places
+        # Write to the config file
         with open(self.config_file_path, "w") as config:
             json.dump(self.config, config, indent=4)
 
@@ -179,6 +200,9 @@ class METADBClient:
         os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
 
     def set_default_user(self, username=None):
+        """
+        Set the default user in the config.
+        """
         if username is None:
             username = utils.get_input("username")
 
@@ -193,6 +217,9 @@ class METADBClient:
             json.dump(self.config, config, indent=4)
 
     def get_default_user(self):
+        """
+        Get the default user in the config.
+        """
         return self.config["default_user"]
 
     def register(self, username, email, institute, password):
@@ -222,17 +249,15 @@ class METADBClient:
         return response
 
     @utils.login_required
-    def create(self, pathogen_code, csv_path=None, fields=None, delimiter=None):
+    def create(self, pathogen_code, fields=None, csv_path=None, delimiter=None):
         """
-        Post new records to the database.
+        Post new pathogen records to the database.
         """
         if (csv_path is not None) and (fields is not None):
-            raise Exception(
-                "Cannot provide both a csv file and fields dict at the same time"
-            )
+            raise Exception("Cannot provide both fields and csv_path")
 
         if (csv_path is None) and (fields is None):
-            raise Exception("Must provide a csv file or fields dict")
+            raise Exception("Must provide either fields or csv_path")
 
         if csv_path is not None:
             if csv_path == "-":
@@ -274,9 +299,11 @@ class METADBClient:
             fields = {}
 
         if cid is not None:
-            if fields.get("cid") is None:
-                fields["cid"] = []
-            fields["cid"].append(cid)
+            fields.setdefault("cid", []).append(cid)
+
+        for field, values in fields.items():
+            if isinstance(values, list):
+                fields[field] = ",".join(values)
 
         response = self.request(
             method=requests.get,
@@ -301,39 +328,102 @@ class METADBClient:
         else:
             yield response, False
 
-    # TODO: Update from a csv
     @utils.login_required
-    def update(self, pathogen_code, cid, fields=None):
+    def update(
+        self, pathogen_code, cid=None, fields=None, csv_path=None, delimiter=None
+    ):
         """
-        Update a record in the database.
+        Update pathogen records in the database.
         """
-        if fields is None:
-            fields = {}
+        if ((cid is not None) or (fields is not None)) and (csv_path is not None):
+            raise Exception("Cannot provide both cid/fields and csv_path")
 
-        responses = []
+        if ((cid is None) or (fields is None)) and (csv_path is None):
+            raise Exception("Must provide either cid and fields, or csv_path")
 
-        response = self.request(
-            method=requests.patch,
-            url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
-            body=fields,
-        )
-        responses.append(response)
-        return responses
+        if csv_path is not None:
+            if csv_path == "-":
+                csv_file = sys.stdin
+            else:
+                csv_file = open(csv_path)
+            try:
+                if delimiter is None:
+                    reader = csv.DictReader(csv_file)
+                else:
+                    reader = csv.DictReader(csv_file, delimiter=delimiter)
 
-    # TODO: Suppress from a csv
+                for record in reader:
+                    cid = record.pop("cid", None)
+                    if cid is None:
+                        raise KeyError("cid column must be provided")
+
+                    fields = record
+
+                    response = self.request(
+                        method=requests.patch,
+                        url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
+                        body=fields,
+                    )
+                    yield response
+            finally:
+                if csv_file is not sys.stdin:
+                    csv_file.close()
+
+        else:
+            response = self.request(
+                method=requests.patch,
+                url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
+                body=fields,
+            )
+            yield response
+
     @utils.login_required
-    def suppress(self, pathogen_code, cid):
+    def suppress(self, pathogen_code, cid=None, csv_path=None, delimiter=None):
         """
-        Suppress a record in the database.
+        Suppress pathogen records in the database.
         """
-        responses = []
+        if (cid is not None) and (csv_path is not None):
+            raise Exception("Cannot provide both cid and csv_path")
 
-        response = self.request(
-            method=requests.delete,
-            url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),
-        )
-        responses.append(response)
-        return responses
+        if (cid is None) and (csv_path is None):
+            raise Exception("Must provide either cid or csv_path")
+
+        if csv_path is not None:
+            if csv_path == "-":
+                csv_file = sys.stdin
+            else:
+                csv_file = open(csv_path)
+            try:
+                if delimiter is None:
+                    reader = csv.DictReader(csv_file)
+                else:
+                    reader = csv.DictReader(csv_file, delimiter=delimiter)
+
+                for record in reader:
+                    cid = record.get("cid")
+
+                    if cid is None:
+                        raise KeyError("cid column must be provided")
+
+                    response = self.request(
+                        method=requests.delete,
+                        url=os.path.join(
+                            self.endpoints["data"], pathogen_code + "/", cid + "/"
+                        ),
+                    )
+                    yield response
+            finally:
+                if csv_file is not sys.stdin:
+                    csv_file.close()
+
+        else:
+            response = self.request(
+                method=requests.delete,
+                url=os.path.join(
+                    self.endpoints["data"], pathogen_code + "/", cid + "/"  # type: ignore
+                ),
+            )
+            yield response
 
     @utils.login_required
     def institute_users(self):

@@ -1,7 +1,7 @@
 import os
 import json
 import time
-import stat
+import inspect
 from getpass import getpass
 from metadbclient import settings
 
@@ -121,56 +121,14 @@ def validate_config(config):
                 )
 
 
-def make_config():
-    """
-    Generate the config directory and config file.
-    """
-    host = get_input("host")
-    port = get_input("port", type=int)
-    config_dir_location = get_input("location to create a config directory")
-    config_dir_location = config_dir_location.replace("~", os.path.expanduser("~"))
-    if not os.path.isdir(config_dir_location):
-        raise FileNotFoundError(f"No such directory: {config_dir_location}")
+def check_for_login_details(obj):
+    if not obj.has_login_details:
+        raise Exception("The client has no details to log in with")
 
-    config_dir_path = os.path.join(config_dir_location, settings.CONFIG_DIR_NAME)
-    if not os.path.isdir(config_dir_path):
-        os.mkdir(config_dir_path)
 
-    # Read-write-execute for OS user only
-    os.chmod(config_dir_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-
-    config_file_path = os.path.join(config_dir_path, settings.CONFIG_FILE_NAME)
-    with open(config_file_path, "w") as config_file:
-        json.dump(
-            {"host": host, "port": port, "users": {}, "default_user": None},
-            config_file,
-            indent=4,
-        )
-
-    # Read-write for OS user only
-    os.chmod(config_file_path, stat.S_IRUSR | stat.S_IWUSR)
-
-    print("")
-    print("Config directory and config file created successfully.")
-    print(
-        f"Please create the following environment variable by typing the following in your shell:"
-    )
-    print("")
-    print(f"export METADB_CONFIG_DIR={config_dir_path}")
-    print("")
-    print(
-        "IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(
-            settings.MESSAGE_BAR_WIDTH, "!"
-        )
-    )
-    warning_message = [
-        "Your config directory (and files within) store sensitive information such as tokens.",
-        "They have been created with the permissions needed to keep your information safe.",
-        "DO NOT CHANGE THESE PERMISSIONS. Doing so may allow other users to read your tokens!",
-    ]
-    for line in warning_message:
-        print(line)
-    print("".center(settings.MESSAGE_BAR_WIDTH, "!"))
+def write_tokens(obj):
+    with open(obj.config["users"][obj.username]["tokens"], "w") as tokens_file:
+        json.dump(obj.tokens, tokens_file, indent=4)
 
 
 def login_required(method):
@@ -182,16 +140,33 @@ def login_required(method):
     * Writes user tokens to their tokens file, after running the provided method.
     """
 
-    def wrapped_method(obj, *args, **kwargs):
-        if not obj.has_login_details:
-            raise Exception(
-                "The client has no details to log in with. If you are using the client as a python import, please first provide details with the 'get_login' command."
-            )
-        try:
-            output = method(obj, *args, **kwargs)
-        finally:
-            with open(obj.config["users"][obj.username]["tokens"], "w") as tokens_file:
-                json.dump(obj.tokens, tokens_file, indent=4)
-        return output
+    # If the method is a generator we have to use 'yield from'
+    # Meddling with forces I don't fully understand here, but it works
+    if inspect.isgeneratorfunction(method):
 
-    return wrapped_method
+        def wrapped_generator_method(obj, *args, **kwargs):
+            check_for_login_details(obj)
+            try:
+                # Run the method and yield the output
+                output = yield from method(obj, *args, **kwargs)
+            finally:
+                # ONLY when the method has finished yielding do we reach this point
+                # After everything is done, write the user tokens to their tokens file
+                write_tokens(obj)
+            return output
+
+        return wrapped_generator_method
+
+    else:
+
+        def wrapped_method(obj, *args, **kwargs):
+            check_for_login_details(obj)
+            try:
+                # Run the method and get the output
+                output = method(obj, *args, **kwargs)
+            finally:
+                # After everything is done, write the user tokens to their tokens file
+                write_tokens(obj)
+            return output
+
+        return wrapped_method
