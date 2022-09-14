@@ -4,7 +4,9 @@ from rest_framework.response import Response
 
 class APIResponse:
     # Generic 404 message
-    NOT_FOUND = "not found"
+    NOT_FOUND = "Not found."
+    UNKNOWN_FIELD = "This field is unknown."
+    NON_ACCEPTED_FIELD = "This field cannot be accepted."
 
     def __init__(self):
         self.errors = {}
