@@ -8,7 +8,7 @@ from secrets import token_hex
 
 # class FastaStats(models.Model):
 #     metadata = models.OneToOneField("data.Pathogen", on_delete=models.CASCADE, related_name="fasta")
-#     # TODO: fasta header ?
+#     fasta_header = models.CharField(max_length=100)
 #     num_seqs = models.IntegerField()
 #     num_bases = models.IntegerField()
 #     pc_acgt = models.FloatField()
@@ -43,7 +43,7 @@ from secrets import token_hex
 #     # pc_pos_cov_gte100 = models.FloatField()
 #     # pc_pos_cov_gte200 = models.FloatField()
 
-#     # TODO: would need library_primers for tiles
+#     # NOTE: would need library_primers for tiles
 #     # pc_tiles_medcov_gte1 = models.FloatField()
 #     # pc_tiles_medcov_gte5 = models.FloatField()
 #     # pc_tiles_medcov_gte10 = models.FloatField()
@@ -209,7 +209,7 @@ class Pathogen(models.Model):
 
 class Mpx(Pathogen):
     fasta_header = models.CharField(max_length=100)
-    # sample_type = models.CharField(max_length=16, validators=[MinLengthValidator(8)]) # TODO: Choices?
+    # sample_type = models.CharField(max_length=16, validators=[MinLengthValidator(8)])
     # run_sequencer = models.CharField(max_length=96)
     # run_seq_protocol = models.CharField(max_length=96)
     # run_layout = models.CharField(
