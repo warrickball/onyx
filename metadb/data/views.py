@@ -253,7 +253,7 @@ class CreateGetPathogenView(APIView):
             # Generate filterset and validate request query parameters
             filterset = METADBFilter(
                 pathogen_model,
-                request.query_params,
+                data=request.query_params,
                 queryset=pathogen_model.objects.filter(suppressed=False),
             )
             # Retrieve the resulting queryset, filtered by the query parameters
