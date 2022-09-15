@@ -4,15 +4,16 @@ from utils.fields import YearMonthField
 from distutils.util import strtobool
 
 
-class MultiValueChoiceFilter(filters.BaseCSVFilter, filters.ChoiceFilter):
-    def filter(self, qs, value):
-        # value is either a list or an 'empty' value
-        values = value or []
+# https://stackoverflow.com/a/41230820/16088113
+# class MultiValueChoiceFilter(filters.BaseCSVFilter, filters.ChoiceFilter):
+#     def filter(self, qs, value):
+#         # value is either a list or an 'empty' value
+#         values = value or []
 
-        for value in values:
-            qs = super(MultiValueChoiceFilter, self).filter(qs, value)
+#         for value in values:
+#             qs = super(MultiValueChoiceFilter, self).filter(qs, value)
 
-        return qs
+#         return qs
 
 
 class ChoiceInFilter(filters.BaseInFilter, filters.ChoiceFilter):
@@ -23,15 +24,15 @@ class ChoiceRangeFilter(filters.BaseRangeFilter, filters.ChoiceFilter):
     pass
 
 
-class MultiValueTypedChoiceFilter(filters.BaseCSVFilter, filters.TypedChoiceFilter):
-    def filter(self, qs, value):
-        # value is either a list or an 'empty' value
-        values = value or []
+# class MultiValueTypedChoiceFilter(filters.BaseCSVFilter, filters.TypedChoiceFilter):
+#     def filter(self, qs, value):
+#         # value is either a list or an 'empty' value
+#         values = value or []
 
-        for value in values:
-            qs = super(MultiValueTypedChoiceFilter, self).filter(qs, value)
+#         for value in values:
+#             qs = super(MultiValueTypedChoiceFilter, self).filter(qs, value)
 
-        return qs
+#         return qs
 
 
 class TypedChoiceInFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
@@ -48,15 +49,15 @@ class AllValuesFilter(filters.AllValuesFilter):
         self.model = model
 
 
-class MultiValueAllValuesFilter(filters.BaseCSVFilter, AllValuesFilter):
-    def filter(self, qs, value):
-        # value is either a list or an 'empty' value
-        values = value or []
+# class MultiValueAllValuesFilter(filters.BaseCSVFilter, AllValuesFilter):
+#     def filter(self, qs, value):
+#         # value is either a list or an 'empty' value
+#         values = value or []
 
-        for value in values:
-            qs = super(MultiValueAllValuesFilter, self).filter(qs, value)
+#         for value in values:
+#             qs = super(MultiValueAllValuesFilter, self).filter(qs, value)
 
-        return qs
+#         return qs
 
 
 class AllValuesInFilter(filters.BaseInFilter, AllValuesFilter):
@@ -67,31 +68,30 @@ class AllValuesRangeFilter(filters.BaseRangeFilter, AllValuesFilter):
     pass
 
 
-# https://stackoverflow.com/a/41230820/16088113
-class MultiValueNumericFilter(filters.BaseCSVFilter, filters.NumberFilter):
-    def filter(self, qs, value):
-        # value is either a list or an 'empty' value
-        values = value or []
+# class MultiValueNumericFilter(filters.BaseCSVFilter, filters.NumberFilter):
+#     def filter(self, qs, value):
+#         # value is either a list or an 'empty' value
+#         values = value or []
 
-        for value in values:
-            qs = super(MultiValueNumericFilter, self).filter(qs, value)
+#         for value in values:
+#             qs = super(MultiValueNumericFilter, self).filter(qs, value)
 
-        return qs
+#         return qs
 
 
 class NumericInFilter(filters.BaseInFilter, filters.NumberFilter):
     pass
 
 
-class MultiValueCharFilter(filters.BaseCSVFilter, filters.CharFilter):
-    def filter(self, qs, value):
-        # value is either a list or an 'empty' value
-        values = value or []
+# class MultiValueCharFilter(filters.BaseCSVFilter, filters.CharFilter):
+#     def filter(self, qs, value):
+#         # value is either a list or an 'empty' value
+#         values = value or []
 
-        for value in values:
-            qs = super(MultiValueCharFilter, self).filter(qs, value)
+#         for value in values:
+#             qs = super(MultiValueCharFilter, self).filter(qs, value)
 
-        return qs
+#         return qs
 
 
 class CharInFilter(filters.BaseInFilter, filters.CharFilter):
@@ -102,15 +102,15 @@ class CharRangeFilter(filters.BaseRangeFilter, filters.CharFilter):
     pass
 
 
-class MultiValueDateFilter(filters.BaseCSVFilter, filters.DateFilter):
-    def filter(self, qs, value):
-        # value is either a list or an 'empty' value
-        values = value or []
+# class MultiValueDateFilter(filters.BaseCSVFilter, filters.DateFilter):
+#     def filter(self, qs, value):
+#         # value is either a list or an 'empty' value
+#         values = value or []
 
-        for value in values:
-            qs = super(MultiValueDateFilter, self).filter(qs, value)
+#         for value in values:
+#             qs = super(MultiValueDateFilter, self).filter(qs, value)
 
-        return qs
+#         return qs
 
 
 class DateInFilter(filters.BaseInFilter, filters.DateFilter):
@@ -176,7 +176,7 @@ class METADBFilter(filters.FilterSet):
             if is_choice_field:
                 choices = pathogen_model._meta.get_field(field).choices
 
-                self.filters[filter_name] = MultiValueChoiceFilter(
+                self.filters[filter_name] = filters.ChoiceFilter(
                     field_name=field, choices=choices
                 )
                 self.filters[filter_name + "__in"] = ChoiceInFilter(
@@ -188,7 +188,7 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__range"] = ChoiceRangeFilter(
                     field_name=field, choices=choices, lookup_expr="range"
                 )
-                self.filters[filter_name + "__isnull"] = MultiValueTypedChoiceFilter(
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
@@ -196,18 +196,18 @@ class METADBFilter(filters.FilterSet):
                 )
 
                 for lookup in BASE_LOOKUPS:
-                    self.filters[filter_name + "__" + lookup] = MultiValueChoiceFilter(
+                    self.filters[filter_name + "__" + lookup] = filters.ChoiceFilter(
                         field_name=field, choices=choices, lookup_expr=lookup
                     )
 
                 if field_type in [models.CharField, models.TextField]:
                     for lookup in CHAR_LOOKUPS:
-                        self.filters[
-                            filter_name + "__" + lookup
-                        ] = MultiValueCharFilter(field_name=field, lookup_expr=lookup)
+                        self.filters[filter_name + "__" + lookup] = filters.CharFilter(
+                            field_name=field, lookup_expr=lookup
+                        )
 
             elif is_db_choice_field:
-                self.filters[filter_name] = MultiValueAllValuesFilter(
+                self.filters[filter_name] = AllValuesFilter(
                     field_name=field,
                     model=pathogen_model,
                 )
@@ -225,7 +225,7 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__range"] = AllValuesRangeFilter(
                     field_name=field, lookup_expr="range", model=pathogen_model
                 )
-                self.filters[filter_name + "__isnull"] = MultiValueTypedChoiceFilter(
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
@@ -233,20 +233,18 @@ class METADBFilter(filters.FilterSet):
                 )
 
                 for lookup in BASE_LOOKUPS:
-                    self.filters[
-                        filter_name + "__" + lookup
-                    ] = MultiValueAllValuesFilter(
+                    self.filters[filter_name + "__" + lookup] = AllValuesFilter(
                         field_name=field, lookup_expr=lookup, model=pathogen_model
                     )
 
                 if field_type in [models.CharField, models.TextField]:
                     for lookup in CHAR_LOOKUPS:
-                        self.filters[
-                            filter_name + "__" + lookup
-                        ] = MultiValueCharFilter(field_name=field, lookup_expr=lookup)
+                        self.filters[filter_name + "__" + lookup] = filters.CharFilter(
+                            field_name=field, lookup_expr=lookup
+                        )
 
             elif field_type in [models.CharField, models.TextField]:
-                self.filters[filter_name] = MultiValueCharFilter(field_name=field)
+                self.filters[filter_name] = filters.CharFilter(field_name=field)
                 self.filters[filter_name + "__in"] = CharInFilter(
                     field_name=field, lookup_expr="in"
                 )
@@ -256,7 +254,7 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__range"] = CharRangeFilter(
                     field_name=field, lookup_expr="range"
                 )
-                self.filters[filter_name + "__isnull"] = MultiValueTypedChoiceFilter(
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
@@ -264,17 +262,17 @@ class METADBFilter(filters.FilterSet):
                 )
 
                 for lookup in BASE_LOOKUPS:
-                    self.filters[filter_name + "__" + lookup] = MultiValueCharFilter(
+                    self.filters[filter_name + "__" + lookup] = filters.CharFilter(
                         field_name=field, lookup_expr=lookup
                     )
 
                 for lookup in CHAR_LOOKUPS:
-                    self.filters[filter_name + "__" + lookup] = MultiValueCharFilter(
+                    self.filters[filter_name + "__" + lookup] = filters.CharFilter(
                         field_name=field, lookup_expr=lookup
                     )
 
             elif field_type == YearMonthField:
-                self.filters[filter_name] = MultiValueDateFilter(
+                self.filters[filter_name] = filters.DateFilter(
                     field_name=field, input_formats=["%Y-%m"]
                 )
                 self.filters[filter_name + "__in"] = DateInFilter(
@@ -291,13 +289,13 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__range"] = DateRangeFilter(
                     field_name=field, input_formats=["%Y-%m"], lookup_expr="range"
                 )
-                self.filters[filter_name + "__isnull"] = MultiValueTypedChoiceFilter(
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
                     lookup_expr="isnull",
                 )
-                self.filters[filter_name + "__iso_year"] = MultiValueNumericFilter(
+                self.filters[filter_name + "__iso_year"] = filters.NumberFilter(
                     field_name=field, lookup_expr="iso_year"
                 )
                 self.filters[filter_name + "__iso_year__in"] = NumericInFilter(
@@ -312,12 +310,12 @@ class METADBFilter(filters.FilterSet):
                 )
 
                 for lookup in BASE_LOOKUPS:
-                    self.filters[filter_name + "__" + lookup] = MultiValueDateFilter(
+                    self.filters[filter_name + "__" + lookup] = filters.DateFilter(
                         field_name=field, input_formats=["%Y-%m"], lookup_expr=lookup
                     )
 
             elif field_type == models.DateField:
-                self.filters[filter_name] = MultiValueDateFilter(
+                self.filters[filter_name] = filters.DateFilter(
                     field_name=field, input_formats=["%Y-%m-%d"]
                 )
                 self.filters[filter_name + "__in"] = DateInFilter(
@@ -332,13 +330,13 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__range"] = DateRangeFilter(
                     field_name=field, input_formats=["%Y-%m-%d"], lookup_expr="range"
                 )
-                self.filters[filter_name + "__isnull"] = MultiValueTypedChoiceFilter(
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
                     lookup_expr="isnull",
                 )
-                self.filters[filter_name + "__iso_year"] = MultiValueNumericFilter(
+                self.filters[filter_name + "__iso_year"] = filters.NumberFilter(
                     field_name=field, lookup_expr="iso_year"
                 )
                 self.filters[filter_name + "__iso_year__in"] = NumericInFilter(
@@ -351,7 +349,7 @@ class METADBFilter(filters.FilterSet):
                     field_name=field,
                     lookup_expr="iso_year__range",
                 )
-                self.filters[filter_name + "__iso_week"] = MultiValueNumericFilter(
+                self.filters[filter_name + "__iso_week"] = filters.NumberFilter(
                     field_name=field, lookup_expr="week"
                 )
                 self.filters[filter_name + "__iso_week__in"] = NumericInFilter(
@@ -366,12 +364,12 @@ class METADBFilter(filters.FilterSet):
                 )
 
                 for lookup in BASE_LOOKUPS:
-                    self.filters[filter_name + "__" + lookup] = MultiValueDateFilter(
+                    self.filters[filter_name + "__" + lookup] = filters.DateFilter(
                         field_name=field, input_formats=["%Y-%m-%d"], lookup_expr=lookup
                     )
 
             elif field_type == models.BooleanField:
-                self.filters[filter_name] = MultiValueTypedChoiceFilter(
+                self.filters[filter_name] = filters.TypedChoiceFilter(
                     field_name=field, choices=BOOLEAN_CHOICES, coerce=strtobool
                 )
                 self.filters[filter_name + "__in"] = TypedChoiceInFilter(
@@ -393,7 +391,7 @@ class METADBFilter(filters.FilterSet):
                     coerce=strtobool,
                     lookup_expr="range",
                 )
-                self.filters[filter_name + "__isnull"] = MultiValueTypedChoiceFilter(
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
                     field_name=field,
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
@@ -403,7 +401,7 @@ class METADBFilter(filters.FilterSet):
                 for lookup in BASE_LOOKUPS:
                     self.filters[
                         filter_name + "__" + lookup
-                    ] = MultiValueTypedChoiceFilter(
+                    ] = filters.TypedChoiceFilter(
                         field_name=field,
                         choices=BOOLEAN_CHOICES,
                         coerce=strtobool,
