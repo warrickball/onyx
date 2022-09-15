@@ -440,7 +440,7 @@ def get_args():
         "get", parents=[user_parser], help="Get pathogen metadata from metadb."
     )
     get_parser.add_argument("pathogen_code")
-    get_parser.add_argument("cid", nargs="?")
+    get_parser.add_argument("cid", nargs="?", help="optional")
     get_parser.add_argument(
         "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
     )
