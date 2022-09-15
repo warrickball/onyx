@@ -2,6 +2,7 @@ import os
 import stat
 import json
 import argparse
+import pandas as pd
 from metadbclient import version, METADBClient, utils, settings
 
 
@@ -81,7 +82,7 @@ def register(client):
         username=username, email=email, institute=institute, password=password  # type: ignore
     )
 
-    print(utils.format_response(registration))
+    utils.print_response(registration)
 
     if registration.ok:
         print("Account created successfully.")
@@ -126,21 +127,19 @@ def approve(client, args):
     Approve another user on the server.
     """
     approval = client.approve(args.username)
-    print(utils.format_response(approval))
+    utils.print_response(approval)
 
 
 def create(client, args):
     """
     Post a new pathogen record to the database.
     """
-    if args.field is not None:
-        fields = {f: v for f, v in args.field}
-    else:
-        fields = {}
+    fields = utils.construct_unique_fields_dict(args.field)
+
     creations = client.create(args.pathogen_code, fields=fields)
 
     for creation in creations:
-        print(utils.format_response(creation))
+        utils.print_response(creation)
 
 
 def csv_create(client, args):
@@ -150,7 +149,7 @@ def csv_create(client, args):
     creations = client.create(args.pathogen_code, csv_path=args.csv)
 
     for creation in creations:
-        print(utils.format_response(creation))
+        utils.print_response(creation)
 
 
 def tsv_create(client, args):
@@ -160,50 +159,42 @@ def tsv_create(client, args):
     creations = client.create(args.pathogen_code, csv_path=args.tsv, delimiter="\t")
 
     for creation in creations:
-        print(utils.format_response(creation))
+        utils.print_response(creation)
 
 
 def get(client, args):
     """
     Get pathogen records from the database.
     """
-    fields = {}
-    if args.field is not None:
-        for f, v in args.field:
-            if fields.get(f) is None:
-                fields[f] = []
-            fields[f].append(v)
+    fields = utils.construct_fields_dict(args.field)
 
     results = client.get(args.pathogen_code, args.cid, fields)
 
-    result, ok = next(results)
-    if ok:
-        print(result.to_csv(index=False, sep="\t"), end="")  # type: ignore
+    result = next(results)
+    if result.ok:
+        table = pd.json_normalize(result.json()["results"])
+        print(table.to_csv(index=False, sep="\t"), end="")
     else:
-        print(utils.format_response(result))
+        utils.print_response(result)
 
-    for result, ok in results:
-        if ok:
-            print(
-                result.to_csv(index=False, sep="\t", header=False), end=""  # type: ignore
-            )
+    for result in results:
+        if result.ok:
+            table = pd.json_normalize(result.json()["results"])
+            print(table.to_csv(index=False, sep="\t", header=False), end="")
         else:
-            print(utils.format_response(result))
+            utils.print_response(result)
 
 
 def update(client, args):
     """
     Update a pathogen record in the database.
     """
-    if args.field is not None:
-        fields = {f: v for f, v in args.field}
-    else:
-        fields = {}
+    fields = utils.construct_unique_fields_dict(args.field)
 
     updates = client.update(args.pathogen_code, cid=args.cid, fields=fields)
 
     for update in updates:
-        print(utils.format_response(update))
+        utils.print_response(update)
 
 
 def csv_update(client, args):
@@ -213,7 +204,7 @@ def csv_update(client, args):
     updates = client.update(args.pathogen_code, csv_path=args.csv)
 
     for update in updates:
-        print(utils.format_response(update))
+        utils.print_response(update)
 
 
 def tsv_update(client, args):
@@ -223,7 +214,7 @@ def tsv_update(client, args):
     updates = client.update(args.pathogen_code, csv_path=args.tsv, delimiter="\t")
 
     for update in updates:
-        print(utils.format_response(update))
+        utils.print_response(update)
 
 
 def suppress(client, args):
@@ -233,7 +224,7 @@ def suppress(client, args):
     suppressions = client.suppress(args.pathogen_code, cid=args.cid)
 
     for suppression in suppressions:
-        print(utils.format_response(suppression))
+        utils.print_response(suppression)
 
 
 def csv_suppress(client, args):
@@ -243,7 +234,7 @@ def csv_suppress(client, args):
     suppressions = client.suppress(args.pathogen_code, csv_path=args.csv)
 
     for suppression in suppressions:
-        print(utils.format_response(suppression))
+        utils.print_response(suppression)
 
 
 def tsv_suppress(client, args):
@@ -255,7 +246,7 @@ def tsv_suppress(client, args):
     )
 
     for suppression in suppressions:
-        print(utils.format_response(suppression))
+        utils.print_response(suppression)
 
 
 def list_pathogen_codes(client):
@@ -263,7 +254,7 @@ def list_pathogen_codes(client):
     Get the current pathogens within the database.
     """
     pathogen_codes = client.pathogen_codes()
-    print(utils.format_response(pathogen_codes))
+    utils.print_response(pathogen_codes)
 
 
 def list_institute_users(client):
@@ -271,7 +262,7 @@ def list_institute_users(client):
     Get the current users within the institute of the requesting user.
     """
     institute_users = client.institute_users()
-    print(utils.format_response(institute_users))
+    utils.print_response(institute_users)
 
 
 def list_all_users(client):
@@ -279,7 +270,7 @@ def list_all_users(client):
     Get all users.
     """
     all_users = client.all_users()
-    print(utils.format_response(all_users))
+    utils.print_response(all_users)
 
 
 def run(args):

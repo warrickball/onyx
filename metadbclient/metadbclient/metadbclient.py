@@ -4,7 +4,6 @@ import csv
 import stat
 import json
 import requests
-import pandas as pd
 from metadbclient import utils, settings
 
 
@@ -291,7 +290,7 @@ class METADBClient:
             yield response
 
     @utils.login_required
-    def get(self, pathogen_code, cid=None, fields=None):
+    def get(self, pathogen_code, cid=None, fields=None, **kwargs):
         """
         Get records from the database.
         """
@@ -301,32 +300,39 @@ class METADBClient:
         if cid is not None:
             fields.setdefault("cid", []).append(cid)
 
-        for field, values in fields.items():
+        for field, values in kwargs.items():
             if isinstance(values, list):
-                fields[field] = ",".join(values)
+                for v in values:
+                    if isinstance(v, tuple):
+                        v = ",".join(str(x) for x in v)
+
+                    fields.setdefault(field, []).append(v)
+            else:
+                if isinstance(values, tuple):
+                    values = ",".join(str(x) for x in values)
+
+                fields.setdefault(field, []).append(values)
 
         response = self.request(
             method=requests.get,
             url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
             params=fields,
         )
+        yield response
+
         if response.ok:
-            table = pd.json_normalize(response.json()["results"])
-            yield table, True
-
             next = response.json()["next"]
-            while next is not None:
-                response = self.request(method=requests.get, url=next)
-                if response.ok:
-                    next = response.json()["next"]
-                    table = pd.json_normalize(response.json()["results"])
-                    yield table, True
-                else:
-                    next = None
-                    yield response, False
-
         else:
-            yield response, False
+            next = None
+
+        while next is not None:
+            response = self.request(method=requests.get, url=next)
+            yield response
+
+            if response.ok:
+                next = response.json()["next"]
+            else:
+                next = None
 
     @utils.login_required
     def update(
