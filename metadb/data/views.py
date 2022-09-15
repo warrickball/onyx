@@ -250,29 +250,49 @@ class CreateGetPathogenView(APIView):
 
             request.query_params._mutable = _mutable
 
-            # Generate filterset and validate request query parameters
-            filterset = METADBFilter(
-                pathogen_model,
-                data=request.query_params,
-                queryset=pathogen_model.objects.filter(suppressed=False),
-            )
-            # Retrieve the resulting queryset, filtered by the query parameters
-            qs = filterset.qs
-
-            # Append any unknown fields to error dict
+            data = {}
+            max_duplicate_field = 0
             for field in request.query_params:
-                if field not in filterset.filters:
-                    response.errors[field] = [APIResponse.UNKNOWN_FIELD]
+                values = list(set(request.query_params.getlist(field)))
+                data[field] = values
+                if len(values) > max_duplicate_field:
+                    max_duplicate_field = len(values)
+
+            filterset_datas = [{} for _ in range(max_duplicate_field)]
+            for field, values in data.items():
+                for i, value in enumerate(values):
+                    filterset_datas[i][field] = value
+
+            # Initial queryset
+            qs = pathogen_model.objects.filter(suppressed=False)
+
+            for i, filterset_data in enumerate(filterset_datas):
+                # Generate filterset of current queryset
+                filterset = METADBFilter(
+                    pathogen_model,
+                    data=filterset_data,
+                    queryset=qs,
+                )
+                # Retrieve the resulting filtered queryset
+                qs = filterset.qs
+
+                # On first pass, append any unknown fields to error dict
+                if i == 0:
+                    # Don't need to do more than i == 0, as here we have all the fields
+                    for field in filterset_data:
+                        if field not in filterset.filters:
+                            response.errors[field] = [APIResponse.UNKNOWN_FIELD]
+
+                if not filterset.is_valid():
+                    # Append any filterset errors to the errors dict
+                    for field, msg in filterset.errors.items():
+                        response.errors[field] = msg
 
             # Check the distinct field is a known field
-            if distinct and distinct not in filterset.filters:
+            if distinct and (distinct not in pathogen_model.FILTER_FIELDS):
                 response.errors[distinct] = [APIResponse.UNKNOWN_FIELD]
 
-            if not filterset.is_valid():
-                # Append any filterset errors to the errors dict
-                for field, msg in filterset.errors.items():
-                    response.errors[field] = msg
-
+            # Return any errors that cropped up during filtering
             if response.errors:
                 return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
 
