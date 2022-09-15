@@ -12,9 +12,9 @@ $ metadbclient register
 ## Uploading data
 
 ```
-$ metadbclient create <PATHOGEN_CODE> --tsv <TSV_FILE>
-$ metadbclient create <PATHOGEN_CODE> --csv <CSV_FILE>
 $ metadbclient create <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadbclient csv-create <PATHOGEN_CODE> <CSV_FILE>
+$ metadbclient tsv-create <PATHOGEN_CODE> <TSV_FILE>
 ```
 
 ## Filtering data
@@ -66,9 +66,13 @@ $ metadbclient get covid --field published_date__iso_week__range 33,37 --field p
 ## Updating data
 ```
 $ metadbclient update <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadbclient csv-update <PATHOGEN_CODE> <CSV>
+$ metadbclient tsv-update <PATHOGEN_CODE> <TSV>
 ```
 
 ## Suppressing data
 ```
 $ metadbclient suppress <PATHOGEN_CODE> <CID>
+$ metadbclient csv-suppress <PATHOGEN_CODE> <CSV>
+$ metadbclient tsv-suppress <PATHOGEN_CODE> <TSV>
 ```
