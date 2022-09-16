@@ -218,9 +218,35 @@ class TestGetPathogen(CustomAPITestCase):
         )
         self.user = self.setup_approved_user("user", self.institute.code)
 
-        for _ in range(100):
+        NUM_SAMPLES = 100
+        for _ in range(NUM_SAMPLES):
             covid_data = get_covid_data(self.institute)
             Covid.objects.create(**covid_data)
+
+    def test_field_mix(self):
+        response = self.client.get(
+            "/data/covid/",
+            data={
+                "sample_type": ["SWAB", "SERUM"],
+                "cid__contains": ["1", "A"],
+                "collection_month__range": ["2021-01,2022-01", "2021-09,2022-03"],
+                "fasta_header__in": ["MN908947.3,hello,goodbye", "NC_045512,hello"],
+                "received_month__lte": ["2022-01", "2021-08"],
+            },
+        )
+        internal = (
+            Covid.objects.filter(sample_type="SWAB")
+            .filter(sample_type="SERUM")
+            .filter(cid__contains="1")
+            .filter(cid__contains="A")
+            .filter(collection_month__range=["2021-01", "2022-01"])
+            .filter(collection_month__range=["2021-09", "2022-03"])
+            .filter(fasta_header__in=["MN908947.3", "hello", "goodbye"])
+            .filter(fasta_header__in=["NC_045512", "hello"])
+            .filter(received_month__lte="2022-01")
+            .filter(received_month__lte="2021-08")
+        )
+        self.assertEqualCids(response, internal)
 
 
 class TestGetPathogenChoiceField(TestGetPathogen):
@@ -297,6 +323,28 @@ class TestGetPathogenChoiceField(TestGetPathogen):
             )
             internal = Covid.objects.filter(**{f"sample_type__{lookup}": "SWAB"})
             self.assertEqualCids(response, internal)
+
+    def test_choice_field_non_choice(self):
+        for value in ["HELLO THERE", "SWA", "SER"]:
+            # Exact
+            response = self.client.get("/data/covid/", data={"sample_type": value})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            # Base lookups
+            for lookup in BASE_LOOKUPS:
+                response = self.client.get(
+                    "/data/covid/", data={f"sample_type__{lookup}": [value]}
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_choice_field_non_choice_but_char_lookup_so_its_all_cool(self):
+        for value in ["HELLO THERE", "SWA", "SER"]:
+            for lookup in CHAR_LOOKUPS:
+                response = self.client.get(
+                    "/data/covid/", data={f"sample_type__{lookup}": [value]}
+                )
+                internal = Covid.objects.filter(**{f"sample_type__{lookup}": value})
+                self.assertEqualCids(response, internal)
 
 
 class TestGetPathogenCharField(TestGetPathogen):
@@ -465,6 +513,29 @@ class TestGetPathogenYearMonthField(TestGetPathogen):
             )
             self.assertEqualCids(response, internal)
 
+    def test_yearmonth_invalid_yearmonth(self):
+        for value in [
+            "2021-",
+            "-01",
+            "HELLO-THERE",
+            "2022-HEELLOOOTHHEEEERREEE!!!",
+            "2022-01-01",
+            "2022",
+            "2022-01-01-01-01-01",
+            "202222222222222222222222222222222-1",
+            "1-1",
+        ]:
+            # Exact
+            response = self.client.get("/data/covid/", data={"collection_month": value})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            # Base lookups
+            for lookup in BASE_LOOKUPS:
+                response = self.client.get(
+                    "/data/covid/", data={f"collection_month__{lookup}": [value]}
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class TestGetPathogenDateField(TestGetPathogen):
     def setUp(self):
@@ -598,6 +669,29 @@ class TestGetPathogenDateField(TestGetPathogen):
             internal = Covid.objects.filter(**{f"published_date__{lookup}": self.today})
             self.assertEqualCids(response, internal)
 
+    def test_date_field_invalid_date(self):
+        for value in [
+            "2021-",
+            "-01",
+            "HELLO-THERE",
+            "2022-HEELLOOOTHHEEEERREEE!!!",
+            "2022-01",
+            "2022",
+            "2022-01-01-01-01-01",
+            "20222222222222222222222-01-01",
+            "1-1-1",
+        ]:
+            # Exact
+            response = self.client.get("/data/covid/", data={"published_date": value})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            # Base lookups
+            for lookup in BASE_LOOKUPS:
+                response = self.client.get(
+                    "/data/covid/", data={f"published_date__{lookup}": [value]}
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class TestGetPathogenBooleanField(TestGetPathogen):
     def test_boolean_field(self):
@@ -680,3 +774,28 @@ class TestGetPathogenBooleanField(TestGetPathogen):
             )
             internal = Covid.objects.filter(**{f"is_external__{lookup}": False})
             self.assertEqualCids(response, internal)
+
+    def test_boolean_field_non_boolean(self):
+        for value in [
+            "tru mayn",
+            "fr fr",
+            "nah",
+            "cap",
+            "no cap",
+            "falseee",
+            "101011111000",
+            "1",
+            "0",
+            "tRUE",
+            "fAlSe",
+        ]:
+            # Exact
+            response = self.client.get("/data/covid/", data={"is_external": value})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            # Base lookups
+            for lookup in BASE_LOOKUPS:
+                response = self.client.get(
+                    "/data/covid/", data={f"is_external__{lookup}": [value]}
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
