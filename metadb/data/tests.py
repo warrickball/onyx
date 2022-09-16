@@ -222,6 +222,8 @@ class TestGetPathogen(CustomAPITestCase):
             covid_data = get_covid_data(self.institute)
             Covid.objects.create(**covid_data)
 
+
+class TestGetPathogenChoiceField(TestGetPathogen):
     def test_choice_field_exact(self):
         for value in ["SWAB", "SERUM"]:
             response = self.client.get("/data/covid/", data={"sample_type": value})
@@ -296,6 +298,8 @@ class TestGetPathogen(CustomAPITestCase):
             internal = Covid.objects.filter(**{f"sample_type__{lookup}": "SWAB"})
             self.assertEqualCids(response, internal)
 
+
+class TestGetPathogenCharField(TestGetPathogen):
     def test_char_field_exact(self):
         for value in ["MN908947.3", "NC_045512", "hello", "goodbye"]:
             response = self.client.get("/data/covid/", data={"fasta_header": value})
@@ -370,6 +374,8 @@ class TestGetPathogen(CustomAPITestCase):
             internal = Covid.objects.filter(**{f"fasta_header__{lookup}": "hello"})
             self.assertEqualCids(response, internal)
 
+
+class TestGetPathogenYearMonthField(TestGetPathogen):
     def test_yearmonth_field_exact(self):
         for value in ["2021-03", "2022-01", "2022-04", "2022-12"]:
             response = self.client.get("/data/covid/", data={"collection_month": value})
@@ -442,9 +448,6 @@ class TestGetPathogen(CustomAPITestCase):
         internal = Covid.objects.filter(collection_month__iso_year__in=[2021, 2022])
         self.assertEqualCids(response, internal)
 
-    # TODO: switching from filters.NumericRange to a custom NumericRange fixed this
-    # Had no problem with published_date
-    # Leads me to think it was an issue with null values... investigate
     def test_yearmonth_field_iso_year_range(self):
         response = self.client.get(
             "/data/covid/", data={"collection_month__iso_year__range": ["2021,2022"]}
@@ -462,82 +465,73 @@ class TestGetPathogen(CustomAPITestCase):
             )
             self.assertEqualCids(response, internal)
 
-    def test_date_field_exact(self):
+
+class TestGetPathogenDateField(TestGetPathogen):
+    def setUp(self):
+        super().setUp()
         today = date.today()
         year, week, day = today.isocalendar()
-        today = str(today)
+        self.today = str(today)
+        self.today_week = week
 
-        for value in ["2021-03-04", "2022-01-01", today, "2022-12-25"]:
+    def test_date_field_exact(self):
+        for value in ["2021-03-04", "2022-01-01", self.today, "2022-12-25"]:
             response = self.client.get("/data/covid/", data={"published_date": value})
             internal = Covid.objects.filter(published_date=value)
             self.assertEqualCids(response, internal)
 
     def test_date_field_in(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
-            "/data/covid/", data={"published_date__in": [f"2021-03-04,{today}"]}
+            "/data/covid/", data={"published_date__in": [f"2021-03-04,{self.today}"]}
         )
-        internal = Covid.objects.filter(published_date__in=["2021-03-04", today])
+        internal = Covid.objects.filter(published_date__in=["2021-03-04", self.today])
         self.assertEqualCids(response, internal)
 
         response = self.client.get(
             "/data/covid/",
             data={
                 "published_date__in": [
-                    f"2021-03-04,{today}",
-                    f"2022-01-01,{today}",
+                    f"2021-03-04,{self.today}",
+                    f"2022-01-01,{self.today}",
                 ]
             },
         )
         internal = Covid.objects.filter(
-            published_date__in=["2021-03-04", today]
-        ).filter(published_date__in=["2022-01-01", today])
+            published_date__in=["2021-03-04", self.today]
+        ).filter(published_date__in=["2022-01-01", self.today])
         self.assertEqualCids(response, internal)
 
     def test_date_field_notin(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
-            "/data/covid/", data={"published_date__notin": [f"2021-03-04,{today}"]}
+            "/data/covid/", data={"published_date__notin": [f"2021-03-04,{self.today}"]}
         )
-        internal = Covid.objects.exclude(published_date__in=["2021-03-04", today])
+        internal = Covid.objects.exclude(published_date__in=["2021-03-04", self.today])
         self.assertEqualCids(response, internal)
 
         response = self.client.get(
             "/data/covid/",
             data={
                 "published_date__notin": [
-                    f"2021-03-04,{today}",
-                    f"2022-01-01,{today}",
+                    f"2021-03-04,{self.today}",
+                    f"2022-01-01,{self.today}",
                 ]
             },
         )
         internal = Covid.objects.exclude(
-            published_date__in=["2021-03-04", today]
-        ).exclude(published_date__in=["2022-01-01", today])
+            published_date__in=["2021-03-04", self.today]
+        ).exclude(published_date__in=["2022-01-01", self.today])
         self.assertEqualCids(response, internal)
 
     def test_date_field_range(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
-            "/data/covid/", data={"published_date__range": [f"2021-03-04,{today}"]}
+            "/data/covid/", data={"published_date__range": [f"2021-03-04,{self.today}"]}
         )
-        internal = Covid.objects.filter(published_date__range=["2021-03-04", today])
+        internal = Covid.objects.filter(
+            published_date__range=["2021-03-04", self.today]
+        )
         self.assertEqualCids(response, internal)
 
     def test_date_field_isnull(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
             "/data/covid/", data={"published_date__isnull": ["true"]}
         )
@@ -551,10 +545,6 @@ class TestGetPathogen(CustomAPITestCase):
         self.assertEqualCids(response, internal)
 
     def test_date_field_iso_year(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
             "/data/covid/", data={"published_date__iso_year": ["2022"]}
         )
@@ -562,10 +552,6 @@ class TestGetPathogen(CustomAPITestCase):
         self.assertEqualCids(response, internal)
 
     def test_date_field_iso_year_in(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
             "/data/covid/", data={"published_date__iso_year__in": ["2021,2022"]}
         )
@@ -573,10 +559,6 @@ class TestGetPathogen(CustomAPITestCase):
         self.assertEqualCids(response, internal)
 
     def test_date_field_iso_year_range(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
             "/data/covid/", data={"published_date__iso_year__range": ["2021,2022"]}
         )
@@ -584,51 +566,40 @@ class TestGetPathogen(CustomAPITestCase):
         self.assertEqualCids(response, internal)
 
     def test_date_field_iso_week(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
-            "/data/covid/", data={"published_date__iso_week": [str(week)]}
+            "/data/covid/", data={"published_date__iso_week": [str(self.today_week)]}
         )
-        internal = Covid.objects.filter(published_date__week=week)
+        internal = Covid.objects.filter(published_date__week=self.today_week)
         self.assertEqualCids(response, internal)
 
     def test_date_field_iso_week_in(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
-            "/data/covid/", data={"published_date__iso_week__in": [f"{str(week)},11"]}
+            "/data/covid/",
+            data={"published_date__iso_week__in": [f"{str(self.today_week)},11"]},
         )
-        internal = Covid.objects.filter(published_date__week__in=[week, 11])
+        internal = Covid.objects.filter(published_date__week__in=[self.today_week, 11])
         self.assertEqualCids(response, internal)
 
     def test_date_field_iso_week_range(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         response = self.client.get(
             "/data/covid/",
-            data={"published_date__iso_week__range": [f"11,{str(week)}"]},
+            data={"published_date__iso_week__range": [f"11,{str(self.today_week)}"]},
         )
-        internal = Covid.objects.filter(published_date__week__range=[11, week])
+        internal = Covid.objects.filter(
+            published_date__week__range=[11, self.today_week]
+        )
         self.assertEqualCids(response, internal)
 
     def test_date_field_base_lookups(self):
-        today = date.today()
-        year, week, day = today.isocalendar()
-        today = str(today)
-
         for lookup in BASE_LOOKUPS:
             response = self.client.get(
-                "/data/covid/", data={f"published_date__{lookup}": [today]}
+                "/data/covid/", data={f"published_date__{lookup}": [self.today]}
             )
-            internal = Covid.objects.filter(**{f"published_date__{lookup}": today})
+            internal = Covid.objects.filter(**{f"published_date__{lookup}": self.today})
             self.assertEqualCids(response, internal)
 
+
+class TestGetPathogenBooleanField(TestGetPathogen):
     def test_boolean_field(self):
         for value in ["true", "True"]:
             response = self.client.get("/data/covid/", data={"is_external": value})

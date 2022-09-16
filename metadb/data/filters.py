@@ -4,35 +4,12 @@ from utils.fields import YearMonthField
 from distutils.util import strtobool
 
 
-# https://stackoverflow.com/a/41230820/16088113
-# class MultiValueChoiceFilter(filters.BaseCSVFilter, filters.ChoiceFilter):
-#     def filter(self, qs, value):
-#         # value is either a list or an 'empty' value
-#         values = value or []
-
-#         for value in values:
-#             qs = super(MultiValueChoiceFilter, self).filter(qs, value)
-
-#         return qs
-
-
 class ChoiceInFilter(filters.BaseInFilter, filters.ChoiceFilter):
     pass
 
 
 class ChoiceRangeFilter(filters.BaseRangeFilter, filters.ChoiceFilter):
     pass
-
-
-# class MultiValueTypedChoiceFilter(filters.BaseCSVFilter, filters.TypedChoiceFilter):
-#     def filter(self, qs, value):
-#         # value is either a list or an 'empty' value
-#         values = value or []
-
-#         for value in values:
-#             qs = super(MultiValueTypedChoiceFilter, self).filter(qs, value)
-
-#         return qs
 
 
 class TypedChoiceInFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
@@ -43,59 +20,29 @@ class TypedChoiceRangeFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
     pass
 
 
-class AllValuesFilter(filters.AllValuesFilter):
+class DBValuesFilter(filters.AllValuesFilter):
     def __init__(self, *args, model, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = model
 
 
-# class MultiValueAllValuesFilter(filters.BaseCSVFilter, AllValuesFilter):
-#     def filter(self, qs, value):
-#         # value is either a list or an 'empty' value
-#         values = value or []
-
-#         for value in values:
-#             qs = super(MultiValueAllValuesFilter, self).filter(qs, value)
-
-#         return qs
-
-
-class AllValuesInFilter(filters.BaseInFilter, AllValuesFilter):
+class DBValuesInFilter(filters.BaseInFilter, DBValuesFilter):
     pass
 
 
-class AllValuesRangeFilter(filters.BaseRangeFilter, AllValuesFilter):
+class DBValuesRangeFilter(filters.BaseRangeFilter, DBValuesFilter):
     pass
-
-
-# class MultiValueNumericFilter(filters.BaseCSVFilter, filters.NumberFilter):
-#     def filter(self, qs, value):
-#         # value is either a list or an 'empty' value
-#         values = value or []
-
-#         for value in values:
-#             qs = super(MultiValueNumericFilter, self).filter(qs, value)
-
-#         return qs
 
 
 class NumericInFilter(filters.BaseInFilter, filters.NumberFilter):
     pass
 
 
+# filters.NumericRangeFilter was the wrong choice to begin with
+# https://django-filter.readthedocs.io/en/latest/ref/filters.html#numericrangefilter
+# Thank you tests for highlighting this
 class NumericRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
     pass
-
-
-# class MultiValueCharFilter(filters.BaseCSVFilter, filters.CharFilter):
-#     def filter(self, qs, value):
-#         # value is either a list or an 'empty' value
-#         values = value or []
-
-#         for value in values:
-#             qs = super(MultiValueCharFilter, self).filter(qs, value)
-
-#         return qs
 
 
 class CharInFilter(filters.BaseInFilter, filters.CharFilter):
@@ -104,17 +51,6 @@ class CharInFilter(filters.BaseInFilter, filters.CharFilter):
 
 class CharRangeFilter(filters.BaseRangeFilter, filters.CharFilter):
     pass
-
-
-# class MultiValueDateFilter(filters.BaseCSVFilter, filters.DateFilter):
-#     def filter(self, qs, value):
-#         # value is either a list or an 'empty' value
-#         values = value or []
-
-#         for value in values:
-#             qs = super(MultiValueDateFilter, self).filter(qs, value)
-
-#         return qs
 
 
 class DateInFilter(filters.BaseInFilter, filters.DateFilter):
@@ -211,22 +147,22 @@ class METADBFilter(filters.FilterSet):
                         )
 
             elif is_db_choice_field:
-                self.filters[filter_name] = AllValuesFilter(
+                self.filters[filter_name] = DBValuesFilter(
                     field_name=field,
                     model=pathogen_model,
                 )
-                self.filters[filter_name + "__in"] = AllValuesInFilter(
+                self.filters[filter_name + "__in"] = DBValuesInFilter(
                     field_name=field,
                     lookup_expr="in",
                     model=pathogen_model,
                 )
-                self.filters[filter_name + "__notin"] = AllValuesInFilter(
+                self.filters[filter_name + "__notin"] = DBValuesInFilter(
                     field_name=field,
                     lookup_expr="in",
                     exclude=True,
                     model=pathogen_model,
                 )
-                self.filters[filter_name + "__range"] = AllValuesRangeFilter(
+                self.filters[filter_name + "__range"] = DBValuesRangeFilter(
                     field_name=field, lookup_expr="range", model=pathogen_model
                 )
                 self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
@@ -237,7 +173,7 @@ class METADBFilter(filters.FilterSet):
                 )
 
                 for lookup in BASE_LOOKUPS:
-                    self.filters[filter_name + "__" + lookup] = AllValuesFilter(
+                    self.filters[filter_name + "__" + lookup] = DBValuesFilter(
                         field_name=field, lookup_expr=lookup, model=pathogen_model
                     )
 
