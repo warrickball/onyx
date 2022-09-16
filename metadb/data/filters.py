@@ -83,6 +83,10 @@ class NumericInFilter(filters.BaseInFilter, filters.NumberFilter):
     pass
 
 
+class NumericRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
+    pass
+
+
 # class MultiValueCharFilter(filters.BaseCSVFilter, filters.CharFilter):
 #     def filter(self, qs, value):
 #         # value is either a list or an 'empty' value
@@ -302,9 +306,7 @@ class METADBFilter(filters.FilterSet):
                     field_name=field,
                     lookup_expr="iso_year__in",
                 )
-                self.filters[
-                    filter_name + "__iso_year__range"
-                ] = filters.NumericRangeFilter(
+                self.filters[filter_name + "__iso_year__range"] = NumericRangeFilter(
                     field_name=field,
                     lookup_expr="iso_year__range",
                 )
@@ -343,9 +345,7 @@ class METADBFilter(filters.FilterSet):
                     field_name=field,
                     lookup_expr="iso_year__in",
                 )
-                self.filters[
-                    filter_name + "__iso_year__range"
-                ] = filters.NumericRangeFilter(
+                self.filters[filter_name + "__iso_year__range"] = NumericRangeFilter(
                     field_name=field,
                     lookup_expr="iso_year__range",
                 )
@@ -356,9 +356,7 @@ class METADBFilter(filters.FilterSet):
                     field_name=field,
                     lookup_expr="week__in",
                 )
-                self.filters[
-                    filter_name + "__iso_week__range"
-                ] = filters.NumericRangeFilter(
+                self.filters[filter_name + "__iso_week__range"] = NumericRangeFilter(
                     field_name=field,
                     lookup_expr="week__range",
                 )
