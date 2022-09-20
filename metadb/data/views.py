@@ -201,7 +201,7 @@ class CreateGetPathogenView(APIView):
 
                 response.results.append(serializer.data)
 
-                return Response(response.data, status=status.HTTP_200_OK)
+                return Response(response.data, status=status.HTTP_201_CREATED)
             else:
                 # Combine serializer errors with current errors
                 response.errors.update(serializer.errors)
