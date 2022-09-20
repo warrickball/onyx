@@ -1,287 +1,10 @@
-from rest_framework.test import APITestCase
 from rest_framework import status
-from .models import Pathogen, Covid, Mpx
-from .views import get_pathogen_model, enforce_optional_value_groups, enforce_field_set
-from accounts.models import User, Institute
-from utils.responses import APIResponse
-from .filters import BASE_LOOKUPS, CHAR_LOOKUPS
+from data.models import Covid
+from accounts.models import Institute
+from data.filters import BASE_LOOKUPS, CHAR_LOOKUPS
 from django.conf import settings
-import secrets
-import random
 from datetime import date
-
-
-class TestGetPathogenModel(APITestCase):
-    def test_get_pathogen_model(self):
-        self.assertEqual(get_pathogen_model("pathogen", accept_base=True), Pathogen)
-        self.assertEqual(get_pathogen_model("pathogen"), None)
-        self.assertEqual(get_pathogen_model("covid"), Covid)
-        self.assertEqual(get_pathogen_model("Covid"), Covid)
-        self.assertEqual(get_pathogen_model("COVID"), Covid)
-        self.assertEqual(get_pathogen_model("mpx"), Mpx)
-        self.assertEqual(get_pathogen_model("COVOD"), None)
-
-
-class TestEnforceOptionalValueGroups(APITestCase):
-    def setUp(self):
-        self.groups = list(Pathogen.OPTIONAL_VALUE_GROUPS)
-
-    def test_enforce_optional_value_groups_ok(self):
-        data = {"collection_month": "2022-01", "received_month": "2022-03"}
-        self.assertEqual(enforce_optional_value_groups(data, self.groups), {})
-        data.pop("collection_month")
-        self.assertEqual(enforce_optional_value_groups(data, self.groups), {})
-
-    def test_enforce_optional_value_groups_fail(self):
-        data = {}
-        self.groups.append(["published_date"])
-        result = enforce_optional_value_groups(data, self.groups)
-
-        self.assertNotEqual(enforce_optional_value_groups(data, self.groups), {})
-        self.assertTrue("required_fields" in result)
-        self.assertEqual(len(result["required_fields"]), 2)
-        for results in result["required_fields"]:
-            groups = list(results.values())
-            for group in groups:
-                self.assertTrue(
-                    (("collection_month" in group) and ("received_month" in group))
-                    or ("published_date" in group)
-                )
-
-
-class TestEnforceFieldSet(APITestCase):
-    def setUp(self):
-        self.accepted_fields = ["cid", "sender_sample_id", "run_name"]
-        self.rejected_fields = ["id", "created"]
-
-    def test_enforce_field_set_ok(self):
-        data = {"cid": "C-123456", "sender_sample_id": "S-123456"}
-
-        self.assertEqual(
-            enforce_field_set(
-                data=data,
-                accepted_fields=self.accepted_fields,
-                rejected_fields=self.rejected_fields,
-            ),
-            ({}, {}),
-        )
-
-    def test_enforce_field_set_fail(self):
-        accepted_fields = ["cid", "sender_sample_id", "run_name"]
-        rejected_fields = ["id", "created"]
-        data = {
-            "cid": "C-123456",
-            "sender_sample_id": "S-123456",
-            "id": 5,
-            "created": "2022-01-01",
-            "hi": "HELLO!!!!",
-        }
-
-        self.assertEqual(
-            enforce_field_set(
-                data=data,
-                accepted_fields=accepted_fields,
-                rejected_fields=rejected_fields,
-            ),
-            (
-                {
-                    "id": [APIResponse.NON_ACCEPTED_FIELD],
-                    "created": [APIResponse.NON_ACCEPTED_FIELD],
-                },
-                {"hi": [APIResponse.UNKNOWN_FIELD]},
-            ),
-        )
-
-
-class METADBTestCase(APITestCase):
-    def setup_authenticated_user(self, username, institute):
-        response = self.client.post(
-            "/accounts/register/",
-            data={
-                "username": username,
-                "password": "pass123456",
-                "email": f"{username}@test.com",
-                "institute": institute,
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(username=username)
-        self.client.force_authenticate(user)  # type: ignore
-        return user
-
-    def setup_approved_user(self, username, institute):
-        response = self.client.post(
-            "/accounts/register/",
-            data={
-                "username": username,
-                "password": "pass123456",
-                "email": f"{username}@test.com",
-                "institute": institute,
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(username=username)
-        user.is_approved = True
-        self.client.force_authenticate(user)  # type: ignore
-        return user
-
-    def setup_authority_user(self, username, institute):
-        response = self.client.post(
-            "/accounts/register/",
-            data={
-                "username": username,
-                "password": "pass123456",
-                "email": f"{username}@test.com",
-                "institute": institute,
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(username=username)
-        user.is_approved = True
-        user.is_authority = True
-        self.client.force_authenticate(user)  # type: ignore
-        return user
-
-    def setup_admin_user(self, username, institute):
-        response = self.client.post(
-            "/accounts/register/",
-            data={
-                "username": username,
-                "password": "pass123456",
-                "email": f"{username}@test.com",
-                "institute": institute,
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(username=username)
-        user.is_staff = True
-        self.client.force_authenticate(user)  # type: ignore
-        return user
-
-    def assertEqualCids(self, results, internal):
-        self.assertEqual(
-            sorted(result["cid"] for result in results),
-            sorted(internal.values_list("cid", flat=True)),
-        )
-
-    def showEqualCids(self, results, internal):
-        return sorted(result["cid"] for result in results) == sorted(
-            internal.values_list("cid", flat=True)
-        )
-
-    def client_get_paginated(
-        self, *args, expected_status_code=status.HTTP_200_OK, **kwargs
-    ):
-        response = self.client.get(*args, **kwargs)
-        self.assertEqual(response.status_code, expected_status_code)
-
-        results = response.json().get("results")
-        _next = response.json().get("next")
-
-        while _next is not None:
-            response = self.client.get(
-                _next,
-            )
-            self.assertEqual(response.status_code, expected_status_code)
-            results.extend(response.json().get("results"))
-            _next = response.json().get("next")
-
-        return results
-
-
-def get_covid_data(institute):
-    sender_sample_id = f"S-{secrets.token_hex(3).upper()}"
-    run_name = f"R-{'.'.join([str(random.randint(0, 9)) for _ in range(9)])}"
-    pathogen_dict = {
-        "sender_sample_id": sender_sample_id,
-        "run_name": run_name,
-        "pathogen_code": "COVID",
-        "institute": institute,
-        "fasta_path": f"{sender_sample_id}.{run_name}.fasta",
-        "bam_path": f"{sender_sample_id}.{run_name}.bam",
-        "is_external": random.choice([True, False]),
-        "fasta_header": random.choice(["MN908947.3", "NC_045512", "hello", "goodbye"]),
-        "sample_type": random.choice(["SWAB", "SERUM"]),
-    }
-    coin = random.randint(0, 2)
-    if coin == 0:
-        pathogen_dict[
-            "collection_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-    elif coin == 1:
-        pathogen_dict[
-            "received_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-    else:
-        pathogen_dict[
-            "collection_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-        pathogen_dict[
-            "received_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-
-    return pathogen_dict
-
-
-class TestCreatePathogen(METADBTestCase):
-    def setUp(self):
-        self.institute = Institute.objects.create(
-            code="DEPTSTUFF", name="Department of Important Stuff"
-        )
-        self.user = self.setup_admin_user("user", self.institute.code)
-
-        settings.CURSOR_PAGINATION_PAGE_SIZE = 20
-        self.covid_data = []
-        for _ in range(settings.CURSOR_PAGINATION_PAGE_SIZE * 5):
-            self.covid_data.append(get_covid_data(self.institute.code))
-
-    def test_unauthenticated_create(self):
-        self.client.force_authenticate(user=None)  # type: ignore
-        response = self.client.post("/data/covid/", data=self.covid_data[0])
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_authenticated_create(self):
-        self.client.force_authenticate(  # type: ignore
-            user=self.setup_authenticated_user(
-                "authenticated-user", institute=self.institute.code
-            )
-        )
-        response = self.client.post("/data/covid/", data=self.covid_data[0])
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_approved_create(self):
-        self.client.force_authenticate(  # type: ignore
-            user=self.setup_approved_user(
-                "approved-user", institute=self.institute.code
-            )
-        )
-        response = self.client.post("/data/covid/", data=self.covid_data[0])
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_authority_create(self):
-        self.client.force_authenticate(  # type: ignore
-            user=self.setup_authority_user(
-                "authority-user", institute=self.institute.code
-            )
-        )
-        response = self.client.post("/data/covid/", data=self.covid_data[0])
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_admin_create(self):
-        self.client.force_authenticate(  # type: ignore
-            user=self.setup_admin_user("admin-user", institute=self.institute.code)
-        )
-        response = self.client.post("/data/covid/", data=self.covid_data[0])
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        results = response.json()["results"]
-        self.assertEqual(len(results), 1)
-        cid = results[0]["cid"]
-        self.assertTrue(Covid.objects.filter(cid=cid).exists())
+from data.tests.utils import METADBTestCase, get_covid_data
 
 
 class TestGetPathogen(METADBTestCase):
@@ -295,35 +18,6 @@ class TestGetPathogen(METADBTestCase):
         for _ in range(settings.CURSOR_PAGINATION_PAGE_SIZE * 5):
             covid_data = get_covid_data(self.institute)
             Covid.objects.create(**covid_data)
-
-    def test_everything(self):
-        results = self.client_get_paginated(
-            "/data/covid/",
-        )
-        internal = Covid.objects.all()
-        self.assertEqualCids(results, internal)
-
-    def test_field_mix(self):
-        results = self.client_get_paginated(
-            "/data/covid/",
-            data={
-                "cid__contains": ["1", "A"],
-                "collection_month__range": ["2021-01,2022-01", "2021-09,2022-03"],
-                "fasta_header__in": ["MN908947.3,hello,goodbye", "NC_045512,hello"],
-                "received_month__lte": ["2022-01", "2021-08"],
-            },
-        )
-        internal = (
-            Covid.objects.filter(cid__contains="1")
-            .filter(cid__contains="A")
-            .filter(collection_month__range=["2021-01", "2022-01"])
-            .filter(collection_month__range=["2021-09", "2022-03"])
-            .filter(fasta_header__in=["MN908947.3", "hello", "goodbye"])
-            .filter(fasta_header__in=["NC_045512", "hello"])
-            .filter(received_month__lte="2022-01")
-            .filter(received_month__lte="2021-08")
-        )
-        self.assertEqualCids(results, internal)
 
     def test_unauthenticated_get(self):
         self.client.force_authenticate(user=None)  # type: ignore
@@ -368,6 +62,35 @@ class TestGetPathogen(METADBTestCase):
         results = self.client_get_paginated(
             "/data/covid/", expected_status_code=status.HTTP_200_OK
         )
+
+    def test_get(self):
+        results = self.client_get_paginated(
+            "/data/covid/",
+        )
+        internal = Covid.objects.all()
+        self.assertEqualCids(results, internal)
+
+    def test_field_mix(self):
+        results = self.client_get_paginated(
+            "/data/covid/",
+            data={
+                "cid__contains": ["1", "A"],
+                "collection_month__range": ["2021-01,2022-01", "2021-09,2022-03"],
+                "fasta_header__in": ["MN908947.3,hello,goodbye", "NC_045512,hello"],
+                "received_month__lte": ["2022-01", "2021-08"],
+            },
+        )
+        internal = (
+            Covid.objects.filter(cid__contains="1")
+            .filter(cid__contains="A")
+            .filter(collection_month__range=["2021-01", "2022-01"])
+            .filter(collection_month__range=["2021-09", "2022-03"])
+            .filter(fasta_header__in=["MN908947.3", "hello", "goodbye"])
+            .filter(fasta_header__in=["NC_045512", "hello"])
+            .filter(received_month__lte="2022-01")
+            .filter(received_month__lte="2021-08")
+        )
+        self.assertEqualCids(results, internal)
 
 
 class TestGetPathogenChoiceField(TestGetPathogen):
@@ -472,6 +195,12 @@ class TestGetPathogenChoiceField(TestGetPathogen):
                 )
                 internal = Covid.objects.filter(**{f"sample_type__{lookup}": value})
                 self.assertEqualCids(results, internal)
+
+    def test_get_unknown_fields(self):
+        pass  # TODO: Add fields such as id, created etc but also weird ones like HAHA
+
+    def test_get_rejected_fields(self):
+        pass  # TODO: Don't think theres any of these
 
 
 class TestGetPathogenCharField(TestGetPathogen):
@@ -951,3 +680,15 @@ class TestGetPathogenBooleanField(TestGetPathogen):
                     data={f"is_external__{lookup}": [value]},
                     expected_status_code=status.HTTP_400_BAD_REQUEST,
                 )
+
+
+class TestUpdatePathogen(METADBTestCase):
+    pass
+
+
+class TestSuppressPathogen(METADBTestCase):
+    pass
+
+
+class TestDeletePathogen(METADBTestCase):
+    pass
