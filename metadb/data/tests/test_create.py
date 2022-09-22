@@ -3,6 +3,9 @@ from data.models import Covid
 from accounts.models import Institute
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
+from utils.responses import APIResponse
+import secrets
+import random
 
 
 class TestCreatePathogen(METADBTestCase):
@@ -61,6 +64,14 @@ class TestCreatePathogen(METADBTestCase):
         cid = results[0]["cid"]
         self.assertTrue(Covid.objects.filter(cid=cid).exists())
 
+    def test_pathogen_not_found(self):
+        for x in self.covid_data:
+            response = self.client.post("/data/hello/", data=x)
+            self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+            self.assertEqual(
+                response.json()["errors"], {"hello": APIResponse.NOT_FOUND}
+            )
+
     def test_create(self):
         results = []
         for x in self.covid_data:
@@ -74,13 +85,160 @@ class TestCreatePathogen(METADBTestCase):
         self.assertEqualCids(results, internal)
 
     def test_create_missing_fields(self):
-        pass  # TODO: Remove fields
+        for x in self.covid_data:
+            for field in [
+                "sender_sample_id",
+                "run_name",
+                "institute",
+                "fasta_path",
+                "bam_path",
+            ]:
+                x_ = dict(x)
+                x_.pop(field)
+
+                response = self.client.post("/data/covid/", data=x_)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_create_empty_values(self):
-        pass  # TODO: Keep fields but make values None/spaces/empty string
+        for x in self.covid_data:
+            for field in [
+                "sender_sample_id",
+                "run_name",
+                "institute",
+                "fasta_path",
+                "bam_path",
+            ]:
+                x_ = dict(x)
+                for bad in ["", " ", "              "]:
+                    x_[field] = bad
+                    response = self.client.post("/data/covid/", data=x_)
+                    self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_create_unknown_fields(self):
-        pass  # TODO: Add fields such as id, created etc but also weird ones like HAHA
+        results = []
+        for x in self.covid_data:
+            x_ = dict(x)
+            x_["id"] = 42
+            x_["HELLO"] = "GOOD DAY"
+            response = self.client.post("/data/covid/", data=x_)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(
+                response.json()["warnings"],
+                {
+                    "id": [APIResponse.UNKNOWN_FIELD],
+                    "HELLO": [APIResponse.UNKNOWN_FIELD],
+                },
+            )
+            response_results = response.json()["results"]
+            self.assertEqual(len(response_results), 1)
+            results.append(response_results[0])
+        internal = Covid.objects.all()
+        self.assertEqualCids(results, internal)
 
     def test_create_rejected_fields(self):
-        pass  # TODO: Add fields such as cid
+        for x in self.covid_data:
+            x_ = dict(x)
+            x_["cid"] = f"C-{secrets.token_hex(3)}"
+            x_["published_date"] = "2022-01-01"
+            response = self.client.post("/data/covid/", data=x_)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(
+                response.json()["errors"],
+                {
+                    "cid": [APIResponse.NON_ACCEPTED_FIELD],
+                    "published_date": [APIResponse.NON_ACCEPTED_FIELD],
+                },
+            )
+
+    def test_create_unknown_and_rejected_fields(self):
+        for x in self.covid_data:
+            x_ = dict(x)
+            x_["id"] = 42
+            x_["HELLO"] = "GOOD DAY"
+            x_["cid"] = f"C-{secrets.token_hex(3)}"
+            x_["published_date"] = "2022-01-01"
+            response = self.client.post("/data/covid/", data=x_)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(
+                response.json()["warnings"],
+                {
+                    "id": [APIResponse.UNKNOWN_FIELD],
+                    "HELLO": [APIResponse.UNKNOWN_FIELD],
+                },
+            )
+            self.assertEqual(
+                response.json()["errors"],
+                {
+                    "cid": [APIResponse.NON_ACCEPTED_FIELD],
+                    "published_date": [APIResponse.NON_ACCEPTED_FIELD],
+                },
+            )
+
+    def test_create_optional_value_groups(self):
+        for x in self.covid_data:
+            x_ = dict(x)
+            x_.pop("collection_month", None)
+            x_.pop("received_month", None)
+            response = self.client.post("/data/covid/", data=x_)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            x_ = dict(x)
+            if x.get("collection_month") and x.get("received_month"):
+                coin = random.randint(0, 1)
+                if coin:
+                    x_.pop("collection_month", None)
+                else:
+                    x_.pop("received_month", None)
+            response = self.client.post("/data/covid/", data=x_)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_mismatch_pathogen_code(self):
+        for x in self.covid_data:
+            x["pathogen_code"] = "PATHOGEN"
+            response = self.client.post("/data/covid/", data=x)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertTrue(len(Covid.objects.all()) == 0)
+
+    def test_sample_and_run_preexisting(self):
+        results = []
+        for x in self.covid_data:
+            response = self.client.post("/data/covid/", data=x)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            response_results = response.json()["results"]
+            self.assertEqual(len(response_results), 1)
+            results.append(response_results[0])
+
+        internal = Covid.objects.all()
+        self.assertEqualCids(results, internal)
+
+        for x in self.covid_data:
+            response = self.client.post("/data/covid/", data=x)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sample_or_run_preexisting(self):
+        results = []
+        for x in self.covid_data:
+            response = self.client.post("/data/covid/", data=x)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            response_results = response.json()["results"]
+            self.assertEqual(len(response_results), 1)
+            results.append(response_results[0])
+
+        internal = Covid.objects.all()
+        self.assertEqualCids(results, internal)
+
+        for x in self.covid_data:
+            x_ = dict(x)
+            coin = random.randint(0, 1)
+            if coin:
+                x_["sender_sample_id"] = f"S-{secrets.token_hex(4)}"
+            else:
+                x_["run_name"] = f"R-{secrets.token_hex(9)}"
+            response = self.client.post("/data/covid/", data=x_)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            response_results = response.json()["results"]
+            self.assertEqual(len(response_results), 1)
+            results.append(response_results[0])
+
+        internal = Covid.objects.all()
+        self.assertEqualCids(results, internal)

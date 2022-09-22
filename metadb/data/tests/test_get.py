@@ -2,6 +2,7 @@ from rest_framework import status
 from data.models import Covid
 from accounts.models import Institute
 from data.filters import BASE_LOOKUPS, CHAR_LOOKUPS
+from utils.responses import APIResponse
 from django.conf import settings
 from datetime import date
 from data.tests.utils import METADBTestCase, get_covid_data
@@ -63,6 +64,11 @@ class TestGetPathogen(METADBTestCase):
             "/data/covid/", expected_status_code=status.HTTP_200_OK
         )
 
+    def test_pathogen_not_found(self):
+        response = self.client.get("/data/hello/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.json()["errors"], {"hello": APIResponse.NOT_FOUND})
+
     def test_get(self):
         results = self.client_get_paginated(
             "/data/covid/",
@@ -91,6 +97,20 @@ class TestGetPathogen(METADBTestCase):
             .filter(received_month__lte="2021-08")
         )
         self.assertEqualCids(results, internal)
+
+    def test_get_unknown_fields(self):
+        response = self.client.get(
+            "/data/covid/",
+            data={"HI THERE": "HELLO!!!!!!!!!!!!!!!!", "BYE THERE": "WEEEEEEEEEEEEEE"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json()["errors"],
+            {
+                "HI THERE": [APIResponse.UNKNOWN_FIELD],
+                "BYE THERE": [APIResponse.UNKNOWN_FIELD],
+            },
+        )
 
 
 class TestGetPathogenChoiceField(TestGetPathogen):
