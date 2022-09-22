@@ -159,24 +159,6 @@ class CreateGetPathogenView(APIView):
                 response.errors[pathogen_code] = APIResponse.NOT_FOUND
                 return Response(response.data, status=status.HTTP_404_NOT_FOUND)
 
-            # If a pathogen_code was provided in the body, and it doesn't match the url, tell them to stop it
-            request_pathogen_code = request.data.get("pathogen_code")
-            if (
-                request_pathogen_code
-                and request_pathogen_code.upper() != pathogen_code.upper()
-            ):
-                response.errors[
-                    pathogen_code
-                ] = "Pathogen code provided in request body does not match URL."
-                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
-
-            # Check the request data contains at least one field from each optional value group
-            response.errors.update(
-                enforce_optional_value_groups(
-                    data=request.data, groups=pathogen_model.OPTIONAL_VALUE_GROUPS
-                )
-            )
-
             # Check the request data contains only model fields allowed for creation
             rejected, unknown = enforce_field_set(
                 data=request.data,
@@ -251,14 +233,14 @@ class CreateGetPathogenView(APIView):
             request.query_params._mutable = _mutable
 
             data = {}
-            max_duplicate_field = 0
+            num_filtersets = 0
             for field in request.query_params:
                 values = list(set(request.query_params.getlist(field)))
                 data[field] = values
-                if len(values) > max_duplicate_field:
-                    max_duplicate_field = len(values)
+                if len(values) > num_filtersets:
+                    num_filtersets = len(values)
 
-            filterset_datas = [{} for _ in range(max_duplicate_field)]
+            filterset_datas = [{} for _ in range(num_filtersets)]
             for field, values in data.items():
                 for i, value in enumerate(values):
                     filterset_datas[i][field] = value
