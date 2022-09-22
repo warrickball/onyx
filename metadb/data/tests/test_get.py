@@ -112,6 +112,19 @@ class TestGetPathogen(METADBTestCase):
             },
         )
 
+        response = self.client.get(
+            "/data/covid/",
+            data={"is_external": True, "hello": "there", "hi": ["hi", "bye"]},
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json()["errors"],
+            {
+                "hello": [APIResponse.UNKNOWN_FIELD],
+                "hi": [APIResponse.UNKNOWN_FIELD],
+            },
+        )
+
 
 class TestGetPathogenChoiceField(TestGetPathogen):
     def test_choice_field_exact(self):
@@ -215,12 +228,6 @@ class TestGetPathogenChoiceField(TestGetPathogen):
                 )
                 internal = Covid.objects.filter(**{f"sample_type__{lookup}": value})
                 self.assertEqualCids(results, internal)
-
-    def test_get_unknown_fields(self):
-        pass  # TODO: Add fields such as id, created etc but also weird ones like HAHA
-
-    def test_get_rejected_fields(self):
-        pass  # TODO: Don't think theres any of these
 
 
 class TestGetPathogenCharField(TestGetPathogen):
@@ -700,15 +707,3 @@ class TestGetPathogenBooleanField(TestGetPathogen):
                     data={f"is_external__{lookup}": [value]},
                     expected_status_code=status.HTTP_400_BAD_REQUEST,
                 )
-
-
-class TestUpdatePathogen(METADBTestCase):
-    pass
-
-
-class TestSuppressPathogen(METADBTestCase):
-    pass
-
-
-class TestDeletePathogen(METADBTestCase):
-    pass
