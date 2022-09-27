@@ -13,6 +13,7 @@ class Command(base.BaseCommand):
         name = options["name"]
         code = options["code"].upper()
         institute = Institute.objects.create(name=name, code=code)
+
         print("Institute created successfully.")
         print("Institute name:", institute.name)
         print("Institute code:", institute.code)

@@ -3,16 +3,22 @@ from ...models import User
 
 
 class Command(base.BaseCommand):
-    help = "Grant user the ability to approve other users within their institute."
+    help = (
+        "Grant/revoke a user's ability to approve other users within their institute."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument("username")
+        action = parser.add_mutually_exclusive_group(required=True)
+        action.add_argument("--grant", action="store_true", dest="action")
+        action.add_argument("--revoke", action="store_false", dest="action")
 
     def handle(self, *args, **options):
         username = options["username"]
-        user = User.objects.get(username=username)
+        action = options["action"]
 
-        user.is_authority = True
+        user = User.objects.get(username=username)
+        user.is_authority = action
         user.save(update_fields=["is_authority"])
 
         user = User.objects.get(username=options["username"])
