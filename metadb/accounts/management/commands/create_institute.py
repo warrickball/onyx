@@ -3,7 +3,7 @@ from ...models import Institute
 
 
 class Command(base.BaseCommand):
-    help = "Add a new institute to the system."
+    help = "Create a new institute in the database."
 
     def add_arguments(self, parser):
         parser.add_argument("-n", "--name")
