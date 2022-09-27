@@ -2,16 +2,16 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils.dateparse import parse_date
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from django.conf import settings
 from datetime import date, datetime
 
 
-# TODO: Improve and test
-# https://stackoverflow.com/questions/1110153/what-is-the-most-efficient-way-to-store-a-list-in-the-django-models
-# Might help with making custom types
 class YearMonthField(models.DateField):
-    '''
+    """
     Minimal override of DateField to support YYYY-MM format.
-    '''
+    """
+
     default_error_messages = {
         "invalid": _(
             "“%(value)s” value has an invalid date format. It must be "
@@ -28,11 +28,16 @@ class YearMonthField(models.DateField):
         if value is None:
             return value
 
+        if isinstance(value, datetime):
+            if settings.USE_TZ and timezone.is_aware(value):
+                # Convert aware datetimes to the default time zone
+                # before casting them to dates (#17742).
+                default_timezone = timezone.get_default_timezone()
+                value = timezone.make_naive(value, default_timezone)
+            return value.date()
+
         if isinstance(value, date):
             return value
-
-        if isinstance(value, datetime):
-            return value.date()
 
         if isinstance(value, str):
             try:

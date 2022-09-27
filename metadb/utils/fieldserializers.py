@@ -7,20 +7,20 @@ class YearMonthField(serializers.Field):
     def to_representation(self, value):
         try:
             year, month, _ = str(value).split("-")
-        except ValueError as e:
-            raise ValidationError("Must be in YYYY-WW-DD format.")
+        except ValueError:
+            raise ValidationError("Must be in YYYY-MM-DD format.")
 
         return year + "-" + month
 
     def to_internal_value(self, data):
         try:
             year, month = str(data).split("-")
-        except ValueError as e:
-            raise ValidationError("Must be in YYYY-WW format.")
-        
+        except ValueError:
+            raise ValidationError("Must be in YYYY-MM format.")
+
         try:
             value = date(int(year), int(month), 1)
         except ValueError as e:
             raise ValidationError(e)
-        
+
         return value
