@@ -68,7 +68,7 @@ from secrets import token_hex
 
 
 def generate_cid():
-    cid = "C-" + "".join(token_hex(3).upper())
+    cid = "C-" + "".join(token_hex(4).upper())
     if Pathogen.objects.filter(cid=cid).exists():
         cid = generate_cid()
     return cid
