@@ -74,7 +74,7 @@ class TestDeletePathogen(METADBTestCase):
                 os.path.join("/data/covid/", cid + "/delete/")
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertTrue(Covid.objects.filter(cid=cid).exists() == False)
+            self.assertFalse(Covid.objects.filter(cid=cid).exists())
 
         results = self.client_get_paginated("/data/covid/")
         internal = Covid.objects.none()

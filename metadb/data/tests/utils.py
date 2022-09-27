@@ -15,7 +15,6 @@ class METADBTestCase(APITestCase):
                 "email": f"{username}@test.com",
                 "institute": institute,
             },
-            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
@@ -31,7 +30,6 @@ class METADBTestCase(APITestCase):
                 "email": f"{username}@test.com",
                 "institute": institute,
             },
-            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
@@ -48,7 +46,6 @@ class METADBTestCase(APITestCase):
                 "email": f"{username}@test.com",
                 "institute": institute,
             },
-            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
@@ -66,7 +63,6 @@ class METADBTestCase(APITestCase):
                 "email": f"{username}@test.com",
                 "institute": institute,
             },
-            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
