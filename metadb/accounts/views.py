@@ -1,4 +1,3 @@
-from rest_framework import permissions
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import CreateAPIView, ListAPIView
@@ -6,28 +5,7 @@ from django.shortcuts import get_object_or_404
 from .models import User
 from .serializers import UserSerializer
 from utils.responses import Responses
-
-
-class IsApproved(permissions.BasePermission):
-    """
-    Allows access only to users that have been approved by an authority for their institute.
-    """
-
-    message = "To perform this action, you need to be approved by an authority from your institute."
-
-    def has_permission(self, request, view):
-        return request.user.is_approved
-
-
-class IsAuthority(permissions.BasePermission):
-    """
-    Allows access only to users who are an authority for their institute.
-    """
-
-    message = "To perform this action, you need to be granted permission by an admin."
-
-    def has_permission(self, request, view):
-        return request.user.is_authority
+from .permissions import IsActive, IsApproved, IsAuthority
 
 
 class CreateUserView(CreateAPIView):
@@ -46,7 +24,7 @@ class ListInstituteUsersView(ListAPIView):
     """
 
     serializer_class = UserSerializer
-    permission_classes = [(IsAuthenticated & IsApproved) | IsAdminUser]
+    permission_classes = [IsAuthenticated & IsActive & (IsApproved | IsAdminUser)]
 
     def get_queryset(self):
         return User.objects.filter(institute=self.request.user.institute).order_by("-date_joined")  # type: ignore
@@ -58,14 +36,16 @@ class ListAllUsersView(ListAPIView):
     """
 
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdminUser]
 
     def get_queryset(self):
         return User.objects.order_by("-date_joined")
 
 
 @api_view(["PATCH"])
-@permission_classes([(IsAuthenticated & IsApproved & IsAuthority) | IsAdminUser])
+@permission_classes(
+    [IsAuthenticated & IsActive & ((IsApproved & IsAuthority) | IsAdminUser)]
+)
 def approve(request, username):
     # Get user to be approved
     target_user = get_object_or_404(User, username=username)
