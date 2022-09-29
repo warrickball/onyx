@@ -1,10 +1,12 @@
-from rest_framework import status
+from rest_framework import status, exceptions
 from rest_framework.response import Response
-
-# from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.pagination import CursorPagination
-from rest_framework.views import APIView
 from django.conf import settings
+from logging.handlers import RotatingFileHandler
+import logging
+import traceback
+import inspect
+
 from . import serializers, models
 from .filters import METADBFilter
 from .models import Pathogen
@@ -14,11 +16,8 @@ from accounts.permissions import (
     IsApproved,
     IsAdminUser,
 )
-from utils.responses import APIResponse
-import inspect
-import logging
-from logging.handlers import RotatingFileHandler
-import traceback
+from utils.views import METADBAPIView
+from utils.responses import METADBAPIResponse
 
 
 logger = logging.getLogger("Rotating Log")
@@ -83,44 +82,20 @@ def enforce_field_set(data, accepted_fields, rejected_fields):
 
     for field in data:
         if field in rejected_fields:
-            rejected[field] = [APIResponse.NON_ACCEPTED_FIELD]
+            rejected[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
         elif field not in accepted_fields:
-            unknown[field] = [APIResponse.UNKNOWN_FIELD]
+            unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
 
     return rejected, unknown
 
 
-class CustomCursorPagination(CursorPagination):
-    def add_errors(self, errors):
-        self.errors = errors
-
-    def add_warnings(self, warnings):
-        self.warnings = warnings
-
-    def get_paginated_response(self, data):
-        data = super().get_paginated_response(data).data
-        if data:
-            response = APIResponse()
-            response.next = data["next"]
-            response.previous = data["previous"]
-            response.errors = self.errors
-            response.warnings = self.warnings
-            response.results = data["results"]
-
-            return Response(response.data)
-        else:
-            return Response(data)
-
-
-class PathogenCodeView(APIView):
-    permission_classes = [IsAuthenticated & IsActive & (IsApproved | IsAdminUser)]
+class PathogenCodeView(METADBAPIView):
+    permission_classes = [IsAuthenticated, IsActive, (IsApproved, IsAdminUser)]
 
     def get(self, request):
         """
         Get a list of `pathogen_codes`, that correspond to tables in the database.
         """
-        response = APIResponse()
-
         try:
             members = inspect.getmembers(models, inspect.isclass)
             pathogen_codes = []
@@ -131,109 +106,47 @@ class PathogenCodeView(APIView):
                 if Pathogen in model.__bases__:
                     pathogen_codes.append(name.upper())
 
-            response.results.append({"pathogen_codes": pathogen_codes})
-
-            return Response(response.data, status=status.HTTP_200_OK)
+            return Response(
+                {"pathogen_codes": pathogen_codes}, status=status.HTTP_200_OK
+            )
 
         except Exception as e:
-            response.errors[(type(e)).__name__] = str(e)
-            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(str(e))
+            logger.error(traceback.format_exc())
+            return Response(
+                {(type(e)).__name__: str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
-def parse_permissions(perm, request, view):
-    """
-    It's recursion time
-    """
-    has_permission = None
-    message = None
-
-    # AND of permissions
-    if isinstance(perm, list):
-        perms = []
-        for p in perm:
-            has_p, msg = parse_permissions(p, request, view)
-            perms.append((has_p, msg))
-
-        for has_p, msg in perms:
-            if not has_p:
-                has_permission = has_p
-                message = msg
-                break
-        else:
-            has_permission = True
-
-    # OR of permissions
-    elif isinstance(perm, tuple):
-        perms = []
-        for p in perm:
-            has_p, msg = parse_permissions(p, request, view)
-            perms.append((has_p, msg))
-
-        messages = []
-        for has_p, msg in perms:
-            if has_p:
-                has_permission = has_p
-                break
-            else:
-                messages.append(msg)
-        else:
-            has_permission = False
-            if len(messages) > 1:
-                message = {"at least one must be satisfied": messages}
-            else:
-                message = messages[0]
-
-    # A permission
-    else:
-        permission = perm()
-        has_permission = permission.has_permission(request, view)
-        message = permission.message
-
-    return has_permission, message
-
-
-class CreateGetPathogenView(APIView):
-    def get_permissions(self):
+class CreateGetPathogenView(METADBAPIView):
+    def get_permission_classes(self):
         if self.request.method == "POST":
             # Creating data requires being an admin user
             permission_classes = [IsAuthenticated, IsActive, IsAdminUser]
         else:
-            # Getting data requires being an authenticated, approved user
+            # Getting data requires being an authenticated, approved user (or an admin)
             permission_classes = [
                 IsAuthenticated,
                 IsActive,
                 (IsApproved, IsAdminUser),
             ]
-        return [permission for permission in permission_classes]
-
-    def check_permissions(self, request):
-        """
-        Check if the request should be permitted.
-        Raises an appropriate exception if the request is not permitted.
-        """
-        permissions = self.get_permissions()
-        has_permission, message = parse_permissions(permissions, request, self)
-
-        if not has_permission:
-            self.permission_denied(
-                request,
-                message=message,
-            )
+        return permission_classes
 
     def post(self, request, pathogen_code):
         """
         Use `request.data` to save a model instance for the model specified by `pathogen_code`.
         """
-        response = APIResponse()
-
         try:
             # Get the corresponding model. The base class Pathogen is NOT accepted when creating data
             pathogen_model = get_pathogen_model(pathogen_code, accept_base=False)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             # Check the request data contains only model fields allowed for creation
             rejected, unknown = enforce_field_set(
@@ -242,54 +155,52 @@ class CreateGetPathogenView(APIView):
                 rejected_fields=pathogen_model.no_create_fields(),
             )
 
-            # Rejected fields (e.g. CID) are not allowed during creation
-            response.errors.update(rejected)
-
-            # Unknown fields will be a warning
-            response.warnings.update(unknown)
-
             # Serializer also carries out validation of input data
             serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(
                 data=request.data
             )
 
+            # Rejected fields (e.g. CID) are not allowed during creation
+            errors = {}
+            errors.update(rejected)
+
+            # Unknown fields will be a warning
+            self.API_RESPONSE.warnings.update(unknown)
+
             # If data is valid, save to the database. If not valid, return errors
-            if serializer.is_valid() and not response.errors:
+            if serializer.is_valid() and not errors:
                 serializer.save()
-
-                response.results.append(serializer.data)
-
-                return Response(response.data, status=status.HTTP_201_CREATED)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
             else:
                 # Combine serializer errors with current errors
-                response.errors.update(serializer.errors)
-
-                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+                errors.update(serializer.errors)
+                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             logger.error(str(e))
             logger.error(traceback.format_exc())
-
-            response.errors[(type(e)).__name__] = str(e)
-            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {(type(e)).__name__: str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     def get(self, request, pathogen_code):
         """
         Use `request.query_params` to filter data for the model specified by `pathogen_code`.
         """
-        response = APIResponse()
-
         try:
             # Get the corresponding model. The base class Pathogen is accepted when creating data
             pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             # Prepare paginator
-            paginator = CustomCursorPagination()
+            paginator = CursorPagination()
             paginator.ordering = "created"
             paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
 
@@ -321,6 +232,8 @@ class CreateGetPathogenView(APIView):
                 for i, value in enumerate(values):
                     filterset_datas[i][field] = value
 
+            errors = {}
+
             # Initial queryset
             qs = pathogen_model.objects.filter(suppressed=False)
 
@@ -339,20 +252,20 @@ class CreateGetPathogenView(APIView):
                     # Don't need to do more than i == 0, as here we have all the fields
                     for field in filterset_data:
                         if field not in filterset.filters:
-                            response.errors[field] = [APIResponse.UNKNOWN_FIELD]
+                            errors[field] = [METADBAPIResponse.UNKNOWN_FIELD]
 
                 if not filterset.is_valid():
                     # Append any filterset errors to the errors dict
                     for field, msg in filterset.errors.items():
-                        response.errors[field] = msg
+                        errors[field] = msg
 
             # Check the distinct field is a known field
             if distinct and (distinct not in pathogen_model.FILTER_FIELDS):
-                response.errors[distinct] = [APIResponse.UNKNOWN_FIELD]
+                errors[distinct] = [METADBAPIResponse.UNKNOWN_FIELD]
 
             # Return any errors that cropped up during filtering
-            if response.errors:
-                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+            if errors:
+                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
             # If a parameter was provided for getting distinct results, apply it
             if distinct:
@@ -363,9 +276,7 @@ class CreateGetPathogenView(APIView):
                     serializers, f"{pathogen_model.__name__}Serializer"
                 )(qs, many=True)
 
-                response.results = serializer.data
-
-                return Response(response.data, status=status.HTTP_200_OK)
+                return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 # Non-distinct results have the potential to be quite large
                 # So pagination (splitting the data into multiple pages) is used
@@ -387,45 +298,45 @@ class CreateGetPathogenView(APIView):
                     serializers, f"{pathogen_model.__name__}Serializer"
                 )(result_page, many=True)
 
-                # Make it look like the other responses for consistency
-                # And we might want to change in future to provide some warnings
-                paginator.add_errors(response.errors)
-                paginator.add_warnings(response.warnings)
-                return paginator.get_paginated_response(serializer.data)
+                self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
+                self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
+                return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(str(e))
             logger.error(traceback.format_exc())
+            return Response(
+                {(type(e)).__name__: str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-            response.errors[(type(e)).__name__] = str(e)
-            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-class UpdateSuppressPathogenView(APIView):
-    permission_classes = [IsAuthenticated & IsActive & IsAdminUser]
+class UpdateSuppressPathogenView(METADBAPIView):
+    permission_classes = [IsAuthenticated, IsActive, IsAdminUser]
 
     def patch(self, request, pathogen_code, cid):
         """
         Use `request.data` and a `cid` to update an instance for the model specified by `pathogen_code`.
         """
-        response = APIResponse()
-
         try:
             # Get the corresponding model. The base class Pathogen is accepted when updating data
             pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             try:
                 # Get the instance to be updated
                 instance = pathogen_model.objects.get(suppressed=False, cid=cid)
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
-                response.errors[cid] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
+                )
 
             # Check the request data contains only model fields allowed for updating
             rejected, unknown = enforce_field_set(
@@ -434,11 +345,12 @@ class UpdateSuppressPathogenView(APIView):
                 rejected_fields=pathogen_model.no_update_fields(),
             )
 
-            # Rejected fields (e.g. CID) are not allowed during creation
-            response.errors.update(rejected)
+            # Rejected fields (e.g. CID) are not allowed during updates
+            errors = {}
+            errors.update(rejected)
 
             # Unknown fields will be a warning
-            response.warnings.update(unknown)
+            self.API_RESPONSE.warnings.update(unknown)
 
             # Serializer also carries out validation of input data
             serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(
@@ -446,54 +358,50 @@ class UpdateSuppressPathogenView(APIView):
             )
 
             # If data is valid, update existing record in the database. If not valid, return errors
-            if serializer.is_valid() and not response.errors:
+            if serializer.is_valid() and not errors:
                 if not serializer.validated_data:
-                    response.errors.setdefault("non_field_errors", []).append(
+                    errors.setdefault("non_field_errors", []).append(
                         "No fields were updated."
                     )
-
-                    return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
-
+                    return Response(errors, status=status.HTTP_400_BAD_REQUEST)
                 serializer.save()
-
-                response.results.append(serializer.data)
-
-                return Response(response.data, status=status.HTTP_200_OK)
+                return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 # Combine serializer errors with current errors
-                response.errors.update(serializer.errors)
-
-                return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+                errors.update(serializer.errors)
+                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             logger.error(str(e))
             logger.error(traceback.format_exc())
-
-            response.errors[(type(e)).__name__] = str(e)
-            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {(type(e)).__name__: str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     def delete(self, request, pathogen_code, cid):
         """
         Use the provided `pathogen_code` and `cid` to suppress a record.
         """
-        response = APIResponse()
-
         try:
             # Get the corresponding model. The base class Pathogen is accepted when suppressing data
             pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             try:
                 # Get the instance to be suppressed
                 instance = pathogen_model.objects.get(suppressed=False, cid=cid)
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
-                response.errors[cid] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
+                )
 
             # Suppress and save
             instance.suppressed = True
@@ -505,59 +413,59 @@ class UpdateSuppressPathogenView(APIView):
                 instance = pathogen_model.objects.get(cid=cid)
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
-                response.errors[cid] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
-
-            response = APIResponse()
-            response.results.append({"cid": cid, "suppressed": instance.suppressed})
+                return Response(
+                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
+                )
 
             # Return the details
             return Response(
-                response.data,
+                {"cid": cid, "suppressed": instance.suppressed},
                 status=status.HTTP_200_OK,
             )
 
         except Exception as e:
             logger.error(str(e))
             logger.error(traceback.format_exc())
+            return Response(
+                {(type(e)).__name__: str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-            response.errors[(type(e)).__name__] = str(e)
-            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-class DeletePathogenView(APIView):
-    permission_classes = [IsAuthenticated & IsActive & IsAdminUser]
+class DeletePathogenView(METADBAPIView):
+    permission_classes = [IsAuthenticated, IsActive, IsAdminUser]
 
     def delete(self, request, pathogen_code, cid):
         """
         Use the provided `pathogen_code` and `cid` to permanently delete a record.
         """
-        response = APIResponse()
-
         try:
             # Get the corresponding model. The base class Pathogen is accepted when deleting data
             pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
-                response.errors[pathogen_code] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             try:
                 # Attempt to delete object with the provided cid
                 pathogen_model.objects.get(cid=cid).delete()
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
-                response.errors[cid] = APIResponse.NOT_FOUND
-                return Response(response.data, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
+                )
 
             deleted = not pathogen_model.objects.filter(cid=cid).exists()
-            response.results.append({"cid": cid, "deleted": deleted})
-            return Response(response.data, status=status.HTTP_200_OK)
+            return Response({"cid": cid, "deleted": deleted}, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(str(e))
             logger.error(traceback.format_exc())
-
-            response.errors[(type(e)).__name__] = str(e)
-            return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {(type(e)).__name__: str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

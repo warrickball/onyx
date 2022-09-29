@@ -2,9 +2,8 @@ from rest_framework import status
 from rest_framework.response import Response
 
 
-class APIResponse:
-    # Generic 404 message
-    NOT_FOUND = "Not found."
+class METADBAPIResponse:
+    NOT_FOUND = "Not found."  # Generic 404 message
     UNKNOWN_FIELD = "This field is unknown."
     NON_ACCEPTED_FIELD = "This field cannot be accepted."
 
