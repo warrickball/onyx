@@ -135,11 +135,8 @@ def create(client, args):
     Post a new pathogen record to the database.
     """
     fields = utils.construct_unique_fields_dict(args.field)
-
     creations = client.create(args.pathogen_code, fields=fields)
-
-    for creation in creations:
-        utils.print_response(creation)
+    utils.execute_uploads(creations)
 
 
 def csv_create(client, args):
@@ -147,9 +144,7 @@ def csv_create(client, args):
     Post new pathogen records to the database, using a csv.
     """
     creations = client.create(args.pathogen_code, csv_path=args.csv)
-
-    for creation in creations:
-        utils.print_response(creation)
+    utils.execute_uploads(creations)
 
 
 def tsv_create(client, args):
@@ -157,9 +152,7 @@ def tsv_create(client, args):
     Post new pathogen records to the database, using a tsv.
     """
     creations = client.create(args.pathogen_code, csv_path=args.tsv, delimiter="\t")
-
-    for creation in creations:
-        utils.print_response(creation)
+    utils.execute_uploads(creations)
 
 
 def get(client, args):
@@ -190,11 +183,8 @@ def update(client, args):
     Update a pathogen record in the database.
     """
     fields = utils.construct_unique_fields_dict(args.field)
-
     updates = client.update(args.pathogen_code, cid=args.cid, fields=fields)
-
-    for update in updates:
-        utils.print_response(update)
+    utils.execute_uploads(updates)
 
 
 def csv_update(client, args):
@@ -202,9 +192,7 @@ def csv_update(client, args):
     Update pathogen records in the database, using a csv.
     """
     updates = client.update(args.pathogen_code, csv_path=args.csv)
-
-    for update in updates:
-        utils.print_response(update)
+    utils.execute_uploads(updates)
 
 
 def tsv_update(client, args):
@@ -212,9 +200,7 @@ def tsv_update(client, args):
     Update pathogen records in the database, using a tsv.
     """
     updates = client.update(args.pathogen_code, csv_path=args.tsv, delimiter="\t")
-
-    for update in updates:
-        utils.print_response(update)
+    utils.execute_uploads(updates)
 
 
 def suppress(client, args):
@@ -222,9 +208,7 @@ def suppress(client, args):
     Suppress a pathogen record in the database.
     """
     suppressions = client.suppress(args.pathogen_code, cid=args.cid)
-
-    for suppression in suppressions:
-        utils.print_response(suppression)
+    utils.execute_uploads(suppressions)
 
 
 def csv_suppress(client, args):
@@ -232,9 +216,7 @@ def csv_suppress(client, args):
     Suppress pathogen records in the database, using a csv.
     """
     suppressions = client.suppress(args.pathogen_code, csv_path=args.csv)
-
-    for suppression in suppressions:
-        utils.print_response(suppression)
+    utils.execute_uploads(suppressions)
 
 
 def tsv_suppress(client, args):
@@ -244,9 +226,7 @@ def tsv_suppress(client, args):
     suppressions = client.suppress(
         args.pathogen_code, csv_path=args.tsv, delimiter="\t"
     )
-
-    for suppression in suppressions:
-        utils.print_response(suppression)
+    utils.execute_uploads(suppressions)
 
 
 def list_pathogen_codes(client):

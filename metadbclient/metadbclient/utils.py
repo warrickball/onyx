@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import inspect
@@ -55,6 +56,8 @@ def construct_unique_fields_dict(arg_fields):
 def print_response(response, pretty_print=True):
     """
     Print the response and make it look lovely.
+
+    Responses with `response.ok == False` are written to `sys.stderr`.
     """
     if pretty_print:
         indent = 4
@@ -68,7 +71,10 @@ def print_response(response, pretty_print=True):
     except json.decoder.JSONDecodeError:
         formatted_response = f"{status_code}\n{response.text}"
 
-    print(formatted_response)
+    if response.ok:
+        print(formatted_response)
+    else:
+        print(formatted_response, file=sys.stderr)
 
 
 def get_input(field, password=False, type=None, required=True):
@@ -205,3 +211,28 @@ def login_required(method):
             return output
 
         return wrapped_method
+
+
+def execute_uploads(uploads):
+    attempted = 0
+    successes = 0
+    failures = 0
+
+    try:
+        for upload in uploads:
+            print_response(upload)
+
+            attempted += 1
+            if upload.ok:
+                successes += 1
+            else:
+                failures += 1
+
+    except KeyboardInterrupt:
+        print("")
+
+    finally:
+        print("[UPLOADS]")
+        print(f"Attempted: {attempted}")
+        print(f"Successes: {successes}")
+        print(f"Failures: {failures}")
