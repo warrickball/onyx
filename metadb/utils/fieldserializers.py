@@ -4,14 +4,6 @@ from datetime import date
 
 
 class YearMonthField(serializers.Field):
-    def to_representation(self, value):
-        try:
-            year, month, _ = str(value).split("-")
-        except ValueError:
-            raise ValidationError("Must be in YYYY-MM-DD format.")
-
-        return year + "-" + month
-
     def to_internal_value(self, data):
         try:
             year, month = str(data).split("-")
@@ -24,3 +16,11 @@ class YearMonthField(serializers.Field):
             raise ValidationError(e)
 
         return value
+
+    def to_representation(self, value):
+        try:
+            year, month, _ = str(value).split("-")
+        except ValueError:
+            raise ValidationError("Must be in YYYY-MM-DD format.")
+
+        return year + "-" + month
