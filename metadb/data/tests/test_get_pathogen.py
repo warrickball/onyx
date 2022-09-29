@@ -2,7 +2,7 @@ from rest_framework import status
 from data.models import Covid
 from accounts.models import Institute
 from data.filters import BASE_LOOKUPS, CHAR_LOOKUPS
-from utils.responses import APIResponse
+from utils.responses import METADBAPIResponse
 from django.conf import settings
 from datetime import date
 from data.tests.utils import METADBTestCase, get_covid_data
@@ -67,7 +67,9 @@ class TestGetPathogen(METADBTestCase):
     def test_pathogen_not_found(self):
         response = self.client.get("/data/hello/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json()["errors"], {"hello": APIResponse.NOT_FOUND})
+        self.assertEqual(
+            response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND}
+        )
 
     def test_get(self):
         results = self.client_get_paginated(
@@ -107,8 +109,8 @@ class TestGetPathogen(METADBTestCase):
         self.assertEqual(
             response.json()["errors"],
             {
-                "HI THERE": [APIResponse.UNKNOWN_FIELD],
-                "BYE THERE": [APIResponse.UNKNOWN_FIELD],
+                "HI THERE": [METADBAPIResponse.UNKNOWN_FIELD],
+                "BYE THERE": [METADBAPIResponse.UNKNOWN_FIELD],
             },
         )
 
@@ -120,8 +122,8 @@ class TestGetPathogen(METADBTestCase):
         self.assertEqual(
             response.json()["errors"],
             {
-                "hello": [APIResponse.UNKNOWN_FIELD],
-                "hi": [APIResponse.UNKNOWN_FIELD],
+                "hello": [METADBAPIResponse.UNKNOWN_FIELD],
+                "hi": [METADBAPIResponse.UNKNOWN_FIELD],
             },
         )
 

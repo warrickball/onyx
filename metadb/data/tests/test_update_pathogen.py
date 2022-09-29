@@ -3,7 +3,7 @@ from data.models import Covid
 from accounts.models import Institute
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
-from utils.responses import APIResponse
+from utils.responses import METADBAPIResponse
 import secrets
 import os
 
@@ -86,14 +86,14 @@ class TestUpdatePathogen(METADBTestCase):
                 os.path.join("/data/hello/", cid + "/"), data={"is_external": False}
             )
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-            self.assertEqual(response.json()["errors"], {"hello": APIResponse.NOT_FOUND})
+            self.assertEqual(response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND})
 
     def test_cid_not_found(self):
         response = self.client.patch(
             os.path.join("/data/covid/", "hello" + "/"), data={"is_external": False}
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json()["errors"], {"hello": APIResponse.NOT_FOUND})
+        self.assertEqual(response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND})
 
     def test_no_updates(self):
         cid = self.cids[0]
@@ -111,7 +111,7 @@ class TestUpdatePathogen(METADBTestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertTrue(Covid.objects.get(cid=cid).is_external == False)
             self.assertTrue(
-                response.json()["warnings"], {"hello": APIResponse.UNKNOWN_FIELD}
+                response.json()["warnings"], {"hello": METADBAPIResponse.UNKNOWN_FIELD}
             )
 
     def test_update_rejected_fields(self):
@@ -136,7 +136,7 @@ class TestUpdatePathogen(METADBTestCase):
                     Covid.objects.get(cid=cid).fasta_path != "/updated/fasta/path.fasta"
                 )
                 self.assertTrue(
-                    response.json()["errors"], {field: APIResponse.NON_ACCEPTED_FIELD}
+                    response.json()["errors"], {field: METADBAPIResponse.NON_ACCEPTED_FIELD}
                 )
 
     def test_update_unknown_and_rejected_fields(self):
@@ -163,10 +163,10 @@ class TestUpdatePathogen(METADBTestCase):
                     Covid.objects.get(cid=cid).fasta_path != "/updated/fasta/path.fasta"
                 )
                 self.assertTrue(
-                    response.json()["errors"], {field: APIResponse.NON_ACCEPTED_FIELD}
+                    response.json()["errors"], {field: METADBAPIResponse.NON_ACCEPTED_FIELD}
                 )
                 self.assertTrue(
-                    response.json()["warnings"], {"hello": APIResponse.UNKNOWN_FIELD}
+                    response.json()["warnings"], {"hello": METADBAPIResponse.UNKNOWN_FIELD}
                 )
 
     def test_update_empty_values(self):

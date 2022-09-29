@@ -3,7 +3,7 @@ from data.models import Covid
 from accounts.models import Institute
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
-from utils.responses import APIResponse
+from utils.responses import METADBAPIResponse
 import secrets
 import random
 
@@ -69,7 +69,7 @@ class TestCreatePathogen(METADBTestCase):
             response = self.client.post("/data/hello/", data=x)
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
             self.assertEqual(
-                response.json()["errors"], {"hello": APIResponse.NOT_FOUND}
+                response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND}
             )
 
     def test_create(self):
@@ -125,8 +125,8 @@ class TestCreatePathogen(METADBTestCase):
             self.assertEqual(
                 response.json()["warnings"],
                 {
-                    "id": [APIResponse.UNKNOWN_FIELD],
-                    "HELLO": [APIResponse.UNKNOWN_FIELD],
+                    "id": [METADBAPIResponse.UNKNOWN_FIELD],
+                    "HELLO": [METADBAPIResponse.UNKNOWN_FIELD],
                 },
             )
             response_results = response.json()["results"]
@@ -145,8 +145,8 @@ class TestCreatePathogen(METADBTestCase):
             self.assertEqual(
                 response.json()["errors"],
                 {
-                    "cid": [APIResponse.NON_ACCEPTED_FIELD],
-                    "published_date": [APIResponse.NON_ACCEPTED_FIELD],
+                    "cid": [METADBAPIResponse.NON_ACCEPTED_FIELD],
+                    "published_date": [METADBAPIResponse.NON_ACCEPTED_FIELD],
                 },
             )
 
@@ -162,15 +162,15 @@ class TestCreatePathogen(METADBTestCase):
             self.assertEqual(
                 response.json()["warnings"],
                 {
-                    "id": [APIResponse.UNKNOWN_FIELD],
-                    "HELLO": [APIResponse.UNKNOWN_FIELD],
+                    "id": [METADBAPIResponse.UNKNOWN_FIELD],
+                    "HELLO": [METADBAPIResponse.UNKNOWN_FIELD],
                 },
             )
             self.assertEqual(
                 response.json()["errors"],
                 {
-                    "cid": [APIResponse.NON_ACCEPTED_FIELD],
-                    "published_date": [APIResponse.NON_ACCEPTED_FIELD],
+                    "cid": [METADBAPIResponse.NON_ACCEPTED_FIELD],
+                    "published_date": [METADBAPIResponse.NON_ACCEPTED_FIELD],
                 },
             )
 

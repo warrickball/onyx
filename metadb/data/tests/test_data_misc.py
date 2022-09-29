@@ -5,7 +5,7 @@ from data.views import (
     enforce_optional_value_groups,
     enforce_field_set,
 )
-from utils.responses import APIResponse
+from utils.responses import METADBAPIResponse
 
 
 class TestGetPathogenModel(APITestCase):
@@ -82,9 +82,9 @@ class TestEnforceFieldSet(APITestCase):
             ),
             (
                 {
-                    "id": [APIResponse.NON_ACCEPTED_FIELD],
-                    "created": [APIResponse.NON_ACCEPTED_FIELD],
+                    "id": [METADBAPIResponse.NON_ACCEPTED_FIELD],
+                    "created": [METADBAPIResponse.NON_ACCEPTED_FIELD],
                 },
-                {"hi": [APIResponse.UNKNOWN_FIELD]},
+                {"hi": [METADBAPIResponse.UNKNOWN_FIELD]},
             ),
         )
