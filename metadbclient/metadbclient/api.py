@@ -62,11 +62,16 @@ class METADBClient:
                     )
                 username = self.config["default_user"]
         else:
+            # Username is case-insensitive
+            username = username.lower()
+
             # The provided user must be in the config
             if username not in self.config["users"]:
                 raise KeyError(
                     f"User '{username}' is not in the config. Add them using the add-user command"
                 )
+
+        # Assign username to the client
         self.username = username
 
         # If the password is meant to be an env var, grab it. If its not there, this is unintended so raise an error
@@ -158,6 +163,9 @@ class METADBClient:
         if username is None:
             username = utils.get_input("username")
 
+        # Username is case-insensitive
+        username = username.lower()
+
         tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
         self.config["users"][username] = {"tokens": tokens_path}
 
@@ -204,6 +212,9 @@ class METADBClient:
         """
         if username is None:
             username = utils.get_input("username")
+
+        # Username is case-insensitive
+        username = username.lower()
 
         if username not in self.config["users"]:
             raise KeyError(
@@ -321,18 +332,18 @@ class METADBClient:
         yield response
 
         if response.ok:
-            next = response.json()["next"]
+            _next = response.json()["next"]
         else:
-            next = None
+            _next = None
 
-        while next is not None:
-            response = self.request(method=requests.get, url=next)
+        while _next is not None:
+            response = self.request(method=requests.get, url=_next)
             yield response
 
             if response.ok:
-                next = response.json()["next"]
+                _next = response.json()["next"]
             else:
-                next = None
+                _next = None
 
     @utils.login_required
     def update(
