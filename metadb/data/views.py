@@ -1,13 +1,19 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+
+# from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from django.conf import settings
 from . import serializers, models
 from .filters import METADBFilter
 from .models import Pathogen
-from accounts.views import IsApproved
+from accounts.permissions import (
+    IsAuthenticated,
+    IsActive,
+    IsApproved,
+    IsAdminUser,
+)
 from utils.responses import APIResponse
 import inspect
 import logging
@@ -107,7 +113,7 @@ class CustomCursorPagination(CursorPagination):
 
 
 class PathogenCodeView(APIView):
-    permission_classes = [(IsAuthenticated & IsApproved) | IsAdminUser]
+    permission_classes = [IsAuthenticated & IsActive & (IsApproved | IsAdminUser)]
 
     def get(self, request):
         """
@@ -134,15 +140,85 @@ class PathogenCodeView(APIView):
             return Response(response.data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def parse_permissions(perm, request, view):
+    """
+    It's recursion time
+    """
+    has_permission = None
+    message = None
+
+    # AND of permissions
+    if isinstance(perm, list):
+        perms = []
+        for p in perm:
+            has_p, msg = parse_permissions(p, request, view)
+            perms.append((has_p, msg))
+
+        for has_p, msg in perms:
+            if not has_p:
+                has_permission = has_p
+                message = msg
+                break
+        else:
+            has_permission = True
+
+    # OR of permissions
+    elif isinstance(perm, tuple):
+        perms = []
+        for p in perm:
+            has_p, msg = parse_permissions(p, request, view)
+            perms.append((has_p, msg))
+
+        messages = []
+        for has_p, msg in perms:
+            if has_p:
+                has_permission = has_p
+                break
+            else:
+                messages.append(msg)
+        else:
+            has_permission = False
+            if len(messages) > 1:
+                message = {"at least one must be satisfied": messages}
+            else:
+                message = messages[0]
+
+    # A permission
+    else:
+        permission = perm()
+        has_permission = permission.has_permission(request, view)
+        message = permission.message
+
+    return has_permission, message
+
+
 class CreateGetPathogenView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             # Creating data requires being an admin user
-            permission_classes = [IsAdminUser]
+            permission_classes = [IsAuthenticated, IsActive, IsAdminUser]
         else:
             # Getting data requires being an authenticated, approved user
-            permission_classes = [(IsAuthenticated & IsApproved) | IsAdminUser]
-        return [permission() for permission in permission_classes]
+            permission_classes = [
+                IsAuthenticated,
+                IsActive,
+                (IsApproved, IsAdminUser),
+            ]
+        return [permission for permission in permission_classes]
+
+    def check_permissions(self, request):
+        """
+        Check if the request should be permitted.
+        Raises an appropriate exception if the request is not permitted.
+        """
+        permissions = self.get_permissions()
+        has_permission, message = parse_permissions(permissions, request, self)
+
+        if not has_permission:
+            self.permission_denied(
+                request,
+                message=message,
+            )
 
     def post(self, request, pathogen_code):
         """
@@ -326,7 +402,7 @@ class CreateGetPathogenView(APIView):
 
 
 class UpdateSuppressPathogenView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated & IsActive & IsAdminUser]
 
     def patch(self, request, pathogen_code, cid):
         """
@@ -450,7 +526,7 @@ class UpdateSuppressPathogenView(APIView):
 
 
 class DeletePathogenView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated & IsActive & IsAdminUser]
 
     def delete(self, request, pathogen_code, cid):
         """
