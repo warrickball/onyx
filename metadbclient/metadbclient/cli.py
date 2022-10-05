@@ -65,7 +65,8 @@ def register(client):
     """
     Create a new user.
     """
-    username = utils.get_input("username")
+    first_name = utils.get_input("first name")
+    last_name = utils.get_input("last name")
     email = utils.get_input("email address")
     institute = utils.get_input("institute code")
 
@@ -79,7 +80,11 @@ def register(client):
             print("Passwords do not match. Please try again.")
 
     registration = client.register(
-        username=username, email=email, institute=institute, password=password  # type: ignore
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
+        institute=institute,
+        password=password,  # type: ignore
     )
 
     utils.print_response(registration)

@@ -9,6 +9,12 @@ from metadbclient import utils, settings
 
 class METADBClient:
     def __init__(self, config_dir_path=None):
+        """
+        Initialise the client, and connect it to a config directory.
+
+        If a `config_dir_path` was not provided, looks for the environment variable given by `settings.CONFIG_DIR_ENV_VAR`.
+        """
+
         # Locate the config
         config_dir_path, config_file_path = utils.locate_config(
             config_dir_path=config_dir_path
@@ -232,14 +238,15 @@ class METADBClient:
         """
         return self.config["default_user"]
 
-    def register(self, username, email, institute, password):
+    def register(self, first_name, last_name, email, institute, password):
         """
         Create a new user.
         """
         response = requests.post(
             self.endpoints["register"],
             json={
-                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
                 "password": password,
                 "email": email,
                 "institute": institute,
