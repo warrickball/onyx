@@ -16,9 +16,9 @@ class Command(base.BaseCommand):
         action = options["action"]
 
         user = User.objects.get(username=username)
-        user.is_approved = action
-        user.save(update_fields=["is_approved"])
+        user.is_institute_approved = action
+        user.save(update_fields=["is_institute_approved"])
 
         user = User.objects.get(username=username)
         print("User:", user.username)
-        print("is_approved:", user.is_approved)
+        print("is_institute_approved:", user.is_institute_approved)

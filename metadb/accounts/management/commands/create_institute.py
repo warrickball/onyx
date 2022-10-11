@@ -11,9 +11,10 @@ class Command(base.BaseCommand):
 
     def handle(self, *args, **options):
         name = options["name"]
-        code = options["code"].upper()
+        code = options["code"]
         institute = Institute.objects.create(name=name, code=code)
 
+        institute = Institute.objects.get(code=code.lower())
         print("Institute created successfully.")
         print("Institute name:", institute.name)
         print("Institute code:", institute.code)
