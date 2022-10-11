@@ -6,7 +6,7 @@ import pandas as pd
 from metadbclient import version, METADBClient, utils, settings
 
 
-def make_config():
+def create_config():
     """
     Generate the config directory and config file.
     """
@@ -61,6 +61,39 @@ def make_config():
     print("".center(settings.MESSAGE_BAR_WIDTH, "!"))
 
 
+def set_default_user(client, args):
+    """
+    Set the default user in the config.
+    """
+    client.set_default_user(args.username)
+    print(f"The user has been set as the default user.")
+
+
+def get_default_user(client):
+    """
+    Get the default user in the config.
+    """
+    default_user = client.get_default_user()
+    print(default_user)
+
+
+def add_user(client, args):
+    """
+    Add user to the config.
+    """
+    client.add_user(args.username)
+    print("The user has been added to the config.")
+
+
+def list_users(client, args):
+    """
+    List all users in the config.
+    """
+    users = client.list_users()
+    for user in users:
+        print(user)
+
+
 def register(client):
     """
     Create a new user.
@@ -98,33 +131,21 @@ def register(client):
             ).upper()
 
         if check == "Y":
-            username = registration.json()["username"]
+            results = registration.json()["results"]
+            if len(results) != 1:
+                raise Exception("Expected only one result in response")
+
+            username = results[0]["username"]
             client.add_user(username)
             print("The user has been added to the config.")
 
 
-def set_default_user(client, args):
+def logout(client, args):
     """
-    Set the default user in the config.
+    Blacklist the current user's refresh token.
     """
-    client.set_default_user(args.username)
-    print(f"The user has been set as the default user.")
-
-
-def get_default_user(client):
-    """
-    Get the default user in the config.
-    """
-    default_user = client.get_default_user()
-    print(default_user)
-
-
-def add_user(client, args):
-    """
-    Add user to the config.
-    """
-    client.add_user(args.username)
-    print("The user has been added to the config.")
+    response = client.logout()
+    utils.print_response(response)
 
 
 def approve(client, args):
@@ -259,31 +280,42 @@ def list_all_users(client):
 
 
 def run(args):
-    if args.command == "make-config":
-        make_config()
+    if args.command == "config":
+        if args.config_command == "create":
+            create_config()
+        else:
+            # Commands that require a config
+            client = METADBClient()
+
+            if args.config_command == "set-default-user":
+                set_default_user(client, args)
+
+            elif args.config_command == "get-default-user":
+                get_default_user(client)
+
+            elif args.config_command == "add-user":
+                add_user(client, args)
+
+            elif args.config_command == "list-users":
+                list_users(client, args)
+
     else:
+        # Commands that require a config
         client = METADBClient()
 
-        # Commands that require a config, but no user login details
         if args.command == "register":
             register(client)
-
-        elif args.command == "set-default-user":
-            set_default_user(client, args)
-
-        elif args.command == "get-default-user":
-            get_default_user(client)
-
-        elif args.command == "add-user":
-            add_user(client, args)
-
         else:
-            # Commands that require a config and user login details
+            # Commands that also require user login details
             client.get_login(
-                username=args.user, use_password_env_var=args.use_password_env_var
+                username=args.user,
+                use_password_env_var=args.use_password_env_var,
             )
 
-            if args.command == "approve":
+            if args.command == "logout":
+                logout(client, args)
+
+            elif args.command == "approve":
                 approve(client, args)
 
             elif args.command == "create":
@@ -341,11 +373,43 @@ def get_args():
         action="store_true",
         help="output the time taken to run a command",
     )
+
     command = parser.add_subparsers(dest="command", metavar="{command}")
 
+    # Commands involving creation/altering of the config
+    config_parser = command.add_parser(
+        "config", help="Commands for creating/interacting with the config."
+    )
+
+    config_commands_parser = config_parser.add_subparsers(
+        dest="config_command", metavar="{config-command}"
+    )
+
     # Create the config directory and config file
-    make_config_parser = command.add_parser(
-        "make-config", help="Make a config for the client."
+    create_config_parser = config_commands_parser.add_parser(
+        "create", help="Create a config for the client."
+    )
+
+    # Set the default user in the config
+    set_default_user_parser = config_commands_parser.add_parser(
+        "set-default-user", help="Set the default user in the config of the client."
+    )
+    set_default_user_parser.add_argument("username", nargs="?")
+
+    # List the default user in the config
+    get_default_user_parser = config_commands_parser.add_parser(
+        "get-default-user", help="Get the default user in the config of the client."
+    )
+
+    # Add a pre-existing user to the config
+    add_user_parser = config_commands_parser.add_parser(
+        "add-user", help="Add a pre-existing metadb user to the config of the client."
+    )
+    add_user_parser.add_argument("username", nargs="?")
+
+    # List all users in the config
+    list_config_users_parser = config_commands_parser.add_parser(
+        "list-users", help="List all users in the config of the client."
     )
 
     # Create a user on the server
@@ -353,28 +417,18 @@ def get_args():
         "register", help="Create a new user in metadb."
     )
 
-    # Approve another user on the server
+    # Log out (blacklist refresh token)
+    logout_parser = command.add_parser(
+        "logout",
+        parents=[user_parser],
+        help="Blacklist your refresh token.",
+    )
+
+    # Institute approval of another user on the server
     approve_parser = command.add_parser(
         "approve", parents=[user_parser], help="Approve another user in metadb."
     )
     approve_parser.add_argument("username")
-
-    # Set default user in the config
-    set_default_user_parser = command.add_parser(
-        "set-default-user", help="Set the default user in the config of the client."
-    )
-    set_default_user_parser.add_argument("username", nargs="?")
-
-    # List the default user in the config
-    get_default_user_parser = command.add_parser(
-        "get-default-user", help="Get the default user in the config of the client."
-    )
-
-    # Add a pre-existing user to the config
-    add_user_parser = command.add_parser(
-        "add-user", help="Add a pre-existing metadb user to the config of the client."
-    )
-    add_user_parser.add_argument("username", nargs="?")
 
     # List users within institute of the requesting user
     list_institute_users_parser = command.add_parser(

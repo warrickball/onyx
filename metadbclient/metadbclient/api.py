@@ -37,6 +37,7 @@ class METADBClient:
         self.endpoints = {
             "token-pair": f"{self.url}/auth/token-pair/",
             "token-refresh": f"{self.url}/auth/token-refresh/",
+            "token-blacklist": f"{self.url}/auth/token-blacklist/",
             "register": f"{self.url}/accounts/register/",
             "approve": f"{self.url}/accounts/approve/",
             "institute-users": f"{self.url}/accounts/institute-users/",
@@ -238,6 +239,12 @@ class METADBClient:
         """
         return self.config["default_user"]
 
+    def list_users(self):
+        """
+        Get a list of the users in the config.
+        """
+        return [username for username in self.config["users"]]
+
     def register(self, first_name, last_name, email, institute, password):
         """
         Create a new user.
@@ -250,6 +257,19 @@ class METADBClient:
                 "password": password,
                 "email": email,
                 "institute": institute,
+            },
+        )
+        return response
+
+    @utils.login_required
+    def logout(self):
+        """
+        Blacklist the user's refresh token.
+        """
+        response = requests.post(
+            self.endpoints["token-blacklist"],
+            json={
+                "refresh": self.tokens["refresh"],
             },
         )
         return response

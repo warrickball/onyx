@@ -9,3 +9,6 @@ MESSAGE_BAR_WIDTH = 100
 
 # Name of environment variable that stores path to config directory
 CONFIG_DIR_ENV_VAR = "METADB_CONFIG_DIR"
+
+# Path to config directory as an option?
+# CONFIG_PATH = "/path/to/config"
