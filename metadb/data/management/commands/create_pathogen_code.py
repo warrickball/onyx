@@ -9,8 +9,9 @@ class Command(base.BaseCommand):
         parser.add_argument("code")
 
     def handle(self, *args, **options):
-        code = options["code"].upper()
+        code = options["code"]
         pathogen_code = PathogenCode.objects.create(code=code)
 
+        pathogen_code = PathogenCode.objects.get(code=code.lower())
         print("PathogenCode created successfully.")
         print("Code:", pathogen_code.code)

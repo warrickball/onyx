@@ -87,10 +87,27 @@ BOOLEAN_CHOICES = (
 
 
 class METADBFilter(filters.FilterSet):
-    def __init__(self, pathogen_model, *args, **kwargs):
+    def __init__(self, pathogen_model, user, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        for field, field_data in pathogen_model.FILTER_FIELDS.items():
+        user_fields = pathogen_model.filter_fields(user=user)
+
+        for field, value in self.data.items():
+            if user_fields.get(field):
+                if isinstance(value, str):
+                    if user_fields[field].get("choices") or user_fields[field].get(
+                        "db_choices"
+                    ):
+                        self.data[field] = value.lower()
+            else:
+                for f, f_d in user_fields.items():
+                    if "alias" in f_d and f_d["alias"] == field:
+                        if isinstance(value, str):
+                            if f_d.get("choices") or f_d.get("db_choices"):
+                                self.data[field] = value.lower()
+                        break
+
+        for field, field_data in user_fields.items():
             # Name for the field, used by the user when filtering
             # An alias allows for renaming of fields, e.g. institute__code is renamed to institute
             filter_name = field_data["alias"] if "alias" in field_data else field

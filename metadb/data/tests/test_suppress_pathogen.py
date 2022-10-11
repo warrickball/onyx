@@ -12,7 +12,7 @@ class TestSuppressPathogen(METADBTestCase):
         self.institute = Institute.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
         )
-        self.user = self.setup_admin_user("user", self.institute.code)
+        self.user = self.setup_admin_user("test-user", self.institute.code)
 
         settings.CURSOR_PAGINATION_PAGE_SIZE = 20
         for _ in range(settings.CURSOR_PAGINATION_PAGE_SIZE * 5):

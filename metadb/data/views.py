@@ -1,4 +1,4 @@
-from rest_framework import status, exceptions
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from django.conf import settings
@@ -7,14 +7,18 @@ import logging
 import traceback
 import inspect
 
-from . import serializers, models
+from . import models
 from .filters import METADBFilter
 from .models import Pathogen
 from accounts.permissions import (
     IsAuthenticated,
-    IsActive,
-    IsApproved,
+    IsActiveUser,
+    IsActiveInstitute,
+    IsInstituteApproved,
+    IsAdminApproved,
+    IsInstituteAuthority,
     IsAdminUser,
+    IsSameInstituteAsUnsuppressedCID,
 )
 from utils.views import METADBAPIView
 from utils.responses import METADBAPIResponse
@@ -90,7 +94,12 @@ def enforce_field_set(data, accepted_fields, rejected_fields):
 
 
 class PathogenCodeView(METADBAPIView):
-    permission_classes = [IsAuthenticated, IsActive, (IsApproved, IsAdminUser)]
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
+    ]
 
     def get(self, request):
         """
@@ -123,13 +132,19 @@ class CreateGetPathogenView(METADBAPIView):
     def get_permission_classes(self):
         if self.request.method == "POST":
             # Creating data requires being an admin user
-            permission_classes = [IsAuthenticated, IsActive, IsAdminUser]
+            permission_classes = [
+                IsAuthenticated,
+                IsActiveInstitute,
+                IsActiveUser,
+                IsAdminUser,
+            ]
         else:
             # Getting data requires being an authenticated, approved user (or an admin)
             permission_classes = [
                 IsAuthenticated,
-                IsActive,
-                (IsApproved, IsAdminUser),
+                IsActiveInstitute,
+                IsActiveUser,
+                ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
             ]
         return permission_classes
 
@@ -151,12 +166,12 @@ class CreateGetPathogenView(METADBAPIView):
             # Check the request data contains only model fields allowed for creation
             rejected, unknown = enforce_field_set(
                 data=request.data,
-                accepted_fields=pathogen_model.create_fields(),
-                rejected_fields=pathogen_model.no_create_fields(),
+                accepted_fields=pathogen_model.create_fields(user=request.user),
+                rejected_fields=pathogen_model.no_create_fields(user=request.user),
             )
 
             # Serializer also carries out validation of input data
-            serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(
+            serializer = pathogen_model.get_serializer(user=request.user)(
                 data=request.data
             )
 
@@ -241,6 +256,7 @@ class CreateGetPathogenView(METADBAPIView):
                 # Generate filterset of current queryset
                 filterset = METADBFilter(
                     pathogen_model,
+                    user=request.user,
                     data=filterset_data,
                     queryset=qs,
                 )
@@ -272,9 +288,9 @@ class CreateGetPathogenView(METADBAPIView):
                 qs = qs.distinct(distinct)
 
                 # Serialize the results
-                serializer = getattr(
-                    serializers, f"{pathogen_model.__name__}Serializer"
-                )(qs, many=True)
+                serializer = pathogen_model.get_serializer(user=request.user)(
+                    qs, many=True
+                )
 
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:
@@ -294,9 +310,9 @@ class CreateGetPathogenView(METADBAPIView):
                 result_page = paginator.paginate_queryset(instances, request)
 
                 # Serialize the results
-                serializer = getattr(
-                    serializers, f"{pathogen_model.__name__}Serializer"
-                )(result_page, many=True)
+                serializer = pathogen_model.get_serializer(user=request.user)(
+                    result_page, many=True
+                )
 
                 self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
                 self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
@@ -312,7 +328,20 @@ class CreateGetPathogenView(METADBAPIView):
 
 
 class UpdateSuppressPathogenView(METADBAPIView):
-    permission_classes = [IsAuthenticated, IsActive, IsAdminUser]
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        (
+            [
+                IsInstituteApproved,
+                IsAdminApproved,
+                IsInstituteAuthority,
+                IsSameInstituteAsUnsuppressedCID,
+            ],
+            IsAdminUser,
+        ),
+    ]
 
     def patch(self, request, pathogen_code, cid):
         """
@@ -341,8 +370,8 @@ class UpdateSuppressPathogenView(METADBAPIView):
             # Check the request data contains only model fields allowed for updating
             rejected, unknown = enforce_field_set(
                 data=request.data,
-                accepted_fields=pathogen_model.update_fields(),
-                rejected_fields=pathogen_model.no_update_fields(),
+                accepted_fields=pathogen_model.update_fields(user=request.user),
+                rejected_fields=pathogen_model.no_update_fields(user=request.user),
             )
 
             # Rejected fields (e.g. CID) are not allowed during updates
@@ -353,7 +382,7 @@ class UpdateSuppressPathogenView(METADBAPIView):
             self.API_RESPONSE.warnings.update(unknown)
 
             # Serializer also carries out validation of input data
-            serializer = getattr(serializers, f"{pathogen_model.__name__}Serializer")(
+            serializer = pathogen_model.get_serializer(user=request.user)(
                 instance=instance, data=request.data, partial=True
             )
 
@@ -433,7 +462,12 @@ class UpdateSuppressPathogenView(METADBAPIView):
 
 
 class DeletePathogenView(METADBAPIView):
-    permission_classes = [IsAuthenticated, IsActive, IsAdminUser]
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        IsAdminUser,
+    ]
 
     def delete(self, request, pathogen_code, cid):
         """
