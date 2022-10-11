@@ -1,15 +1,9 @@
 from rest_framework.views import APIView
+from rest_framework.generics import CreateAPIView, ListAPIView
 from .responses import METADBAPIResponse
 
 
-class METADBAPIView(APIView):
-    def setup(self, request, *args, **kwargs):
-        self.API_RESPONSE = METADBAPIResponse()
-        super().setup(request, *args, **kwargs)
-
-    def get_permission_classes(self):
-        return self.permission_classes
-
+class METADBAPIMixin:
     def parse_permissions(self, perm, request, view):
         """
         It's recursion time
@@ -33,7 +27,7 @@ class METADBAPIView(APIView):
             if messages:
                 has_permission = False
                 if len(messages) > 1:
-                    message = {"all must be satisfied": messages}
+                    message = {"All are required": messages}
                 else:
                     message = messages[0]
             else:
@@ -56,7 +50,7 @@ class METADBAPIView(APIView):
             else:
                 has_permission = False
                 if len(messages) > 1:
-                    message = {"at least one must be satisfied": messages}
+                    message = {"At least one is required": messages}
                 else:
                     message = messages[0]
 
@@ -67,6 +61,75 @@ class METADBAPIView(APIView):
             message = permission.message
 
         return has_permission, message
+
+
+class METADBAPIView(METADBAPIMixin, APIView):
+    def setup(self, request, *args, **kwargs):
+        self.API_RESPONSE = METADBAPIResponse()
+        super().setup(request, *args, **kwargs)
+
+    def get_permission_classes(self):
+        return self.permission_classes
+
+    def check_permissions(self, request):
+        has_permission, message = self.parse_permissions(
+            self.get_permission_classes(), request, self
+        )
+
+        if not has_permission:
+            # if request.authenticators and not request.successful_authenticator:
+            #     raise exceptions.PermissionDenied(detail=message, code=401)
+            # else:
+            #     raise exceptions.PermissionDenied(detail=message, code=403)
+
+            self.permission_denied(
+                request,
+                message=message,
+            )
+
+    def get_renderer_context(self):
+        context = super().get_renderer_context()
+        context["api_response"] = self.API_RESPONSE
+        return context
+
+
+class METADBCreateAPIView(METADBAPIMixin, CreateAPIView):
+    def setup(self, request, *args, **kwargs):
+        self.API_RESPONSE = METADBAPIResponse()
+        super().setup(request, *args, **kwargs)
+
+    def get_permission_classes(self):
+        return self.permission_classes
+
+    def check_permissions(self, request):
+        has_permission, message = self.parse_permissions(
+            self.get_permission_classes(), request, self
+        )
+
+        if not has_permission:
+            # if request.authenticators and not request.successful_authenticator:
+            #     raise exceptions.PermissionDenied(detail=message, code=401)
+            # else:
+            #     raise exceptions.PermissionDenied(detail=message, code=403)
+
+            self.permission_denied(
+                request,
+                message=message,
+            )
+
+    def get_renderer_context(self):
+        context = super().get_renderer_context()
+        context["api_response"] = self.API_RESPONSE
+        return context
+
+
+class METADBListAPIView(METADBAPIMixin, ListAPIView):
+    def setup(self, request, *args, **kwargs):
+        self.API_RESPONSE = METADBAPIResponse()
+        super().setup(request, *args, **kwargs)
+
+    def get_permission_classes(self):
+        return self.permission_classes
 
     def check_permissions(self, request):
         has_permission, message = self.parse_permissions(

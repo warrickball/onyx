@@ -24,3 +24,15 @@ class YearMonthField(serializers.Field):
             raise ValidationError("Must be in YYYY-MM-DD format.")
 
         return year + "-" + month
+
+
+class LowerChoiceField(serializers.ChoiceField):
+    def to_internal_value(self, data):
+        data = str(data).lower()
+        return super().to_internal_value(data)
+
+
+class LowerCharField(serializers.CharField):
+    def to_internal_value(self, data):
+        data = str(data).lower()
+        return super().to_internal_value(data)

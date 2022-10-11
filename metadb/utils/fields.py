@@ -55,3 +55,14 @@ class YearMonthField(models.DateField):
             code="invalid",
             params={"value": value},
         )
+
+
+class LowerCharField(models.CharField):
+    def to_python(self, value):
+        if value is None:
+            return value
+
+        if isinstance(value, str):
+            return value.lower()
+
+        return str(value).lower()
