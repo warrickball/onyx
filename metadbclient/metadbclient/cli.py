@@ -3,7 +3,7 @@ import stat
 import json
 import argparse
 import pandas as pd
-from metadbclient import version, METADBClient, utils, settings
+from metadbclient import version, Client, Config, utils, settings
 
 
 def create_config():
@@ -12,9 +12,9 @@ def create_config():
     """
     host = utils.get_input("host")
     port = utils.get_input("port", type=int)
+
     config_dir_location = utils.get_input("location to create a config directory")
     config_dir_location = config_dir_location.replace("~", os.path.expanduser("~"))
-
     if not os.path.isdir(config_dir_location):
         raise FileNotFoundError(f"No such directory: {config_dir_location}")
 
@@ -28,6 +28,9 @@ def create_config():
     os.chmod(config_dir_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
     config_file_path = os.path.join(config_dir_path, settings.CONFIG_FILE_NAME)
+    if os.path.isfile(config_file_path):
+        raise FileExistsError(f"Config file already exists: {config_file_path}")
+
     with open(config_file_path, "w") as config_file:
         json.dump(
             {"host": host, "port": port, "users": {}, "default_user": None},
@@ -61,35 +64,35 @@ def create_config():
     print("".center(settings.MESSAGE_BAR_WIDTH, "!"))
 
 
-def set_default_user(client, args):
-    """
-    Set the default user in the config.
-    """
-    client.set_default_user(args.username)
-    print(f"The user has been set as the default user.")
-
-
-def get_default_user(client):
-    """
-    Get the default user in the config.
-    """
-    default_user = client.get_default_user()
-    print(default_user)
-
-
-def add_user(client, args):
+def add_user(config, username):
     """
     Add user to the config.
     """
-    client.add_user(args.username)
+    config.add_user(username)
     print("The user has been added to the config.")
 
 
-def list_users(client, args):
+def set_default_user(config, username):
+    """
+    Set the default user in the config.
+    """
+    config.set_default_user(username)
+    print(f"The user has been set as the default user.")
+
+
+def get_default_user(config):
+    """
+    Get the default user in the config.
+    """
+    default_user = config.get_default_user()
+    print(default_user)
+
+
+def list_users(config):
     """
     List all users in the config.
     """
-    users = client.list_users()
+    users = config.list_users()
     for user in users:
         print(user)
 
@@ -140,54 +143,65 @@ def register(client):
             print("The user has been added to the config.")
 
 
-def logout(client, args):
+def login(client, username, env_password):
     """
-    Blacklist the current user's refresh token.
+    Log in as a user.
+    """
+    response = client.login(
+        username=username,
+        env_password=env_password,
+    )
+    utils.print_response(response, status_only=True)
+
+
+def logout(client):
+    """
+    Log out the current user.
     """
     response = client.logout()
-    utils.print_response(response)
+    utils.print_response(response, status_only=True)
 
 
-def approve(client, args):
+def approve(client, username):
     """
     Approve another user on the server.
     """
-    approval = client.approve(args.username)
+    approval = client.approve(username)
     utils.print_response(approval)
 
 
-def create(client, args):
+def create(client, pathogen_code, fields):
     """
     Post a new pathogen record to the database.
     """
-    fields = utils.construct_unique_fields_dict(args.field)
-    creations = client.create(args.pathogen_code, fields=fields)
+    fields = utils.construct_unique_fields_dict(fields)
+    creations = client.create(pathogen_code, fields=fields)
     utils.execute_uploads(creations)
 
 
-def csv_create(client, args):
+def csv_create(client, pathogen_code, csv_path):
     """
     Post new pathogen records to the database, using a csv.
     """
-    creations = client.create(args.pathogen_code, csv_path=args.csv)
+    creations = client.create(pathogen_code, csv_path=csv_path)
     utils.execute_uploads(creations)
 
 
-def tsv_create(client, args):
+def tsv_create(client, pathogen_code, tsv_path):
     """
     Post new pathogen records to the database, using a tsv.
     """
-    creations = client.create(args.pathogen_code, csv_path=args.tsv, delimiter="\t")
+    creations = client.create(pathogen_code, csv_path=tsv_path, delimiter="\t")
     utils.execute_uploads(creations)
 
 
-def get(client, args):
+def get(client, pathogen_code, cid, fields):
     """
     Get pathogen records from the database.
     """
-    fields = utils.construct_fields_dict(args.field)
+    fields = utils.construct_fields_dict(fields)
 
-    results = client.get(args.pathogen_code, args.cid, fields)
+    results = client.get(pathogen_code, cid, fields)
 
     result = next(results)
     if result.ok:
@@ -204,54 +218,52 @@ def get(client, args):
             utils.print_response(result)
 
 
-def update(client, args):
+def update(client, pathogen_code, cid, fields):
     """
     Update a pathogen record in the database.
     """
-    fields = utils.construct_unique_fields_dict(args.field)
-    updates = client.update(args.pathogen_code, cid=args.cid, fields=fields)
+    fields = utils.construct_unique_fields_dict(fields)
+    updates = client.update(pathogen_code, cid=cid, fields=fields)
     utils.execute_uploads(updates)
 
 
-def csv_update(client, args):
+def csv_update(client, pathogen_code, csv_path):
     """
     Update pathogen records in the database, using a csv.
     """
-    updates = client.update(args.pathogen_code, csv_path=args.csv)
+    updates = client.update(pathogen_code, csv_path=csv_path)
     utils.execute_uploads(updates)
 
 
-def tsv_update(client, args):
+def tsv_update(client, pathogen_code, tsv_path):
     """
     Update pathogen records in the database, using a tsv.
     """
-    updates = client.update(args.pathogen_code, csv_path=args.tsv, delimiter="\t")
+    updates = client.update(pathogen_code, csv_path=tsv_path, delimiter="\t")
     utils.execute_uploads(updates)
 
 
-def suppress(client, args):
+def suppress(client, pathogen_code, cid):
     """
     Suppress a pathogen record in the database.
     """
-    suppressions = client.suppress(args.pathogen_code, cid=args.cid)
+    suppressions = client.suppress(pathogen_code, cid=cid)
     utils.execute_uploads(suppressions)
 
 
-def csv_suppress(client, args):
+def csv_suppress(client, pathogen_code, csv_path):
     """
     Suppress pathogen records in the database, using a csv.
     """
-    suppressions = client.suppress(args.pathogen_code, csv_path=args.csv)
+    suppressions = client.suppress(pathogen_code, csv_path=csv_path)
     utils.execute_uploads(suppressions)
 
 
-def tsv_suppress(client, args):
+def tsv_suppress(client, pathogen_code, tsv_path):
     """
     Suppress pathogen records in the database, using a tsv.
     """
-    suppressions = client.suppress(
-        args.pathogen_code, csv_path=args.tsv, delimiter="\t"
-    )
+    suppressions = client.suppress(pathogen_code, csv_path=tsv_path, delimiter="\t")
     utils.execute_uploads(suppressions)
 
 
@@ -271,7 +283,7 @@ def list_institute_users(client):
     utils.print_response(institute_users)
 
 
-def list_all_users(client):
+def admin_list_users(client):
     """
     Get all users.
     """
@@ -281,72 +293,80 @@ def list_all_users(client):
 
 def run(args):
     if args.command == "config":
+
         if args.config_command == "create":
             create_config()
+
         else:
-            # Commands that require a config
-            client = METADBClient()
+            config = Config()
 
             if args.config_command == "set-default-user":
-                set_default_user(client, args)
+                set_default_user(config, args.username)
 
             elif args.config_command == "get-default-user":
-                get_default_user(client)
+                get_default_user(config)
 
             elif args.config_command == "add-user":
-                add_user(client, args)
+                add_user(config, args.username)
 
             elif args.config_command == "list-users":
-                list_users(client, args)
+                list_users(config)
 
     else:
-        # Commands that require a config
-        client = METADBClient()
+        config = Config()
+        client = Client(config)
 
         if args.command == "register":
             register(client)
-        else:
-            # Commands that also require user login details
-            client.get_login(
-                username=args.user,
-                use_password_env_var=args.use_password_env_var,
-            )
 
-            if args.command == "logout":
-                logout(client, args)
+        elif args.command == "login":
+            login(client, args.user, args.env_password)
+
+        else:
+            client.continue_session(username=args.user, env_password=args.env_password)
+
+            if args.command == "admin":
+                if args.admin_command == "approve":
+                    pass  # TODO
+
+                elif args.admin_command == "list-users":
+                    admin_list_users(client)
+
+            elif args.command == "logout":
+                logout(client)
 
             elif args.command == "approve":
-                approve(client, args)
+                approve(client, args.username)
 
             elif args.command == "create":
-                create(client, args)
+                create(client, args.pathogen_code, args.field)
 
             elif args.command == "csv-create":
-                csv_create(client, args)
+                csv_create(client, args.pathogen_code, args.csv)
 
             elif args.command == "tsv-create":
-                tsv_create(client, args)
+                tsv_create(client, args.pathogen_code, args.tsv)
 
             elif args.command == "get":
-                get(client, args)
+                get(client, args.pathogen_code, args.cid, args.field)
 
             elif args.command == "update":
-                update(client, args)
+                update(client, args.pathogen_code, args.cid, args.field)
 
             elif args.command == "csv-update":
-                csv_update(client, args)
+                csv_update(client, args.pathogen_code, args.csv)
 
             elif args.command == "tsv-update":
-                tsv_update(client, args)
+                tsv_update(client, args.pathogen_code, args.tsv)
 
             elif args.command == "suppress":
-                suppress(client, args)
+                suppress(client, args.pathogen_code, args.cid)
 
             elif args.command == "csv-suppress":
-                csv_suppress(client, args)
+                csv_suppress(client, args.pathogen_code, args.csv)
 
             elif args.command == "tsv-suppress":
-                tsv_suppress(client, args)
+                tsv_suppress(client, args.pathogen_code, args.tsv)
 
             elif args.command == "list-pathogen-codes":
                 list_pathogen_codes(client)
@@ -354,24 +374,15 @@ def run(args):
             elif args.command == "list-institute-users":
                 list_institute_users(client)
 
-            elif args.command == "list-all-users":
-                list_all_users(client)
-
 
 def get_args():
     user_parser = argparse.ArgumentParser(add_help=False)
     user_parser.add_argument("-u", "--user")
-    user_parser.add_argument("-p", "--use-password-env-var", action="store_true")
+    user_parser.add_argument("-p", "--env-password", action="store_true")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-v", "--version", action="version", version=version.__version__
-    )
-    parser.add_argument(
-        "-t",
-        "--timeit",
-        action="store_true",
-        help="output the time taken to run a command",
     )
 
     command = parser.add_subparsers(dest="command", metavar="{command}")
@@ -412,16 +423,39 @@ def get_args():
         "list-users", help="List all users in the config of the client."
     )
 
+    # Admin specific commands
+    admin_parser = command.add_parser("admin", help="Commands for admins only.")
+
+    admin_commands_parser = admin_parser.add_subparsers(
+        dest="admin_command", metavar="{admin-command}"
+    )
+
+    # Admin-approve a user
+    admin_approve_parser = admin_commands_parser.add_parser(
+        "approve", parents=[user_parser], help="Admin-approve another user in metadb."
+    )
+    admin_approve_parser.add_argument("username")
+
+    # List all users
+    list_all_users_parser = admin_commands_parser.add_parser(
+        "list-users", parents=[user_parser], help="List all users in metadb."
+    )
+
     # Create a user on the server
     register_parser = command.add_parser(
         "register", help="Create a new user in metadb."
     )
 
-    # Log out (blacklist refresh token)
+    # Log in to metadb
+    login_parser = command.add_parser(
+        "login", parents=[user_parser], help="Log in to metadb."
+    )
+
+    # Log out of metadb
     logout_parser = command.add_parser(
         "logout",
         parents=[user_parser],
-        help="Blacklist your refresh token.",
+        help="Log out of metadb.",
     )
 
     # Institute approval of another user on the server
@@ -435,11 +469,6 @@ def get_args():
         "list-institute-users",
         parents=[user_parser],
         help="List all users within the institute of the requesting user.",
-    )
-
-    # List all users
-    list_all_users_parser = command.add_parser(
-        "list-all-users", parents=[user_parser], help="List all users in metadb."
     )
 
     # List all pathogen codes
@@ -546,8 +575,4 @@ def get_args():
 
 def main():
     args = get_args()
-
-    if args.timeit:
-        utils.timefunc(run)(args)
-    else:
-        run(args)
+    run(args)

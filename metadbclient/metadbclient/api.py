@@ -1,249 +1,57 @@
 import os
 import sys
 import csv
-import stat
 import json
 import requests
-from metadbclient import utils, settings
+from metadbclient import utils, settings, Config
 
 
-class METADBClient:
-    def __init__(self, config_dir_path=None):
+class Client:
+    def __init__(self, config):
         """
-        Initialise the client, and connect it to a config directory.
-
-        If a `config_dir_path` was not provided, looks for the environment variable given by `settings.CONFIG_DIR_ENV_VAR`.
+        Initialise the client with a given config.
         """
-
-        # Locate the config
-        config_dir_path, config_file_path = utils.locate_config(
-            config_dir_path=config_dir_path
-        )
-
-        # Load the config
-        with open(config_file_path) as config_file:
-            config = json.load(config_file)
-
-        # Validate the config structure
-        utils.validate_config(config)
-
-        # Set up the client object
         self.config = config
-        self.config_dir_path = config_dir_path
-        self.config_file_path = config_file_path
-        self.url = f"http://{self.config['host']}:{self.config['port']}"
-
-        # Define API endpoints
+        self.url = f"http://{self.config.host}:{self.config.port}"
         self.endpoints = {
-            "token-pair": f"{self.url}/auth/token-pair/",
-            "token-refresh": f"{self.url}/auth/token-refresh/",
-            "token-blacklist": f"{self.url}/auth/token-blacklist/",
+            # accounts
             "register": f"{self.url}/accounts/register/",
-            "approve": f"{self.url}/accounts/approve/",
-            "institute-users": f"{self.url}/accounts/institute-users/",
-            "all-users": f"{self.url}/accounts/all-users/",
+            "login": f"{self.url}/accounts/login/",
+            "logout": f"{self.url}/accounts/logout/",
+            "logout_all": f"{self.url}/accounts/logoutall/",
+            "institute_approve": f"{self.url}/accounts/institute/approve/",
+            "institute_users": f"{self.url}/accounts/institute/users/",
+            "admin_approve": f"{self.url}/accounts/admin/approve/",
+            "admin_users": f"{self.url}/accounts/admin/users/",
+            # data
             "data": f"{self.url}/data/",
             "pathogen-codes": f"{self.url}/data/pathogen-codes/",
         }
 
-        # No user login details have been assigned to the client yet
-        self.has_login_details = False
-
-    def get_login(self, username=None, use_password_env_var=False):
-        """
-        Assign username, tokens and (if stored in an env var) password to the client.
-
-        If no username is provided, the `default_user` in the config is used.
-        """
-        if username is None:
-            # Attempt to use default_user if no username was provided
-            if self.config["default_user"] is None:
-                raise Exception(
-                    "No username was provided and there is no default_user in the config. Either provide a username or set a default_user"
-                )
-            else:
-                # The default_user must be in the config
-                if self.config["default_user"] not in self.config["users"]:
-                    raise Exception(
-                        f"default_user '{self.config['default_user']}' is not in the users list for the config"
-                    )
-                username = self.config["default_user"]
-        else:
-            # Username is case-insensitive
-            username = username.lower()
-
-            # The provided user must be in the config
-            if username not in self.config["users"]:
-                raise KeyError(
-                    f"User '{username}' is not in the config. Add them using the add-user command"
-                )
-
-        # Assign username to the client
-        self.username = username
-
-        # If the password is meant to be an env var, grab it. If its not there, this is unintended so raise an error
-        if use_password_env_var:
-            password_env_var = (
-                settings.PASSWORD_ENV_VAR_PREFIX
-                + self.username.upper()
-                + settings.PASSWORD_ENV_VAR_POSTFIX
-            )
-            password = os.getenv(password_env_var)
-            if password is None:
-                raise KeyError(f"Environment variable '{password_env_var}' is not set")
-            self.password = password
-        else:
-            self.password = None
-
-        # Open the tokens file for the user and assign their tokens
-        with open(self.config["users"][username]["tokens"]) as tokens_file:
-            self.tokens = json.load(tokens_file)
-
-        # The client now has details to log in with (correct or not)
-        self.has_login_details = True
-
-    def request(self, method, url, params=None, body=None):
-        """
-        Carry out a given request, refreshing tokens if required.
-        """
-        if params is None:
-            params = {}
-
-        if body is None:
-            body = {}
-
-        # Make request with the current access token
-        response = method(
-            url=url,
-            headers={"Authorization": "Bearer {}".format(self.tokens["access"])},
-            params=params,
-            json=body,
+    def request(self, method, **kwargs):
+        kwargs.setdefault("headers", {}).update(
+            {"Authorization": f"Token {self.token}"}
         )
-
-        # Handle token expiry
-        if response.status_code == 401:
-            # Get a new access token using the refresh token
-            access_token_response = requests.post(
-                self.endpoints["token-refresh"],
-                json={
-                    "refresh": self.tokens["refresh"],
-                },
+        method_response = method(**kwargs)
+        if method_response.status_code == 401:
+            password = self.get_password()
+            login_response = requests.post(
+                self.endpoints["login"], auth=(self.username, password)
             )
+            if login_response.ok:
+                self.token = login_response.json().get("token")
+                self.expiry = login_response.json().get("expiry")
+                self.config.write_token(self.username, self.token, self.expiry)
 
-            # Something went wrong with the refresh token
-            if not access_token_response.ok:
-                # Get the password if it doesn't already exist in the client
-                if self.password is None:
-                    print(
-                        "Your refresh token has expired or is invalid. Please enter your password to request new tokens."
-                    )
-                    self.password = utils.get_input("password", password=True)
-
-                # Request a new access-refresh token pair
-                token_pair_response = requests.post(
-                    self.endpoints["token-pair"],
-                    json={"username": self.username, "password": self.password},
+                kwargs.setdefault("headers", {}).update(
+                    {"Authorization": f"Token {self.token}"}
                 )
+                method_response = method(**kwargs)
 
-                if token_pair_response.ok:
-                    self.tokens = token_pair_response.json()
-                else:
-                    # Who knows what is happening, return the issue back to user
-                    return token_pair_response
             else:
-                self.tokens["access"] = access_token_response.json()["access"]
+                return login_response
 
-            # Now that we have our updated tokens, retry the request and return whatever response is given
-            response = method(
-                url=url,
-                headers={"Authorization": "Bearer {}".format(self.tokens["access"])},
-                params=params,
-                json=body,
-            )
-
-        return response
-
-    def add_user(self, username=None):
-        """
-        Add user to the config.
-        """
-        if username is None:
-            username = utils.get_input("username")
-
-        # Username is case-insensitive
-        username = username.lower()
-
-        tokens_path = os.path.join(self.config_dir_path, f"{username}_tokens.json")
-        self.config["users"][username] = {"tokens": tokens_path}
-
-        # Reload the config incase its changed
-        # Not perfect but better than just blanket overwriting the file
-        config_dir_path, config_file_path = utils.locate_config(
-            config_dir_path=self.config_dir_path
-        )
-        self.config_dir_path = config_dir_path
-        self.config_file_path = config_file_path
-
-        # Load the config
-        with open(self.config_file_path) as current_config_file:
-            current_config = json.load(current_config_file)
-
-        # Validate the config structure
-        utils.validate_config(current_config)
-
-        # Update the config
-        self.config["host"] = current_config["host"]
-        self.config["port"] = current_config["port"]
-        self.config["users"].update(current_config["users"])
-
-        # If there is only one user in the config, make them the default_user
-        if len(self.config["users"]) == 1:
-            self.config["default_user"] = username
-        else:
-            self.config["default_user"] = current_config["default_user"]
-
-        # Write to the config file
-        with open(self.config_file_path, "w") as config:
-            json.dump(self.config, config, indent=4)
-
-        # Create user tokens file
-        with open(tokens_path, "w") as tokens:
-            json.dump({"access": None, "refresh": None}, tokens, indent=4)
-
-        # Read-write for OS user only
-        os.chmod(tokens_path, stat.S_IRUSR | stat.S_IWUSR)
-
-    def set_default_user(self, username=None):
-        """
-        Set the default user in the config.
-        """
-        if username is None:
-            username = utils.get_input("username")
-
-        # Username is case-insensitive
-        username = username.lower()
-
-        if username not in self.config["users"]:
-            raise KeyError(
-                f"User '{username}' is not in the config. Add them using the add-user command"
-            )
-
-        self.config["default_user"] = username
-
-        with open(self.config_file_path, "w") as config:
-            json.dump(self.config, config, indent=4)
-
-    def get_default_user(self):
-        """
-        Get the default user in the config.
-        """
-        return self.config["default_user"]
-
-    def list_users(self):
-        """
-        Get a list of the users in the config.
-        """
-        return [username for username in self.config["users"]]
+        return method_response
 
     def register(self, first_name, last_name, email, institute, password):
         """
@@ -261,31 +69,125 @@ class METADBClient:
         )
         return response
 
-    @utils.login_required
-    def logout(self):
+    def continue_session(self, username=None, env_password=False):
+        if username is None:
+            # Attempt to use default_user if no username was provided
+            if self.config.default_user is None:
+                raise Exception(
+                    "No username was provided and there is no default_user in the config. Either provide a username or set a default_user"
+                )
+            else:
+                # The default_user must be in the config
+                if self.config.default_user not in self.config.users:
+                    raise Exception(
+                        f"default_user '{self.config.default_user}' is not in the users list for the config"
+                    )
+                username = self.config.default_user
+        else:
+            # Username is case-insensitive
+            username = username.lower()
+
+            # The provided user must be in the config
+            if username not in self.config.users:
+                raise KeyError(
+                    f"User '{username}' is not in the config. Add them using the add-user config command"
+                )
+
+        # Assign username to the client
+        self.username = username
+
+        # Assign flag indicating whether to look for user's password to the client
+        self.env_password = env_password
+
+        # Open the token file for the user and assign the current token, and its expiry, to the client
+        with open(self.config.users[username]["token"]) as token_file:
+            token_data = json.load(token_file)
+            self.token = token_data.get("token")
+            self.expiry = token_data.get("expiry")
+
+        return username
+
+    def get_password(self):
+        if self.env_password:
+            # If the password is meant to be an env var, grab it. If its not there, this is unintended so raise an error
+            password_env_var = (
+                settings.PASSWORD_ENV_VAR_PREFIX
+                + self.username.upper()
+                + settings.PASSWORD_ENV_VAR_POSTFIX
+            )
+            password = os.getenv(password_env_var)
+            if password is None:
+                raise KeyError(f"Environment variable '{password_env_var}' is not set")
+        else:
+            # Otherwise, prompt for the password
+            print("Please enter your password.")
+            password = utils.get_input("password", password=True)
+        return password
+
+    def login(self, username=None, env_password=False):
         """
-        Blacklist the user's refresh token.
+        Log in as a particular user, get a new token and store the token in the client.
+
+        If no user is provided, the `default_user` in the config is used.
         """
+
+        # Load previous session
+        # If no user was provided, the previous session of the default_user is used
+        self.continue_session(username, env_password=env_password)
+
+        if isinstance(self.token, str):
+            # Log out the current token just in case
+            # Is cleaner this way, I think so at least
+            # Helps ensure each user of the config is tied to only one token at a particular time
+            # Of course this is not a hard enforcement but slows users from spam creating new tokens they don't use
+            # If a user needs logins on different machines, this is still possible via multiple configs
+            response = self.request(
+                method=requests.post,
+                url=self.endpoints["logout"],
+            )
+
+        # Get the password
+        password = self.get_password()
+
+        # Log in
         response = requests.post(
-            self.endpoints["token-blacklist"],
-            json={
-                "refresh": self.tokens["refresh"],
-            },
+            self.endpoints["login"], auth=(self.username, password)
         )
+        if response.ok:
+            self.token = response.json().get("token")
+            self.expiry = response.json().get("expiry")
+            self.config.write_token(self.username, self.token, self.expiry)
+
         return response
 
-    @utils.login_required
+    @utils.session_required
+    def logout(self):
+        """
+        Log out the user.
+        """
+        response = self.request(
+            method=requests.post,
+            url=self.endpoints["logout"],
+        )
+        if response.ok:
+            self.token = None
+            self.expiry = None
+            self.config.write_token(self.username, self.token, self.expiry)
+
+        return response
+
+    @utils.session_required
     def approve(self, username):
         """
         Approve another user on the server.
         """
         response = self.request(
             method=requests.patch,
-            url=os.path.join(self.endpoints["approve"], username + "/"),
+            url=os.path.join(self.endpoints["institute_approve"], username + "/"),
         )
         return response
 
-    @utils.login_required
+    @utils.session_required
     def create(self, pathogen_code, fields=None, csv_path=None, delimiter=None):
         """
         Post new pathogen records to the database.
@@ -311,7 +213,7 @@ class METADBClient:
                     response = self.request(
                         method=requests.post,
                         url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-                        body=record,
+                        json=record,
                     )
                     yield response
 
@@ -323,11 +225,11 @@ class METADBClient:
             response = self.request(
                 method=requests.post,
                 url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-                body=fields,
+                json=fields,
             )
             yield response
 
-    @utils.login_required
+    @utils.session_required
     def get(self, pathogen_code, cid=None, fields=None, **kwargs):
         """
         Get records from the database.
@@ -364,7 +266,10 @@ class METADBClient:
             _next = None
 
         while _next is not None:
-            response = self.request(method=requests.get, url=_next)
+            response = self.request(
+                method=requests.get,
+                url=_next,
+            )
             yield response
 
             if response.ok:
@@ -372,7 +277,7 @@ class METADBClient:
             else:
                 _next = None
 
-    @utils.login_required
+    @utils.session_required
     def update(
         self, pathogen_code, cid=None, fields=None, csv_path=None, delimiter=None
     ):
@@ -406,7 +311,7 @@ class METADBClient:
                     response = self.request(
                         method=requests.patch,
                         url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
-                        body=fields,
+                        json=fields,
                     )
                     yield response
             finally:
@@ -417,11 +322,11 @@ class METADBClient:
             response = self.request(
                 method=requests.patch,
                 url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
-                body=fields,
+                json=fields,
             )
             yield response
 
-    @utils.login_required
+    @utils.session_required
     def suppress(self, pathogen_code, cid=None, csv_path=None, delimiter=None):
         """
         Suppress pathogen records in the database.
@@ -469,25 +374,25 @@ class METADBClient:
             )
             yield response
 
-    @utils.login_required
+    @utils.session_required
     def institute_users(self):
         """
         Get the current users within the institute of the requesting user.
         """
         response = self.request(
-            method=requests.get, url=self.endpoints["institute-users"]
+            method=requests.get, url=self.endpoints["institute_users"]
         )
         return response
 
-    @utils.login_required
+    @utils.session_required
     def all_users(self):
         """
         Get all users.
         """
-        response = self.request(method=requests.get, url=self.endpoints["all-users"])
+        response = self.request(method=requests.get, url=self.endpoints["admin_users"])
         return response
 
-    @utils.login_required
+    @utils.session_required
     def pathogen_codes(self):
         """
         Get the current pathogens within the database.
@@ -496,3 +401,25 @@ class METADBClient:
             method=requests.get, url=self.endpoints["pathogen-codes"]
         )
         return response
+
+
+class Session:
+    def __init__(self, username, env_password=False, login=False, logout=False):
+        self.config = Config()
+        self.client = Client(self.config)
+        self.username = username
+        self.env_password = env_password
+        self.login = login
+        self.logout = logout
+
+    def __enter__(self):
+        if self.login:
+            response = self.client.login(self.username, env_password=self.env_password)
+            response.raise_for_status()
+        else:
+            self.client.continue_session(self.username, env_password=self.env_password)
+        return self.client
+
+    def __exit__(self, type, value, traceback):
+        if self.logout:
+            self.client.logout()
