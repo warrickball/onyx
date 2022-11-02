@@ -2,8 +2,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.authentication import BasicAuthentication
 from knox.views import LoginView as KnoxLoginView
+from datetime import datetime
 from .models import User
-from .serializers import UserSerializer
+from .serializers import (
+    UserSerializer,
+    InstituteWaitingUserSerializer,
+    AdminWaitingUserSerializer,
+)
 from utils.responses import METADBAPIResponse
 from utils.views import METADBAPIView, METADBCreateAPIView, METADBListAPIView
 from .permissions import (
@@ -24,6 +29,10 @@ def create_username(first_name, last_name):
 
 
 class LoginView(KnoxLoginView):
+    """
+    Login a user.
+    """
+
     authentication_classes = [BasicAuthentication]
 
 
@@ -57,41 +66,11 @@ class CreateUserView(METADBCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class ListInstituteUsersView(METADBListAPIView):
-    """
-    List all users in the institute of the requesting user.
-    """
-
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveInstitute,
-        IsActiveUser,
-        ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
-    ]
-    serializer_class = UserSerializer
-
-    def get_queryset(self):
-        return User.objects.filter(institute=self.request.user.institute).order_by("-date_joined")  # type: ignore
-
-
-class ListAllUsersView(METADBListAPIView):
-    """
-    List all users.
-    """
-
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveInstitute,
-        IsActiveUser,
-        IsAdminUser,
-    ]
-    serializer_class = UserSerializer
-
-    def get_queryset(self):
-        return User.objects.order_by("-date_joined")
-
-
 class InstituteApproveView(METADBAPIView):
+    """
+    Grant institute approval to a user.
+    """
+
     permission_classes = [
         IsAuthenticated,
         IsActiveInstitute,
@@ -119,7 +98,8 @@ class InstituteApproveView(METADBAPIView):
 
         # Approve user
         user.is_institute_approved = True
-        user.save(update_fields=["is_institute_approved"])
+        user.date_institute_approved = datetime.now()
+        user.save(update_fields=["is_institute_approved", "date_institute_approved"])
 
         return Response(
             {
@@ -131,6 +111,10 @@ class InstituteApproveView(METADBAPIView):
 
 
 class AdminApproveView(METADBAPIView):
+    """
+    Grant admin approval to a user.
+    """
+
     permission_classes = [
         IsAuthenticated,
         IsActiveInstitute,
@@ -159,3 +143,88 @@ class AdminApproveView(METADBAPIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class InstituteWaitingView(METADBListAPIView):
+    """
+    List all users waiting for institute approval.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        (
+            [
+                IsInstituteApproved,
+                IsAdminApproved,
+                IsInstituteAuthority,
+            ],
+            IsAdminUser,
+        ),
+    ]
+    serializer_class = InstituteWaitingUserSerializer
+
+    def get_queryset(self):
+        return (
+            User.objects.filter(is_active=True)
+            .filter(institute=self.request.user.institute)  # type: ignore
+            .filter(is_institute_approved=False)
+            .order_by("-date_joined")
+        )
+
+
+class AdminWaitingView(METADBListAPIView):
+    """
+    List all users waiting for admin approval.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        IsAdminUser,
+    ]
+    serializer_class = AdminWaitingUserSerializer
+
+    def get_queryset(self):
+        return (
+            User.objects.filter(is_active=True)
+            .filter(is_institute_approved=True)
+            .filter(is_admin_approved=False)
+            .order_by("-date_institute_approved")
+        )
+
+
+class InstituteUsersView(METADBListAPIView):
+    """
+    List all users in the institute of the requesting user.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
+    ]
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        return User.objects.filter(institute=self.request.user.institute).order_by("-date_joined")  # type: ignore
+
+
+class AdminUsersView(METADBListAPIView):
+    """
+    List all users.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        IsAdminUser,
+    ]
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        return User.objects.order_by("-date_joined")

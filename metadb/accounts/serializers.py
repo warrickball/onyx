@@ -47,3 +47,20 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["username", "password", "email", "institute"]
+
+
+class InstituteWaitingUserSerializer(UserSerializer):
+    class Meta:
+        model = User
+        fields = ["username", "email", "institute", "date_joined"]
+
+
+class AdminWaitingUserSerializer(UserSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "username",
+            "email",
+            "institute",
+            "date_institute_approved",
+        ]
