@@ -2,10 +2,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from django.conf import settings
+from django.db.models import Q
 from logging.handlers import RotatingFileHandler
 import logging
 import traceback
 import inspect
+import operator
+import functools
 
 from . import models
 from .filters import METADBFilter
@@ -317,6 +320,72 @@ class CreateGetPathogenView(METADBAPIView):
                 self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
                 self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
                 return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(str(e))
+            logger.error(traceback.format_exc())
+            return Response(
+                {(type(e)).__name__: str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+def get_query(data):
+    key, value = next(iter(data.items()))
+
+    # OR
+    if key == "|":
+        q_objects = [get_query(k_v) for k_v in value]
+        q_objects_or = functools.reduce(operator.or_, q_objects)
+        return q_objects_or
+
+    # AND
+    elif key == "&":
+        q_objects = [get_query(k_v) for k_v in value]
+        q_objects_and = functools.reduce(operator.and_, q_objects)
+        return q_objects_and
+
+    # NOT
+    elif key == "~":
+        q_object = [get_query(k_v) for k_v in value][0]
+        q_object_not = ~q_object
+        return q_object_not
+
+    else:
+        q = Q(**{key: value})
+        return q
+
+
+class QueryPathogenView(METADBAPIView):
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveInstitute,
+        IsActiveUser,
+        ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
+    ]
+
+    def post(self, request, pathogen_code):
+        try:
+            # Get the corresponding model. The base class Pathogen is accepted when creating data
+            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
+
+            # If pathogen model does not exist, return error
+            if pathogen_model is None:
+                return Response(
+                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            query = get_query(request.data)
+
+            # Initial queryset
+            qs = pathogen_model.objects.filter(suppressed=False)
+            qs = qs.filter(query)
+
+            # Serialize the results
+            serializer = pathogen_model.get_serializer(user=request.user)(qs, many=True)
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(str(e))
