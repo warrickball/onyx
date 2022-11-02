@@ -1,6 +1,5 @@
 import sys
 import json
-import time
 import inspect
 from getpass import getpass
 

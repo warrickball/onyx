@@ -3,7 +3,9 @@ import sys
 import csv
 import json
 import requests
-from metadbclient import utils, settings, Config
+from metadbclient import utils, settings
+from metadbclient.field import Field
+from metadbclient.config import Config
 
 
 class Client:
@@ -18,14 +20,15 @@ class Client:
             "register": f"{self.url}/accounts/register/",
             "login": f"{self.url}/accounts/login/",
             "logout": f"{self.url}/accounts/logout/",
-            "logout_all": f"{self.url}/accounts/logoutall/",
+            "logoutall": f"{self.url}/accounts/logoutall/",
             "institute_approve": f"{self.url}/accounts/institute/approve/",
+            "institute_waiting": f"{self.url}/accounts/institute/waiting/",
             "institute_users": f"{self.url}/accounts/institute/users/",
             "admin_approve": f"{self.url}/accounts/admin/approve/",
+            "admin_waiting": f"{self.url}/accounts/admin/waiting/",
             "admin_users": f"{self.url}/accounts/admin/users/",
             # data
             "data": f"{self.url}/data/",
-            "pathogen-codes": f"{self.url}/data/pathogen-codes/",
         }
 
     def request(self, method, **kwargs):
@@ -36,7 +39,8 @@ class Client:
         if method_response.status_code == 401:
             password = self.get_password()
             login_response = requests.post(
-                self.endpoints["login"], auth=(self.username, password)
+                self.endpoints["login"],
+                auth=(self.username, password),
             )
             if login_response.ok:
                 self.token = login_response.json().get("token")
@@ -177,13 +181,88 @@ class Client:
         return response
 
     @utils.session_required
-    def approve(self, username):
+    def logoutall(self):
         """
-        Approve another user on the server.
+        Log out the user everywhere.
+        """
+        response = self.request(
+            method=requests.post,
+            url=self.endpoints["logoutall"],
+        )
+        if response.ok:
+            self.token = None
+            self.expiry = None
+            self.config.write_token(self.username, self.token, self.expiry)
+
+        return response
+
+    @utils.session_required
+    def institute_approve(self, username):
+        """
+        Institute-approve another user.
         """
         response = self.request(
             method=requests.patch,
             url=os.path.join(self.endpoints["institute_approve"], username + "/"),
+        )
+        return response
+
+    @utils.session_required
+    def institute_list_waiting(self):
+        """
+        List users waiting for institute approval.
+        """
+        response = self.request(
+            method=requests.get, url=self.endpoints["institute_waiting"]
+        )
+        return response
+
+    @utils.session_required
+    def institute_list_users(self):
+        """
+        Get the current users within the institute of the requesting user.
+        """
+        response = self.request(
+            method=requests.get, url=self.endpoints["institute_users"]
+        )
+        return response
+
+    @utils.session_required
+    def admin_approve(self, username):
+        """
+        Admin-approve another user.
+        """
+        response = self.request(
+            method=requests.patch,
+            url=os.path.join(self.endpoints["admin_approve"], username + "/"),
+        )
+        return response
+
+    @utils.session_required
+    def admin_list_waiting(self):
+        """
+        List users waiting for admin approval.
+        """
+        response = self.request(
+            method=requests.get, url=self.endpoints["admin_waiting"]
+        )
+        return response
+
+    @utils.session_required
+    def admin_list_users(self):
+        """
+        List all users.
+        """
+        response = self.request(method=requests.get, url=self.endpoints["admin_users"])
+        return response
+
+    @utils.session_required
+    def list_pathogen_codes(self):
+        """
+        List the current pathogens within the database.
+        """
+        response = self.request(
+            method=requests.get, url=os.path.join(self.endpoints["data"], "pathogens/")
         )
         return response
 
@@ -276,6 +355,22 @@ class Client:
                 _next = response.json()["next"]
             else:
                 _next = None
+
+    @utils.session_required
+    def query(self, pathogen_code, query):
+        """
+        Get records from the database.
+        """
+        if not isinstance(query, Field):
+            raise Exception("Query must be of type Field")
+
+        response = self.request(
+            method=requests.post,
+            url=os.path.join(self.endpoints["data"], pathogen_code + "/query/"),
+            json=query.query,
+        )
+
+        return response
 
     @utils.session_required
     def update(
@@ -373,34 +468,6 @@ class Client:
                 ),
             )
             yield response
-
-    @utils.session_required
-    def institute_users(self):
-        """
-        Get the current users within the institute of the requesting user.
-        """
-        response = self.request(
-            method=requests.get, url=self.endpoints["institute_users"]
-        )
-        return response
-
-    @utils.session_required
-    def all_users(self):
-        """
-        Get all users.
-        """
-        response = self.request(method=requests.get, url=self.endpoints["admin_users"])
-        return response
-
-    @utils.session_required
-    def pathogen_codes(self):
-        """
-        Get the current pathogens within the database.
-        """
-        response = self.request(
-            method=requests.get, url=self.endpoints["pathogen-codes"]
-        )
-        return response
 
 
 class Session:

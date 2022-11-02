@@ -12,6 +12,10 @@ class Field:
     def __init__(self, **kwargs):
         check_kwargs(kwargs)
         field, value = next(iter(kwargs.items()))
+
+        if isinstance(value, tuple):
+            value = list(value)
+
         self.query = {field: value}
 
     def __and__(self, field):
