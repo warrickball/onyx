@@ -1,0 +1,14 @@
+setup.py
+metadb.egg-info/PKG-INFO
+metadb.egg-info/SOURCES.txt
+metadb.egg-info/dependency_links.txt
+metadb.egg-info/entry_points.txt
+metadb.egg-info/top_level.txt
+metadbclient/__init__.py
+metadbclient/api.py
+metadbclient/cli.py
+metadbclient/config.py
+metadbclient/field.py
+metadbclient/settings.py
+metadbclient/utils.py
+metadbclient/version.py

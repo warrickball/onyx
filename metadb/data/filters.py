@@ -109,7 +109,7 @@ class METADBFilter(filters.FilterSet):
 
         for field, field_data in user_fields.items():
             # Name for the field, used by the user when filtering
-            # An alias allows for renaming of fields, e.g. institute__code is renamed to institute
+            # An alias allows for renaming of fields, e.g. site__code is renamed to site
             filter_name = field_data["alias"] if "alias" in field_data else field
 
             # If none of the params provided in the request even begin with the filter name

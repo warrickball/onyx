@@ -21,9 +21,9 @@ class Client:
             "login": f"{self.url}/accounts/login/",
             "logout": f"{self.url}/accounts/logout/",
             "logoutall": f"{self.url}/accounts/logoutall/",
-            "institute_approve": f"{self.url}/accounts/institute/approve/",
-            "institute_waiting": f"{self.url}/accounts/institute/waiting/",
-            "institute_users": f"{self.url}/accounts/institute/users/",
+            "site_approve": f"{self.url}/accounts/site/approve/",
+            "site_waiting": f"{self.url}/accounts/site/waiting/",
+            "site_users": f"{self.url}/accounts/site/users/",
             "admin_approve": f"{self.url}/accounts/admin/approve/",
             "admin_waiting": f"{self.url}/accounts/admin/waiting/",
             "admin_users": f"{self.url}/accounts/admin/users/",
@@ -57,7 +57,7 @@ class Client:
 
         return method_response
 
-    def register(self, first_name, last_name, email, institute, password):
+    def register(self, first_name, last_name, email, site, password):
         """
         Create a new user.
         """
@@ -68,7 +68,7 @@ class Client:
                 "last_name": last_name,
                 "password": password,
                 "email": email,
-                "institute": institute,
+                "site": site,
             },
         )
         return response
@@ -197,34 +197,30 @@ class Client:
         return response
 
     @utils.session_required
-    def institute_approve(self, username):
+    def site_approve(self, username):
         """
-        Institute-approve another user.
+        Site-approve another user.
         """
         response = self.request(
             method=requests.patch,
-            url=os.path.join(self.endpoints["institute_approve"], username + "/"),
+            url=os.path.join(self.endpoints["site_approve"], username + "/"),
         )
         return response
 
     @utils.session_required
-    def institute_list_waiting(self):
+    def site_list_waiting(self):
         """
-        List users waiting for institute approval.
+        List users waiting for site approval.
         """
-        response = self.request(
-            method=requests.get, url=self.endpoints["institute_waiting"]
-        )
+        response = self.request(method=requests.get, url=self.endpoints["site_waiting"])
         return response
 
     @utils.session_required
-    def institute_list_users(self):
+    def site_list_users(self):
         """
-        Get the current users within the institute of the requesting user.
+        Get the current users within the site of the requesting user.
         """
-        response = self.request(
-            method=requests.get, url=self.endpoints["institute_users"]
-        )
+        response = self.request(method=requests.get, url=self.endpoints["site_users"])
         return response
 
     @utils.session_required

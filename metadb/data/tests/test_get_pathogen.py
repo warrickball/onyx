@@ -1,6 +1,6 @@
 from rest_framework import status
 from data.models import Covid
-from accounts.models import Institute
+from accounts.models import Site
 from data.filters import BASE_LOOKUPS, CHAR_LOOKUPS
 from utils.responses import METADBAPIResponse
 from django.conf import settings
@@ -10,14 +10,14 @@ from data.tests.utils import METADBTestCase, get_covid_data
 
 class TestGetPathogen(METADBTestCase):
     def setUp(self):
-        self.institute = Institute.objects.create(
+        self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
         )
-        self.user = self.setup_approved_user("test-user", self.institute.code)
+        self.user = self.setup_approved_user("test-user", self.site.code)
 
         settings.CURSOR_PAGINATION_PAGE_SIZE = 20
         for _ in range(settings.CURSOR_PAGINATION_PAGE_SIZE * 5):
-            covid_data = get_covid_data(self.institute)
+            covid_data = get_covid_data(self.site)
             Covid.objects.create(**covid_data)
 
     def test_unauthenticated_get(self):
@@ -29,7 +29,7 @@ class TestGetPathogen(METADBTestCase):
     def test_authenticated_get(self):
         self.client.force_authenticate(  # type: ignore
             user=self.setup_authenticated_user(
-                "authenticated-user", institute=self.institute.code
+                "authenticated-user", site=self.site.code
             )
         )
         results = self.client_get_paginated(
@@ -38,9 +38,7 @@ class TestGetPathogen(METADBTestCase):
 
     def test_approved_get(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_approved_user(
-                "approved-user", institute=self.institute.code
-            )
+            user=self.setup_approved_user("approved-user", site=self.site.code)
         )
         results = self.client_get_paginated(
             "/data/covid/", expected_status_code=status.HTTP_200_OK
@@ -48,9 +46,7 @@ class TestGetPathogen(METADBTestCase):
 
     def test_authority_get(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authority_user(
-                "authority-user", institute=self.institute.code
-            )
+            user=self.setup_authority_user("authority-user", site=self.site.code)
         )
         results = self.client_get_paginated(
             "/data/covid/", expected_status_code=status.HTTP_200_OK
@@ -58,7 +54,7 @@ class TestGetPathogen(METADBTestCase):
 
     def test_admin_get(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_admin_user("admin-user", institute=self.institute.code)
+            user=self.setup_admin_user("admin-user", site=self.site.code)
         )
         results = self.client_get_paginated(
             "/data/covid/", expected_status_code=status.HTTP_200_OK

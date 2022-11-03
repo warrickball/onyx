@@ -1,6 +1,6 @@
 from rest_framework import status
 from data.models import Covid
-from accounts.models import Institute
+from accounts.models import Site
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
 from utils.responses import METADBAPIResponse
@@ -9,14 +9,14 @@ import os
 
 class TestSuppressPathogen(METADBTestCase):
     def setUp(self):
-        self.institute = Institute.objects.create(
+        self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
         )
-        self.user = self.setup_admin_user("test-user", self.institute.code)
+        self.user = self.setup_admin_user("test-user", self.site.code)
 
         settings.CURSOR_PAGINATION_PAGE_SIZE = 20
         for _ in range(settings.CURSOR_PAGINATION_PAGE_SIZE * 5):
-            covid_data = get_covid_data(self.institute)
+            covid_data = get_covid_data(self.site)
             Covid.objects.create(**covid_data)
 
         self.cids = Covid.objects.values_list("cid", flat=True)
@@ -30,7 +30,7 @@ class TestSuppressPathogen(METADBTestCase):
     def test_authenticated_suppress(self):
         self.client.force_authenticate(  # type: ignore
             user=self.setup_authenticated_user(
-                "authenticated-user", institute=self.institute.code
+                "authenticated-user", site=self.site.code
             )
         )
         for cid in self.cids:
@@ -39,9 +39,7 @@ class TestSuppressPathogen(METADBTestCase):
 
     def test_approved_suppress(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_approved_user(
-                "approved-user", institute=self.institute.code
-            )
+            user=self.setup_approved_user("approved-user", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.delete(os.path.join("/data/covid/", cid + "/"))
@@ -49,9 +47,7 @@ class TestSuppressPathogen(METADBTestCase):
 
     def test_authority_suppress(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authority_user(
-                "authority-user", institute=self.institute.code
-            )
+            user=self.setup_authority_user("authority-user", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.delete(os.path.join("/data/covid/", cid + "/"))
@@ -59,7 +55,7 @@ class TestSuppressPathogen(METADBTestCase):
 
     def test_admin_suppress(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_admin_user("admin-user", institute=self.institute.code)
+            user=self.setup_admin_user("admin-user", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.delete(os.path.join("/data/covid/", cid + "/"))

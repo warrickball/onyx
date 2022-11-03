@@ -5,7 +5,7 @@ from django.db.models.lookups import BuiltinLookup
 from rest_framework import serializers
 from secrets import token_hex
 
-from accounts.models import Institute
+from accounts.models import Site
 from utils.fields import YearMonthField, LowerCharField
 from utils import fieldserializers
 
@@ -63,18 +63,19 @@ class Pathogen(models.Model):
     published_date = models.DateField(auto_now_add=True)
 
     pathogen_code = models.ForeignKey("PathogenCode", on_delete=models.CASCADE)
-    institute = models.ForeignKey("accounts.Institute", on_delete=models.CASCADE)
+    site = models.ForeignKey("accounts.Site", on_delete=models.CASCADE)
 
     cid = models.CharField(default=generate_cid, max_length=12, unique=True)
     sender_sample_id = models.CharField(
         max_length=24, validators=[MinLengthValidator(8)]
     )
+    collection_month = YearMonthField(null=True)
+    received_month = YearMonthField(null=True)
+
     run_name = models.CharField(max_length=96, validators=[MinLengthValidator(18)])
     fasta_path = models.TextField()
     bam_path = models.TextField()
     is_external = models.BooleanField()
-    collection_month = YearMonthField(null=True)
-    received_month = YearMonthField(null=True)
 
     class Meta:
         constraints = [
@@ -102,7 +103,7 @@ class Pathogen(models.Model):
         "sender_sample_id": ["create", "no update"],
         "run_name": ["create", "no update"],
         "pathogen_code": ["create", "no update"],
-        "institute": ["create", "no update"],
+        "site": ["create", "no update"],
         "published_date": ["no create", "no update"],
         "fasta_path": ["create", "update"],
         "bam_path": ["create", "update"],
@@ -121,11 +122,11 @@ class Pathogen(models.Model):
             "alias": "pathogen_code",
             "root_field": "pathogen_code",
         },
-        "institute__code": {
+        "site__code": {
             "type": models.CharField,
             "db_choices": True,
-            "alias": "institute",
-            "root_field": "institute",
+            "alias": "site",
+            "root_field": "site",
         },
         "published_date": {"type": models.DateField},
         "fasta_path": {"type": models.TextField},
@@ -138,14 +139,14 @@ class Pathogen(models.Model):
     OPTIONAL_VALUE_GROUPS = [["collection_month", "received_month"]]
 
     # loop through user groups
-    # loop through institute groups
+    # loop through site groups
 
     @classmethod
     def user_fields(cls, user):
         if user.is_staff:
             fields = "__all__"
 
-        elif user.institute.is_pha:
+        elif user.site.is_pha:
             fields = [
                 field
                 for field, perms in cls.FIELD_PERMISSIONS.items()
@@ -163,7 +164,7 @@ class Pathogen(models.Model):
 
     @classmethod
     def create_fields(cls, user):
-        if user.is_staff or user.institute.is_pha:
+        if user.is_staff or user.site.is_pha:
             fields = [
                 field
                 for field, perms in cls.FIELD_PERMISSIONS.items()
@@ -179,7 +180,7 @@ class Pathogen(models.Model):
 
     @classmethod
     def no_create_fields(cls, user):
-        if user.is_staff or user.institute.is_pha:
+        if user.is_staff or user.site.is_pha:
             fields = [
                 field
                 for field, perms in cls.FIELD_PERMISSIONS.items()
@@ -195,7 +196,7 @@ class Pathogen(models.Model):
 
     @classmethod
     def update_fields(cls, user):
-        if user.is_staff or user.institute.is_pha:
+        if user.is_staff or user.site.is_pha:
             fields = [
                 field
                 for field, perms in cls.FIELD_PERMISSIONS.items()
@@ -211,7 +212,7 @@ class Pathogen(models.Model):
 
     @classmethod
     def no_update_fields(cls, user):
-        if user.is_staff or user.institute.is_pha:
+        if user.is_staff or user.site.is_pha:
             fields = [
                 field
                 for field, perms in cls.FIELD_PERMISSIONS.items()
@@ -227,7 +228,7 @@ class Pathogen(models.Model):
 
     @classmethod
     def filter_fields(cls, user):
-        if user.is_staff or user.institute.is_pha:
+        if user.is_staff or user.site.is_pha:
             filter_fields = cls.FILTER_FIELDS
         else:
             filter_fields = {}
@@ -248,8 +249,8 @@ class Pathogen(models.Model):
             received_month = fieldserializers.YearMonthField(
                 required=False, allow_null=True
             )
-            institute = serializers.SlugRelatedField(
-                queryset=Institute.objects.all(), slug_field="code"
+            site = serializers.SlugRelatedField(
+                queryset=Site.objects.all(), slug_field="code"
             )
             pathogen_code = serializers.SlugRelatedField(
                 queryset=PathogenCode.objects.all(), slug_field="code"

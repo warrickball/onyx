@@ -36,17 +36,15 @@ class IsActiveUser(permissions.BasePermission):
         return bool(request.user and getattr(request.user, "is_active", False))
 
 
-class IsInstituteApproved(permissions.BasePermission):
+class IsSiteApproved(permissions.BasePermission):
     """
-    Allows access only to users that have been approved by an authority for their institute.
+    Allows access only to users that have been approved by an authority for their site.
     """
 
-    message = "You need to be approved by an authority from your institute."
+    message = "You need to be approved by an authority from your site."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user and getattr(request.user, "is_institute_approved", False)
-        )
+        return bool(request.user and getattr(request.user, "is_site_approved", False))
 
 
 class IsAdminApproved(permissions.BasePermission):
@@ -60,30 +58,28 @@ class IsAdminApproved(permissions.BasePermission):
         return bool(request.user and getattr(request.user, "is_admin_approved", False))
 
 
-class IsInstituteAuthority(permissions.BasePermission):
+class IsSiteAuthority(permissions.BasePermission):
     """
-    Allows access only to users who are an authority for their institute.
+    Allows access only to users who are an authority for their site.
     """
 
-    message = "You need to be an authority for your institute."
+    message = "You need to be an authority for your site."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user and getattr(request.user, "is_institute_authority", False)
-        )
+        return bool(request.user and getattr(request.user, "is_site_authority", False))
 
 
-class IsActiveInstitute(permissions.BasePermission):
+class IsActiveSite(permissions.BasePermission):
     """
-    Allows access only to users who are still in an active institute.
+    Allows access only to users who are still in an active site.
     """
 
-    message = "Your institute needs to be reactivated."
+    message = "Your site needs to be reactivated."
 
     def has_permission(self, request, view):
         return bool(
             request.user
-            and getattr(getattr(request.user, "institute", False), "is_active", False)
+            and getattr(getattr(request.user, "site", False), "is_active", False)
         )
 
 
@@ -92,12 +88,12 @@ class IsPHAMember(permissions.BasePermission):
     Allows access only to users who are a member of a Public Health Agency.
     """
 
-    message = "Your institute would need to be a Public Health Agency."
+    message = "Your site would need to be a Public Health Agency."
 
     def has_permission(self, request, view):
         return bool(
             request.user
-            and getattr(getattr(request.user, "institute", False), "is_pha", False)
+            and getattr(getattr(request.user, "site", False), "is_pha", False)
         )
 
 
@@ -112,9 +108,9 @@ class IsAdminUser(permissions.BasePermission):
         return bool(request.user and getattr(request.user, "is_staff", False))
 
 
-class IsSameInstituteAsUnsuppressedCID(permissions.BasePermission):
+class IsSameSiteAsUnsuppressedCID(permissions.BasePermission):
     """
-    Allows access only to users of the same institute as the (unsuppressed) cid they are accessing.
+    Allows access only to users of the same site as the (unsuppressed) cid they are accessing.
     """
 
     def has_permission(self, request, view):
@@ -125,16 +121,14 @@ class IsSameInstituteAsUnsuppressedCID(permissions.BasePermission):
         except Pathogen.DoesNotExist:
             raise exceptions.NotFound({cid: "Not found."})
 
-        self.message = f"You need to be from institute {obj.institute.code}"
+        self.message = f"You need to be from site {obj.site.code}"
 
-        return bool(
-            request.user and getattr(request.user, "institute", False) == obj.institute
-        )
+        return bool(request.user and getattr(request.user, "site", False) == obj.site)
 
 
-class IsSameInstituteAsUser(permissions.BasePermission):
+class IsSameSiteAsUser(permissions.BasePermission):
     """
-    Allows access only to users of the same institute as the user they are accessing.
+    Allows access only to users of the same site as the user they are accessing.
     """
 
     def has_permission(self, request, view):
@@ -146,9 +140,7 @@ class IsSameInstituteAsUser(permissions.BasePermission):
         except User.DoesNotExist:
             raise exceptions.NotFound({username: "Not found."})
 
-        self.message = f"You need to be from institute {obj.institute.code}"
+        self.message = f"You need to be from site {obj.site.code}"
 
-        # Check that request user is in the same institute as the target user
-        return bool(
-            request.user and getattr(request.user, "institute", False) == obj.institute
-        )
+        # Check that request user is in the same site as the target user
+        return bool(request.user and getattr(request.user, "site", False) == obj.site)

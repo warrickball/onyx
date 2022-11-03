@@ -1,9 +1,9 @@
 from django.core.management import base
-from ...models import Institute
+from ...models import Site
 
 
 class Command(base.BaseCommand):
-    help = "Grant/revoke an institute's status as a public health agency."
+    help = "Grant/revoke an site's status as a public health agency."
 
     def add_arguments(self, parser):
         parser.add_argument("code")
@@ -15,10 +15,10 @@ class Command(base.BaseCommand):
         code = options["code"]
         action = options["action"]
 
-        institute = Institute.objects.get(code=code)
-        institute.is_pha = action
-        institute.save(update_fields=["is_pha"])
+        site = Site.objects.get(code=code)
+        site.is_pha = action
+        site.save(update_fields=["is_pha"])
 
-        institute = Institute.objects.get(code=code)
-        print("Institute:", institute.code)
-        print("is_pha:", institute.is_pha)
+        site = Site.objects.get(code=code)
+        print("Site:", site.code)
+        print("is_pha:", site.is_pha)

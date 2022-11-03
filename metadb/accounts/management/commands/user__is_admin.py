@@ -3,9 +3,7 @@ from ...models import User
 
 
 class Command(base.BaseCommand):
-    help = (
-        "Grant/revoke a user's ability to perform actions on data of other institutes."
-    )
+    help = "Grant/revoke a user's ability to perform actions on data of other sites."
 
     def add_arguments(self, parser):
         parser.add_argument("username")

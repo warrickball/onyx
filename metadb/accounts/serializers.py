@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from .models import User, Institute
+from .models import User, Site
 from django.core.exceptions import ValidationError
 import django.contrib.auth.password_validation as validators
 from utils import fieldserializers
@@ -14,9 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
         validators=[UniqueValidator(queryset=User.objects.all())]
     )
     password = serializers.CharField(write_only=True)
-    institute = serializers.SlugRelatedField(
-        queryset=Institute.objects.all(), slug_field="code"
-    )
+    site = serializers.SlugRelatedField(queryset=Site.objects.all(), slug_field="code")
 
     def create(self, validated_data):
         # User.objects.create_user() hashes the password
@@ -24,7 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
             username=validated_data["username"],
             email=validated_data["email"],
             password=validated_data["password"],
-            institute=validated_data["institute"],
+            site=validated_data["site"],
         )
         return user
 
@@ -46,13 +44,13 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["username", "password", "email", "institute"]
+        fields = ["username", "password", "email", "site"]
 
 
-class InstituteWaitingUserSerializer(UserSerializer):
+class SiteWaitingUserSerializer(UserSerializer):
     class Meta:
         model = User
-        fields = ["username", "email", "institute", "date_joined"]
+        fields = ["username", "email", "site", "date_joined"]
 
 
 class AdminWaitingUserSerializer(UserSerializer):
@@ -61,6 +59,6 @@ class AdminWaitingUserSerializer(UserSerializer):
         fields = [
             "username",
             "email",
-            "institute",
-            "date_institute_approved",
+            "site",
+            "date_site_approved",
         ]

@@ -6,14 +6,14 @@ import random
 
 
 class METADBTestCase(APITestCase):
-    def setup_authenticated_user(self, username, institute):
+    def setup_authenticated_user(self, username, site):
         response = self.client.post(
             "/accounts/register/",
             data={
                 "username": username,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
-                "institute": institute,
+                "site": site,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -21,47 +21,47 @@ class METADBTestCase(APITestCase):
         self.client.force_authenticate(user)  # type: ignore
         return user
 
-    def setup_approved_user(self, username, institute):
+    def setup_approved_user(self, username, site):
         response = self.client.post(
             "/accounts/register/",
             data={
                 "username": username,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
-                "institute": institute,
+                "site": site,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
-        user.is_institute_approved = True
+        user.is_site_approved = True
         self.client.force_authenticate(user)  # type: ignore
         return user
 
-    def setup_authority_user(self, username, institute):
+    def setup_authority_user(self, username, site):
         response = self.client.post(
             "/accounts/register/",
             data={
                 "username": username,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
-                "institute": institute,
+                "site": site,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
-        user.is_institute_approved = True
-        user.is_institute_authority = True
+        user.is_site_approved = True
+        user.is_site_authority = True
         self.client.force_authenticate(user)  # type: ignore
         return user
 
-    def setup_admin_user(self, username, institute):
+    def setup_admin_user(self, username, site):
         response = self.client.post(
             "/accounts/register/",
             data={
                 "username": username,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
-                "institute": institute,
+                "site": site,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -101,14 +101,14 @@ class METADBTestCase(APITestCase):
         return results
 
 
-def get_covid_data(institute):
+def get_covid_data(site):
     sender_sample_id = f"S-{secrets.token_hex(3).upper()}"
     run_name = f"R-{'.'.join([str(random.randint(0, 9)) for _ in range(9)])}"
     pathogen_dict = {
         "sender_sample_id": sender_sample_id,
         "run_name": run_name,
         "pathogen_code": "COVID",
-        "institute": institute,
+        "site": site,
         "fasta_path": f"{sender_sample_id}.{run_name}.fasta",
         "bam_path": f"{sender_sample_id}.{run_name}.bam",
         "is_external": random.choice([True, False]),

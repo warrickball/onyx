@@ -6,7 +6,7 @@ from model_utils.fields import MonitorField
 from utils.fields import LowerCharField
 
 
-class Institute(models.Model):
+class Site(models.Model):
     code = LowerCharField(max_length=10, unique=True)
     name = models.CharField(max_length=100, unique=True)
 
@@ -36,8 +36,8 @@ class User(AbstractUser):
             "unique": _("A user with that email already exists."),
         },
     )
-    institute = models.ForeignKey("Institute", on_delete=models.CASCADE)
-    is_institute_approved = models.BooleanField(default=False)
-    date_institute_approved = models.DateTimeField(null=True)
+    site = models.ForeignKey("Site", on_delete=models.CASCADE)
+    is_site_approved = models.BooleanField(default=False)
+    date_site_approved = models.DateTimeField(null=True)
     is_admin_approved = models.BooleanField(default=False)
-    is_institute_authority = models.BooleanField(default=False)
+    is_site_authority = models.BooleanField(default=False)

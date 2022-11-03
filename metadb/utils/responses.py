@@ -44,11 +44,11 @@ class Responses:
     )
 
     # Forbidden
-    _403_different_institute = Response(
-        {"detail": "cannot approve this user. they belong to a different institute"},
+    _403_different_site = Response(
+        {"detail": "cannot approve this user. they belong to a different site"},
         status=status.HTTP_403_FORBIDDEN,
     )
-    _403_incorrect_institute_for_user = Response(
-        {"detail": "provided institute code does not match user's institute code"},
+    _403_incorrect_site_for_user = Response(
+        {"detail": "provided site code does not match user's site code"},
         status=status.HTTP_403_FORBIDDEN,
     )

@@ -16,12 +16,12 @@ from .models import Pathogen
 from accounts.permissions import (
     IsAuthenticated,
     IsActiveUser,
-    IsActiveInstitute,
-    IsInstituteApproved,
+    IsActiveSite,
+    IsSiteApproved,
     IsAdminApproved,
-    IsInstituteAuthority,
+    IsSiteAuthority,
     IsAdminUser,
-    IsSameInstituteAsUnsuppressedCID,
+    IsSameSiteAsUnsuppressedCID,
 )
 from utils.views import METADBAPIView
 from utils.responses import METADBAPIResponse
@@ -99,9 +99,9 @@ def enforce_field_set(data, accepted_fields, rejected_fields):
 class PathogenCodeView(METADBAPIView):
     permission_classes = [
         IsAuthenticated,
-        IsActiveInstitute,
+        IsActiveSite,
         IsActiveUser,
-        ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
+        ([IsSiteApproved, IsAdminApproved], IsAdminUser),
     ]
 
     def get(self, request):
@@ -137,7 +137,7 @@ class CreateGetPathogenView(METADBAPIView):
             # Creating data requires being an admin user
             permission_classes = [
                 IsAuthenticated,
-                IsActiveInstitute,
+                IsActiveSite,
                 IsActiveUser,
                 IsAdminUser,
             ]
@@ -145,9 +145,9 @@ class CreateGetPathogenView(METADBAPIView):
             # Getting data requires being an authenticated, approved user (or an admin)
             permission_classes = [
                 IsAuthenticated,
-                IsActiveInstitute,
+                IsActiveSite,
                 IsActiveUser,
-                ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
+                ([IsSiteApproved, IsAdminApproved], IsAdminUser),
             ]
         return permission_classes
 
@@ -359,9 +359,9 @@ def get_query(data):
 class QueryPathogenView(METADBAPIView):
     permission_classes = [
         IsAuthenticated,
-        IsActiveInstitute,
+        IsActiveSite,
         IsActiveUser,
-        ([IsInstituteApproved, IsAdminApproved], IsAdminUser),
+        ([IsSiteApproved, IsAdminApproved], IsAdminUser),
     ]
 
     def post(self, request, pathogen_code):
@@ -399,14 +399,14 @@ class QueryPathogenView(METADBAPIView):
 class UpdateSuppressPathogenView(METADBAPIView):
     permission_classes = [
         IsAuthenticated,
-        IsActiveInstitute,
+        IsActiveSite,
         IsActiveUser,
         (
             [
-                IsInstituteApproved,
+                IsSiteApproved,
                 IsAdminApproved,
-                IsInstituteAuthority,
-                IsSameInstituteAsUnsuppressedCID,
+                IsSiteAuthority,
+                IsSameSiteAsUnsuppressedCID,
             ],
             IsAdminUser,
         ),
@@ -533,7 +533,7 @@ class UpdateSuppressPathogenView(METADBAPIView):
 class DeletePathogenView(METADBAPIView):
     permission_classes = [
         IsAuthenticated,
-        IsActiveInstitute,
+        IsActiveSite,
         IsActiveUser,
         IsAdminUser,
     ]

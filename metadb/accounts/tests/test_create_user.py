@@ -1,11 +1,11 @@
 from rest_framework.test import APITestCase
 from rest_framework import status
-from accounts.models import User, Institute
+from accounts.models import User, Site
 
 
 class TestCreateUser(APITestCase):
     def setUp(self):
-        self.institute = Institute.objects.create(
+        self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
         )
 
@@ -16,7 +16,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-tom",
                 "password": "pass123456",
                 "email": "tom@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -29,7 +29,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-tom",
                 "password": "pass123456",
                 "email": "jerry@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -41,7 +41,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-tom",
                 "password": "pass123456",
                 "email": "tom@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -54,7 +54,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-tom",
                 "password": "pass123456",
                 "email": "jerry@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -66,7 +66,7 @@ class TestCreateUser(APITestCase):
                 "username": "TeSt-ToM",
                 "password": "pass123456",
                 "email": "tom@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -82,7 +82,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-tom",
                 "password": "pass123456",
                 "email": "tom@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -94,7 +94,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-jerry",
                 "password": "pass123456",
                 "email": "tom@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -107,7 +107,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-tom",
                 "password": "pass123456",
                 "email": "tom@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -119,7 +119,7 @@ class TestCreateUser(APITestCase):
                 "username": "test-jerry",
                 "password": "pass123456",
                 "email": "ToM@test.com",
-                "institute": self.institute.code,
+                "site": self.site.code,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -141,20 +141,20 @@ class TestCreateUser(APITestCase):
                     "username": user,
                     "password": "pass123456",
                     "email": email,
-                    "institute": self.institute.code,
+                    "site": self.site.code,
                 },
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             self.assertFalse(User.objects.filter(username=user).exists())
 
-    def test_create_user_invalid_institute(self):
+    def test_create_user_invalid_site(self):
         response = self.client.post(
             "/accounts/register/",
             data={
                 "username": "test-jerry",
                 "password": "pass123456",
                 "email": "jerry@test.com",
-                "institute": "NOTAPLACE",
+                "site": "NOTAPLACE",
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -165,7 +165,7 @@ class TestCreateUser(APITestCase):
             "username": "test-jerry",
             "password": "pass123456",
             "email": "jerry@test.com",
-            "institute": self.institute.code,
+            "site": self.site.code,
         }
         for i, key in enumerate(data):
             data_ = dict(data)
@@ -184,7 +184,7 @@ class TestCreateUser(APITestCase):
     def test_create_user_bad_password(self):
         data = {
             "username": "jerrymeister",
-            "institute": self.institute.code,
+            "site": self.site.code,
         }
         # According to django... bad passwords are:
         # Less than 8 characters

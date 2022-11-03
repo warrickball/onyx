@@ -15,7 +15,7 @@ def register(client):
     first_name = utils.get_input("first name")
     last_name = utils.get_input("last name")
     email = utils.get_input("email address")
-    institute = utils.get_input("institute code")
+    site = utils.get_input("site code")
 
     match = False
     while not match:
@@ -30,7 +30,7 @@ def register(client):
         first_name=first_name,
         last_name=last_name,
         email=email,
-        institute=institute,
+        site=site,
         password=password,  # type: ignore
     )
 
@@ -222,35 +222,33 @@ class ConfigCommands:
             print(user)
 
 
-class InstituteCommands:
+class SiteCommands:
     """
-    Institute specific commands.
+    Site specific commands.
     """
 
     @classmethod
     def add_commands(cls, command, user_parser):
-        institute_parser = command.add_parser(
-            "institute", help="Institute-specific commands."
-        )
-        institute_commands_parser = institute_parser.add_subparsers(
-            dest="institute_command", metavar="{institute-command}"
+        site_parser = command.add_parser("site", help="Site-specific commands.")
+        site_commands_parser = site_parser.add_subparsers(
+            dest="site_command", metavar="{site-command}"
         )
 
-        institute_approve_parser = institute_commands_parser.add_parser(
+        site_approve_parser = site_commands_parser.add_parser(
             "approve", parents=[user_parser], help="Approve another user in metadb."
         )
-        institute_approve_parser.add_argument("username", help="User to be approved.")
+        site_approve_parser.add_argument("username", help="User to be approved.")
 
-        institute_waiting_parser = institute_commands_parser.add_parser(
+        site_waiting_parser = site_commands_parser.add_parser(
             "list-waiting",
             parents=[user_parser],
-            help="List users waiting for institute approval.",
+            help="List users waiting for site approval.",
         )
 
-        institute_list_users_parser = institute_commands_parser.add_parser(
+        site_list_users_parser = site_commands_parser.add_parser(
             "list-users",
             parents=[user_parser],
-            help="List institute users.",
+            help="List site users.",
         )
 
     @classmethod
@@ -258,23 +256,23 @@ class InstituteCommands:
         """
         Approve another user.
         """
-        approval = client.institute_approve(username)
+        approval = client.site_approve(username)
         utils.print_response(approval)
 
     @classmethod
     def list_waiting(cls, client):
         """
-        List users waiting for institute approval.
+        List users waiting for site approval.
         """
-        users = client.institute_list_waiting()
+        users = client.site_list_waiting()
         utils.print_response(users)
 
     @classmethod
     def list_users(cls, client):
         """
-        List institute users.
+        List site users.
         """
-        users = client.institute_list_users()
+        users = client.site_list_users()
         utils.print_response(users)
 
 
@@ -592,15 +590,15 @@ def run(args):
                 elif args.admin_command == "list-users":
                     AdminCommands.list_users(client)
 
-            elif args.command == "institute":
-                if args.institute_command == "approve":
-                    InstituteCommands.approve(client, args.username)
+            elif args.command == "site":
+                if args.site_command == "approve":
+                    SiteCommands.approve(client, args.username)
 
-                elif args.institute_command == "list-waiting":
-                    InstituteCommands.list_waiting(client)
+                elif args.site_command == "list-waiting":
+                    SiteCommands.list_waiting(client)
 
-                elif args.institute_command == "list-users":
-                    InstituteCommands.list_users(client)
+                elif args.site_command == "list-users":
+                    SiteCommands.list_users(client)
 
             elif args.command == "logout":
                 logout(client)
@@ -669,7 +667,7 @@ def get_args():
 
     ConfigCommands.add_commands(command)
 
-    InstituteCommands.add_commands(command, user_parser=user_parser)
+    SiteCommands.add_commands(command, user_parser=user_parser)
 
     AdminCommands.add_commands(command, user_parser=user_parser)
 

@@ -3,7 +3,7 @@ from ...models import User
 
 
 class Command(base.BaseCommand):
-    help = "Grant/revoke a user's ability to approve other users within their site."
+    help = "Grant/revoke admin approval of a user."
 
     def add_arguments(self, parser):
         parser.add_argument("username")
@@ -16,9 +16,9 @@ class Command(base.BaseCommand):
         action = options["action"]
 
         user = User.objects.get(username=username)
-        user.is_site_authority = action
-        user.save(update_fields=["is_site_authority"])
+        user.is_admin_approved = action
+        user.save(update_fields=["is_admin_approved"])
 
-        user = User.objects.get(username=options["username"])
+        user = User.objects.get(username=username)
         print("User:", user.username)
-        print("is_site_authority:", user.is_site_authority)
+        print("is_admin_approved:", user.is_admin_approved)

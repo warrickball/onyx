@@ -1,0 +1,2 @@
+[console_scripts]
+metadb = metadbclient.cli:main
