@@ -83,7 +83,7 @@ class TestCreatePathogen(METADBTestCase):
     def test_create_missing_fields(self):
         for x in self.covid_data:
             for field in [
-                "sender_sample_id",
+                "sample_id",
                 "run_name",
                 "site",
                 "fasta_path",
@@ -98,7 +98,7 @@ class TestCreatePathogen(METADBTestCase):
     def test_create_empty_values(self):
         for x in self.covid_data:
             for field in [
-                "sender_sample_id",
+                "sample_id",
                 "run_name",
                 "site",
                 "fasta_path",
@@ -227,7 +227,7 @@ class TestCreatePathogen(METADBTestCase):
             x_ = dict(x)
             coin = random.randint(0, 1)
             if coin:
-                x_["sender_sample_id"] = f"S-{secrets.token_hex(4)}"
+                x_["sample_id"] = f"S-{secrets.token_hex(4)}"
             else:
                 x_["run_name"] = f"R-{secrets.token_hex(9)}"
             response = self.client.post("/data/covid/", data=x_)

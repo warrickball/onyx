@@ -48,11 +48,11 @@ class TestEnforceOptionalValueGroups(APITestCase):
 
 class TestEnforceFieldSet(APITestCase):
     def setUp(self):
-        self.accepted_fields = ["cid", "sender_sample_id", "run_name"]
+        self.accepted_fields = ["cid", "sample_id", "run_name"]
         self.rejected_fields = ["id", "created"]
 
     def test_enforce_field_set_ok(self):
-        data = {"cid": "C-123456", "sender_sample_id": "S-123456"}
+        data = {"cid": "C-123456", "sample_id": "S-123456"}
 
         self.assertEqual(
             enforce_field_set(
@@ -64,11 +64,11 @@ class TestEnforceFieldSet(APITestCase):
         )
 
     def test_enforce_field_set_fail(self):
-        accepted_fields = ["cid", "sender_sample_id", "run_name"]
+        accepted_fields = ["cid", "sample_id", "run_name"]
         rejected_fields = ["id", "created"]
         data = {
             "cid": "C-123456",
-            "sender_sample_id": "S-123456",
+            "sample_id": "S-123456",
             "id": 5,
             "created": "2022-01-01",
             "hi": "HELLO!!!!",

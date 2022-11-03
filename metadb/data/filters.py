@@ -1,6 +1,6 @@
 from django_filters import rest_framework as filters
 from django.db import models
-from utils.fields import YearMonthField
+from utils.fields import YearMonthField, LowerCharField
 from distutils.util import strtobool
 
 
@@ -157,7 +157,7 @@ class METADBFilter(filters.FilterSet):
                         field_name=field, choices=choices, lookup_expr=lookup
                     )
 
-                if field_type in [models.CharField, models.TextField]:
+                if field_type in [LowerCharField, models.CharField, models.TextField]:
                     for lookup in CHAR_LOOKUPS:
                         self.filters[filter_name + "__" + lookup] = filters.CharFilter(
                             field_name=field, lookup_expr=lookup
@@ -194,13 +194,13 @@ class METADBFilter(filters.FilterSet):
                         field_name=field, lookup_expr=lookup, model=pathogen_model
                     )
 
-                if field_type in [models.CharField, models.TextField]:
+                if field_type in [LowerCharField, models.CharField, models.TextField]:
                     for lookup in CHAR_LOOKUPS:
                         self.filters[filter_name + "__" + lookup] = filters.CharFilter(
                             field_name=field, lookup_expr=lookup
                         )
 
-            elif field_type in [models.CharField, models.TextField]:
+            elif field_type in [LowerCharField, models.CharField, models.TextField]:
                 self.filters[filter_name] = filters.CharFilter(field_name=field)
                 self.filters[filter_name + "__in"] = CharInFilter(
                     field_name=field, lookup_expr="in"

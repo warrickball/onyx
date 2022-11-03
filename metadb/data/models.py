@@ -60,35 +60,32 @@ class Pathogen(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     suppressed = models.BooleanField(default=False)
-    published_date = models.DateField(auto_now_add=True)
 
     pathogen_code = models.ForeignKey("PathogenCode", on_delete=models.CASCADE)
     site = models.ForeignKey("accounts.Site", on_delete=models.CASCADE)
-
     cid = models.CharField(default=generate_cid, max_length=12, unique=True)
-    sender_sample_id = models.CharField(
-        max_length=24, validators=[MinLengthValidator(8)]
-    )
-    collection_month = YearMonthField(null=True)
-    received_month = YearMonthField(null=True)
-
+    sample_id = models.CharField(max_length=24, validators=[MinLengthValidator(8)])
     run_name = models.CharField(max_length=96, validators=[MinLengthValidator(18)])
+
+    collection_month = YearMonthField(null=True)
+    received_month = YearMonthField()
+    published_date = models.DateField(auto_now_add=True)
+
     fasta_path = models.TextField()
     bam_path = models.TextField()
-    is_external = models.BooleanField()
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["sender_sample_id", "run_name", "pathogen_code"],
-                name="sample_run_pathogen_unique_together",
+                fields=["pathogen_code", "sample_id", "run_name"],
+                name="pathogen_sample_run_unique_together",
             )
         ]
         indexes = [
             models.Index(fields=["cid"]),
-            models.Index(fields=["sender_sample_id"]),
+            models.Index(fields=["sample_id"]),
             models.Index(fields=["run_name"]),
-            models.Index(fields=["sender_sample_id", "run_name"]),
+            models.Index(fields=["sample_id", "run_name"]),
             models.Index(fields=["collection_month"]),
             models.Index(fields=["received_month"]),
             models.Index(fields=["published_date"]),
@@ -99,23 +96,19 @@ class Pathogen(models.Model):
         "created": ["hidden"],
         "last_modified": ["hidden"],
         "suppressed": ["hidden"],
-        "cid": ["no create", "no update"],
-        "sender_sample_id": ["create", "no update"],
-        "run_name": ["create", "no update"],
         "pathogen_code": ["create", "no update"],
         "site": ["create", "no update"],
+        "cid": ["no create", "no update"],
+        "sample_id": ["create", "no update"],
+        "run_name": ["create", "no update"],
+        "collection_month": ["create", "update"],
+        "received_month": ["create", "update"],
         "published_date": ["no create", "no update"],
         "fasta_path": ["create", "update"],
         "bam_path": ["create", "update"],
-        "is_external": ["create", "update"],
-        "collection_month": ["create", "update"],
-        "received_month": ["create", "update"],
     }
 
     FILTER_FIELDS = {
-        "cid": {"type": models.CharField},
-        "sender_sample_id": {"type": models.CharField},
-        "run_name": {"type": models.CharField},
         "pathogen_code__code": {
             "type": models.CharField,
             "db_choices": True,
@@ -128,15 +121,17 @@ class Pathogen(models.Model):
             "alias": "site",
             "root_field": "site",
         },
+        "cid": {"type": models.CharField},
+        "sample_id": {"type": models.CharField},
+        "run_name": {"type": models.CharField},
+        "collection_month": {"type": YearMonthField},
+        "received_month": {"type": YearMonthField},
         "published_date": {"type": models.DateField},
         "fasta_path": {"type": models.TextField},
         "bam_path": {"type": models.TextField},
-        "is_external": {"type": models.BooleanField},
-        "collection_month": {"type": YearMonthField},
-        "received_month": {"type": YearMonthField},
     }
 
-    OPTIONAL_VALUE_GROUPS = [["collection_month", "received_month"]]
+    OPTIONAL_VALUE_GROUPS = []
 
     # loop through user groups
     # loop through site groups
@@ -242,19 +237,16 @@ class Pathogen(models.Model):
     @classmethod
     def get_serializer(cls, user):
         class PathogenSerializer(serializers.ModelSerializer):
-
-            collection_month = fieldserializers.YearMonthField(
-                required=False, allow_null=True
-            )
-            received_month = fieldserializers.YearMonthField(
-                required=False, allow_null=True
+            pathogen_code = serializers.SlugRelatedField(
+                queryset=PathogenCode.objects.all(), slug_field="code"
             )
             site = serializers.SlugRelatedField(
                 queryset=Site.objects.all(), slug_field="code"
             )
-            pathogen_code = serializers.SlugRelatedField(
-                queryset=PathogenCode.objects.all(), slug_field="code"
+            collection_month = fieldserializers.YearMonthField(
+                required=False, allow_null=True
             )
+            received_month = fieldserializers.YearMonthField()
 
             class Meta:
                 model = cls
@@ -318,7 +310,59 @@ class Pathogen(models.Model):
 
 
 class Mpx(Pathogen):
-    fasta_header = models.CharField(max_length=100)
+    sample_type = LowerCharField(
+        max_length=50, choices=[("swab", "swab"), ("serum", "serum")]
+    )
+    sample_site = LowerCharField(
+        max_length=50, choices=[("sore", "sore"), ("genital", "genital")], null=True
+    )
+    patient_ageband = LowerCharField(
+        max_length=50,
+        choices=[
+            ("0-5", "0-5"),
+            ("6-10", "6-10"),
+            ("11-15", "11-15"),
+            ("16-20", "16-20"),
+            ("21-25", "21-25"),
+            ("26-30", "26-30"),
+            ("31-35", "31-35"),
+            ("36-40", "36-40"),
+            ("41-45", "41-45"),
+            ("46-50", "46-50"),
+            ("51-55", "51-55"),
+            ("56-60", "56-60"),
+            ("61-65", "61-65"),
+            ("66-70", "66-70"),
+            ("71-75", "71-75"),
+            ("76-80", "76-80"),
+            ("81-85", "81-85"),
+            ("86-90", "86-90"),
+            ("91-95", "91-95"),
+            ("96-100", "96-100"),
+            ("100+", "100+"),
+        ],
+        null=True,
+    )
+    country = LowerCharField(
+        max_length=50,
+        choices=[
+            ("eng", "eng"),
+            ("wales", "wales"),
+            ("scot", "scot"),
+            ("ni", "ni"),
+        ],
+    )
+    da_region = LowerCharField(
+        max_length=50, choices=[("phe", "phe"), ("phw", "phw"), ("other", "other")]
+    )
+    outer_postcode = models.CharField(
+        max_length=5, validators=[MinLengthValidator(3)], null=True
+    )
+    epi_cluster = models.TextField(null=True)
+    travel_status = LowerCharField(
+        max_length=50, choices=[("yes", "yes"), ("no", "no")], null=True
+    )
+    patient_id = models.TextField()
     seq_platform = LowerCharField(
         max_length=50,
         choices=[
@@ -328,23 +372,133 @@ class Mpx(Pathogen):
             ("ion_torrent", "ion_torrent"),
         ],
     )
+    instrument_model = models.TextField()
+    seq_protocol = models.TextField()
+    run_layout = LowerCharField(
+        max_length=50, choices=[("single", "single"), ("paired", "paired")]
+    )
+    enrichment_method = LowerCharField(
+        max_length=50,
+        choices=[
+            ("other", "other"),
+            ("pcr", "pcr"),
+            ("random", "random"),
+            ("random_pcr", "random_pcr"),
+            ("none", "none"),
+        ],
+    )
+    source_of_library = LowerCharField(
+        max_length=50,
+        choices=[
+            ("genomic", "genomic"),
+            ("metagenomic", "metagenomic"),
+            ("metatranscriptomic", "metatranscriptomic"),
+            ("other", "other"),
+            ("transcriptomic", "transcriptomic"),
+            ("viral_rna", "viral_rna"),
+        ],
+        null=True,
+    )
+    seq_strategy = LowerCharField(
+        max_length=50,
+        choices=[
+            ("amplicon", "amplicon"),
+            ("other", "other"),
+            ("targeted_capture", "targeted_capture"),
+            ("wga", "wga"),
+            ("wgs", "wgs"),
+        ],
+    )
+    bioinfo_pipe_name = models.TextField()
+    bioinfo_pipe_version = models.TextField()
+    csv_template_version = models.TextField()
 
     FIELD_PERMISSIONS = Pathogen.FIELD_PERMISSIONS | {
-        "fasta_header": ["create", "update"],
+        "sample_type": ["create", "update"],
+        "sample_site": ["create", "update"],
+        "patient_ageband": ["create", "update"],
+        "country": ["create", "update"],
+        "da_region": ["create", "update"],
+        "outer_postcode": ["create", "update"],
+        "epi_cluster": ["create", "update"],
+        "travel_status": ["create", "update"],
+        "patient_id": ["create", "update"],
         "seq_platform": ["create", "update"],
+        "instrument_model": ["create", "update"],
+        "seq_protocol": ["create", "update"],
+        "run_layout": ["create", "update"],
+        "enrichment_method": ["create", "update"],
+        "source_library": ["create", "update"],
+        "seq_strategy": ["create", "update"],
+        "bioinfo_pipe_name": ["create", "update"],
+        "bioinfo_pipe_version": ["create", "update"],
+        "csv_template_version": ["hidden", "create", "no update"],
     }
 
     FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
-        "fasta_header": {"type": models.CharField},
-        "seq_platform": {"type": models.CharField, "choices": True},
+        "sample_type": {"type": LowerCharField, "choices": True},
+        "sample_site": {"type": LowerCharField, "choices": True},
+        "patient_ageband": {"type": LowerCharField, "choices": True},
+        "country": {"type": LowerCharField, "choices": True},
+        "da_region": {"type": LowerCharField, "choices": True},
+        "outer_postcode": {"type": models.CharField},
+        "epi_cluster": {"type": models.TextField},
+        "travel_status": {"type": LowerCharField, "choices": True},
+        "patient_id": {"type": models.TextField},
+        "seq_platform": {"type": LowerCharField, "choices": True},
+        "instrument_model": {"type": models.TextField},
+        "seq_protocol": {"type": models.TextField},
+        "run_layout": {"type": LowerCharField, "choices": True},
+        "enrichment_method": {"type": LowerCharField, "choices": True},
+        "source_of_library": {"type": LowerCharField, "choices": True},
+        "seq_strategy": {"type": LowerCharField, "choices": True},
+        "bioinfo_pipe_name": {"type": models.TextField},
+        "bioinfo_pipe_version": {"type": models.TextField},
     }
 
     @classmethod
     def get_serializer(cls, user):
         class MpxSerializer(super().get_serializer(user)):
-
+            sample_type = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("sample_type").choices
+            )
+            sample_site = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("sample_site").choices,
+                required=False,
+                allow_null=True,
+            )
+            patient_ageband = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("patient_ageband").choices,
+                required=False,
+                allow_null=True,
+            )
+            country = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("country").choices,
+            )
+            da_region = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("da_region").choices,
+            )
+            travel_status = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("travel_status").choices,
+                required=False,
+                allow_null=True,
+            )
             seq_platform = fieldserializers.LowerChoiceField(
                 choices=Mpx._meta.get_field("seq_platform").choices
+            )
+            run_layout = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("run_layout").choices
+            )
+            enrichment_method = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("enrichment_method").choices
+            )
+            source_of_library = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("source_of_library").choices,
+                required=False,
+                allow_null=True,
+            )
+            seq_strategy = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("seq_strategy").choices
             )
 
             class Meta:
@@ -355,29 +509,9 @@ class Mpx(Pathogen):
 
 
 class Covid(Pathogen):
-    fasta_header = models.CharField(max_length=100)
-    sample_type = LowerCharField(
-        max_length=50, choices=[("swab", "swab"), ("serum", "serum")]
-    )
-
-    FIELD_PERMISSIONS = Pathogen.FIELD_PERMISSIONS | {
-        "fasta_header": ["create", "update"],
-        "sample_type": ["create", "update"],
-    }
-
-    FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
-        "fasta_header": {"type": models.CharField},
-        "sample_type": {"type": models.CharField, "choices": True},
-    }
-
     @classmethod
     def get_serializer(cls, user):
         class CovidSerializer(super().get_serializer(user)):
-
-            sample_type = fieldserializers.LowerChoiceField(
-                choices=Covid._meta.get_field("sample_type").choices
-            )
-
             class Meta:
                 model = cls
                 fields = cls.user_fields(user)

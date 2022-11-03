@@ -117,7 +117,7 @@ class TestUpdatePathogen(METADBTestCase):
     def test_update_rejected_fields(self):
         non_updaters = {
             "cid": f"C.{secrets.token_hex(3)}",
-            "sender_sample_id": f"S.{secrets.token_hex(3)}",
+            "sample_id": f"S.{secrets.token_hex(3)}",
             "run_name": f"R.{secrets.token_hex(9)}",
             "pathogen_code": "MPX",
             "published_date": "2022-01-01",
@@ -142,7 +142,7 @@ class TestUpdatePathogen(METADBTestCase):
     def test_update_unknown_and_rejected_fields(self):
         non_updaters = {
             "cid": f"C.{secrets.token_hex(3)}",
-            "sender_sample_id": f"S.{secrets.token_hex(3)}",
+            "sample_id": f"S.{secrets.token_hex(3)}",
             "run_name": f"R.{secrets.token_hex(9)}",
             "pathogen_code": "MPX",
             "published_date": "2022-01-01",
