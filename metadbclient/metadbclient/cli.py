@@ -8,10 +8,13 @@ from metadbclient.config import Config
 from metadbclient.api import Client
 
 
-def register(client):
+def register():
     """
     Create a new user.
     """
+    config = Config()
+    client = Client(config)
+
     first_name = utils.get_input("first name")
     last_name = utils.get_input("last name")
     email = utils.get_input("email address")
@@ -54,10 +57,13 @@ def register(client):
             print("The user has been added to the config.")
 
 
-def login(client, username, env_password):
+def login(username, env_password):
     """
     Log in as a user.
     """
+    config = Config()
+    client = Client(config)
+
     response = client.login(
         username=username,
         env_password=env_password,
@@ -65,26 +71,38 @@ def login(client, username, env_password):
     utils.print_response(response, status_only=True)
 
 
-def logout(client):
+def logout(username, env_password):
     """
     Log out the current user.
     """
+    config = Config()
+    client = Client(config)
+    client.continue_session(username=username, env_password=env_password)
+
     response = client.logout()
     utils.print_response(response, status_only=True)
 
 
-def logoutall(client):
+def logoutall(username, env_password):
     """
     Log out the current user everywhere.
     """
+    config = Config()
+    client = Client(config)
+    client.continue_session(username=username, env_password=env_password)
+
     response = client.logoutall()
     utils.print_response(response, status_only=True)
 
 
-def list_pathogen_codes(client):
+def list_pathogen_codes(username, env_password):
     """
     Get the current pathogens within the database.
     """
+    config = Config()
+    client = Client(config)
+    client.continue_session(username=username, env_password=env_password)
+
     pathogen_codes = client.list_pathogen_codes()
     utils.print_response(pathogen_codes)
 
@@ -93,6 +111,9 @@ class ConfigCommands:
     """
     Commands involving creation/altering of the config.
     """
+
+    def __init__(self):
+        self.config = Config()
 
     @classmethod
     def add_commands(cls, command):
@@ -188,36 +209,32 @@ class ConfigCommands:
             print(line)
         print("".center(settings.MESSAGE_BAR_WIDTH, "!"))
 
-    @classmethod
-    def set_default_user(cls, config, username):
+    def set_default_user(self, username):
         """
         Set the default user in the config.
         """
-        config.set_default_user(username)
+        self.config.set_default_user(username)
         print(f"The user has been set as the default user.")
 
-    @classmethod
-    def get_default_user(cls, config):
+    def get_default_user(self):
         """
         Get the default user in the config.
         """
-        default_user = config.get_default_user()
+        default_user = self.config.get_default_user()
         print(default_user)
 
-    @classmethod
-    def add_user(cls, config, username):
+    def add_user(self, username):
         """
         Add user to the config.
         """
-        config.add_user(username)
+        self.config.add_user(username)
         print("The user has been added to the config.")
 
-    @classmethod
-    def list_users(cls, config):
+    def list_users(self):
         """
         List all users in the config.
         """
-        users = config.list_users()
+        users = self.config.list_users()
         for user in users:
             print(user)
 
@@ -226,6 +243,11 @@ class SiteCommands:
     """
     Site specific commands.
     """
+
+    def __init__(self, username, env_password):
+        config = Config()
+        self.client = Client(config)
+        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -251,28 +273,25 @@ class SiteCommands:
             help="List site users.",
         )
 
-    @classmethod
-    def approve(cls, client, username):
+    def approve(self, username):
         """
         Approve another user.
         """
-        approval = client.site_approve(username)
+        approval = self.client.site_approve(username)
         utils.print_response(approval)
 
-    @classmethod
-    def list_waiting(cls, client):
+    def list_waiting(self):
         """
         List users waiting for site approval.
         """
-        users = client.site_list_waiting()
+        users = self.client.site_list_waiting()
         utils.print_response(users)
 
-    @classmethod
-    def list_users(cls, client):
+    def list_users(self):
         """
         List site users.
         """
-        users = client.site_list_users()
+        users = self.client.site_list_users()
         utils.print_response(users)
 
 
@@ -280,6 +299,11 @@ class AdminCommands:
     """
     Admin specific commands.
     """
+
+    def __init__(self, username, env_password):
+        config = Config()
+        self.client = Client(config)
+        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -305,28 +329,25 @@ class AdminCommands:
             "list-users", parents=[user_parser], help="List all users in metadb."
         )
 
-    @classmethod
-    def approve(cls, client, username):
+    def approve(self, username):
         """
         Admin-approve another user.
         """
-        approval = client.admin_approve(username)
+        approval = self.client.admin_approve(username)
         utils.print_response(approval)
 
-    @classmethod
-    def list_waiting(cls, client):
+    def list_waiting(self):
         """
         List users waiting for admin approval.
         """
-        users = client.admin_list_waiting()
+        users = self.client.admin_list_waiting()
         utils.print_response(users)
 
-    @classmethod
-    def list_users(cls, client):
+    def list_users(self):
         """
         List all users.
         """
-        users = client.admin_list_users()
+        users = self.client.admin_list_users()
         utils.print_response(users)
 
 
@@ -334,6 +355,11 @@ class CreateCommands:
     """
     Commands for creating.
     """
+
+    def __init__(self, username, env_password):
+        config = Config()
+        self.client = Client(config)
+        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -361,29 +387,26 @@ class CreateCommands:
         tsv_create_parser.add_argument("pathogen_code")
         tsv_create_parser.add_argument("tsv")
 
-    @classmethod
-    def create(cls, client, pathogen_code, fields):
+    def create(self, pathogen_code, fields):
         """
         Post a new pathogen record to the database.
         """
         fields = utils.construct_unique_fields_dict(fields)
-        creations = client.create(pathogen_code, fields=fields)
-        utils.execute_uploads(creations)
+        creation = self.client.create(pathogen_code, fields)
+        utils.print_response(creation)
 
-    @classmethod
-    def csv_create(cls, client, pathogen_code, csv_path):
+    def csv_create(self, pathogen_code, csv_path):
         """
         Post new pathogen records to the database, using a csv.
         """
-        creations = client.create(pathogen_code, csv_path=csv_path)
+        creations = self.client.csv_create(pathogen_code, csv_path)
         utils.execute_uploads(creations)
 
-    @classmethod
-    def tsv_create(cls, client, pathogen_code, tsv_path):
+    def tsv_create(self, pathogen_code, tsv_path):
         """
         Post new pathogen records to the database, using a tsv.
         """
-        creations = client.create(pathogen_code, csv_path=tsv_path, delimiter="\t")
+        creations = self.client.csv_create(pathogen_code, tsv_path, delimiter="\t")
         utils.execute_uploads(creations)
 
 
@@ -391,6 +414,11 @@ class GetCommands:
     """
     Commands for getting.
     """
+
+    def __init__(self, username, env_password):
+        config = Config()
+        self.client = Client(config)
+        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -403,14 +431,13 @@ class GetCommands:
             "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
         )
 
-    @classmethod
-    def get(cls, client, pathogen_code, cid, fields):
+    def get(self, pathogen_code, cid, fields):
         """
         Get pathogen records from the database.
         """
         fields = utils.construct_fields_dict(fields)
 
-        results = client.get(pathogen_code, cid, fields)
+        results = self.client.get(pathogen_code, cid, fields)
 
         result = next(results)
         if result.ok:
@@ -431,6 +458,11 @@ class UpdateCommands:
     """
     Commands for updating.
     """
+
+    def __init__(self, username, env_password):
+        config = Config()
+        self.client = Client(config)
+        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -461,29 +493,26 @@ class UpdateCommands:
         tsv_update_parser.add_argument("pathogen_code")
         tsv_update_parser.add_argument("tsv")
 
-    @classmethod
-    def update(cls, client, pathogen_code, cid, fields):
+    def update(self, pathogen_code, cid, fields):
         """
         Update a pathogen record in the database.
         """
         fields = utils.construct_unique_fields_dict(fields)
-        updates = client.update(pathogen_code, cid=cid, fields=fields)
-        utils.execute_uploads(updates)
+        update = self.client.update(pathogen_code, cid, fields)
+        utils.print_response(update)
 
-    @classmethod
-    def csv_update(cls, client, pathogen_code, csv_path):
+    def csv_update(self, pathogen_code, csv_path):
         """
         Update pathogen records in the database, using a csv.
         """
-        updates = client.update(pathogen_code, csv_path=csv_path)
+        updates = self.client.csv_update(pathogen_code, csv_path)
         utils.execute_uploads(updates)
 
-    @classmethod
-    def tsv_update(cls, client, pathogen_code, tsv_path):
+    def tsv_update(self, pathogen_code, tsv_path):
         """
         Update pathogen records in the database, using a tsv.
         """
-        updates = client.update(pathogen_code, csv_path=tsv_path, delimiter="\t")
+        updates = self.client.csv_update(pathogen_code, tsv_path, delimiter="\t")
         utils.execute_uploads(updates)
 
 
@@ -491,6 +520,11 @@ class SuppressCommands:
     """
     Commands for suppressing (soft deleting).
     """
+
+    def __init__(self, username, env_password):
+        config = Config()
+        self.client = Client(config)
+        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -522,122 +556,131 @@ class SuppressCommands:
         tsv_suppress_parser.add_argument("pathogen_code")
         tsv_suppress_parser.add_argument("tsv")
 
-    @classmethod
-    def suppress(cls, client, pathogen_code, cid):
+    def suppress(self, pathogen_code, cid):
         """
         Suppress a pathogen record in the database.
         """
-        suppressions = client.suppress(pathogen_code, cid=cid)
-        utils.execute_uploads(suppressions)
+        suppression = self.client.suppress(pathogen_code, cid)
+        utils.print_response(suppression)
 
-    @classmethod
-    def csv_suppress(cls, client, pathogen_code, csv_path):
+    def csv_suppress(self, pathogen_code, csv_path):
         """
         Suppress pathogen records in the database, using a csv.
         """
-        suppressions = client.suppress(pathogen_code, csv_path=csv_path)
+        suppressions = self.client.csv_suppress(pathogen_code, csv_path)
         utils.execute_uploads(suppressions)
 
-    @classmethod
-    def tsv_suppress(cls, client, pathogen_code, tsv_path):
+    def tsv_suppress(self, pathogen_code, tsv_path):
         """
         Suppress pathogen records in the database, using a tsv.
         """
-        suppressions = client.suppress(pathogen_code, csv_path=tsv_path, delimiter="\t")
+        suppressions = self.client.csv_suppress(pathogen_code, tsv_path, delimiter="\t")
         utils.execute_uploads(suppressions)
 
 
 def run(args):
     if args.command == "config":
-
         if args.config_command == "create":
             ConfigCommands.create()
         else:
-            config = Config()
-
+            config_commands = ConfigCommands()
             if args.config_command == "set-default-user":
-                ConfigCommands.set_default_user(config, args.username)
+                config_commands.set_default_user(args.username)
 
             elif args.config_command == "get-default-user":
-                ConfigCommands.get_default_user(config)
+                config_commands.get_default_user()
 
             elif args.config_command == "add-user":
-                ConfigCommands.add_user(config, args.username)
+                config_commands.add_user(args.username)
 
             elif args.config_command == "list-users":
-                ConfigCommands.list_users(config)
+                config_commands.list_users()
 
-    else:
-        config = Config()
-        client = Client(config)
+    elif args.command == "site":
+        site_commands = SiteCommands(
+            username=args.user,
+            env_password=args.env_password,
+        )
 
-        if args.command == "register":
-            register(client)
+        if args.site_command == "approve":
+            site_commands.approve(args.username)
 
-        elif args.command == "login":
-            login(client, args.user, args.env_password)
+        elif args.site_command == "list-waiting":
+            site_commands.list_waiting()
 
-        else:
-            client.continue_session(username=args.user, env_password=args.env_password)
+        elif args.site_command == "list-users":
+            site_commands.list_users()
 
-            if args.command == "admin":
-                if args.admin_command == "approve":
-                    AdminCommands.approve(client, args.username)
+    elif args.command == "admin":
+        admin_commands = AdminCommands(
+            username=args.user,
+            env_password=args.env_password,
+        )
 
-                elif args.admin_command == "list-waiting":
-                    AdminCommands.list_waiting(client)
+        if args.admin_command == "approve":
+            admin_commands.approve(args.username)
 
-                elif args.admin_command == "list-users":
-                    AdminCommands.list_users(client)
+        elif args.admin_command == "list-waiting":
+            admin_commands.list_waiting()
 
-            elif args.command == "site":
-                if args.site_command == "approve":
-                    SiteCommands.approve(client, args.username)
+        elif args.admin_command == "list-users":
+            admin_commands.list_users()
 
-                elif args.site_command == "list-waiting":
-                    SiteCommands.list_waiting(client)
+    elif args.command == "register":
+        register()
 
-                elif args.site_command == "list-users":
-                    SiteCommands.list_users(client)
+    elif args.command == "login":
+        login(args.user, args.env_password)
 
-            elif args.command == "logout":
-                logout(client)
+    elif args.command == "logout":
+        logout(args.user, args.env_password)
 
-            elif args.command == "logoutall":
-                logoutall(client)
+    elif args.command == "logoutall":
+        logoutall(args.user, args.env_password)
 
-            elif args.command == "list-pathogens":
-                list_pathogen_codes(client)
+    elif args.command == "list-pathogens":
+        list_pathogen_codes(args.user, args.env_password)
 
-            elif args.command == "create":
-                CreateCommands.create(client, args.pathogen_code, args.field)
+    elif args.command in ["create", "csv-create", "tsv-create"]:
+        create_commands = CreateCommands(args.user, args.env_password)
 
-            elif args.command == "csv-create":
-                CreateCommands.csv_create(client, args.pathogen_code, args.csv)
+        if args.command == "create":
+            create_commands.create(args.pathogen_code, args.field)
 
-            elif args.command == "tsv-create":
-                CreateCommands.tsv_create(client, args.pathogen_code, args.tsv)
+        elif args.command == "csv-create":
+            create_commands.csv_create(args.pathogen_code, args.csv)
 
-            elif args.command == "get":
-                GetCommands.get(client, args.pathogen_code, args.cid, args.field)
+        elif args.command == "tsv-create":
+            create_commands.tsv_create(args.pathogen_code, args.tsv)
 
-            elif args.command == "update":
-                UpdateCommands.update(client, args.pathogen_code, args.cid, args.field)
+    elif args.command == "get":
+        get_commands = GetCommands(args.user, args.env_password)
 
-            elif args.command == "csv-update":
-                UpdateCommands.csv_update(client, args.pathogen_code, args.csv)
+        get_commands.get(args.pathogen_code, args.cid, args.field)
 
-            elif args.command == "tsv-update":
-                UpdateCommands.tsv_update(client, args.pathogen_code, args.tsv)
+    elif args.command in ["update", "csv-update", "tsv-update"]:
+        update_commands = UpdateCommands(args.user, args.env_password)
 
-            elif args.command == "suppress":
-                SuppressCommands.suppress(client, args.pathogen_code, args.cid)
+        if args.command == "update":
+            update_commands.update(args.pathogen_code, args.cid, args.field)
 
-            elif args.command == "csv-suppress":
-                SuppressCommands.csv_suppress(client, args.pathogen_code, args.csv)
+        elif args.command == "csv-update":
+            update_commands.csv_update(args.pathogen_code, args.csv)
 
-            elif args.command == "tsv-suppress":
-                SuppressCommands.tsv_suppress(client, args.pathogen_code, args.tsv)
+        elif args.command == "tsv-update":
+            update_commands.tsv_update(args.pathogen_code, args.tsv)
+
+    elif args.command in ["suppress", "csv-suppress", "tsv-suppress"]:
+        suppress_commands = SuppressCommands(args.user, args.env_password)
+
+        if args.command == "suppress":
+            suppress_commands.suppress(args.pathogen_code, args.cid)
+
+        elif args.command == "csv-suppress":
+            suppress_commands.csv_suppress(args.pathogen_code, args.csv)
+
+        elif args.command == "tsv-suppress":
+            suppress_commands.tsv_suppress(args.pathogen_code, args.tsv)
 
 
 def get_args():

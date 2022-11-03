@@ -263,46 +263,42 @@ class Client:
         return response
 
     @utils.session_required
-    def create(self, pathogen_code, fields=None, csv_path=None, delimiter=None):
+    def create(self, pathogen_code, fields):
         """
-        Post new pathogen records to the database.
+        Post a pathogen record to the database.
         """
-        if (csv_path is not None) and (fields is not None):
-            raise Exception("Cannot provide both fields and csv_path")
+        response = self.request(
+            method=requests.post,
+            url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
+            json=fields,
+        )
+        return response
 
-        if (csv_path is None) and (fields is None):
-            raise Exception("Must provide either fields or csv_path")
-
-        if csv_path is not None:
-            if csv_path == "-":
-                csv_file = sys.stdin
-            else:
-                csv_file = open(csv_path)
-            try:
-                if delimiter is None:
-                    reader = csv.DictReader(csv_file)
-                else:
-                    reader = csv.DictReader(csv_file, delimiter=delimiter)
-
-                for record in reader:
-                    response = self.request(
-                        method=requests.post,
-                        url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-                        json=record,
-                    )
-                    yield response
-
-            finally:
-                if csv_file is not sys.stdin:
-                    csv_file.close()
-
+    @utils.session_required
+    def csv_create(self, pathogen_code, csv_path, delimiter=None):
+        """
+        Post a .csv or .tsv containing pathogen records to the database.
+        """
+        if csv_path == "-":
+            csv_file = sys.stdin
         else:
-            response = self.request(
-                method=requests.post,
-                url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
-                json=fields,
-            )
-            yield response
+            csv_file = open(csv_path)
+        try:
+            if delimiter is None:
+                reader = csv.DictReader(csv_file)
+            else:
+                reader = csv.DictReader(csv_file, delimiter=delimiter)
+
+            for record in reader:
+                response = self.request(
+                    method=requests.post,
+                    url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
+                    json=record,
+                )
+                yield response
+        finally:
+            if csv_file is not sys.stdin:
+                csv_file.close()
 
     @utils.session_required
     def get(self, pathogen_code, cid=None, fields=None, **kwargs):
@@ -369,105 +365,96 @@ class Client:
         return response
 
     @utils.session_required
-    def update(
-        self, pathogen_code, cid=None, fields=None, csv_path=None, delimiter=None
-    ):
+    def update(self, pathogen_code, cid, fields):
         """
-        Update pathogen records in the database.
+        Update a pathogen record in the database.
         """
-        if ((cid is not None) or (fields is not None)) and (csv_path is not None):
-            raise Exception("Cannot provide both cid/fields and csv_path")
-
-        if ((cid is None) or (fields is None)) and (csv_path is None):
-            raise Exception("Must provide either cid and fields, or csv_path")
-
-        if csv_path is not None:
-            if csv_path == "-":
-                csv_file = sys.stdin
-            else:
-                csv_file = open(csv_path)
-            try:
-                if delimiter is None:
-                    reader = csv.DictReader(csv_file)
-                else:
-                    reader = csv.DictReader(csv_file, delimiter=delimiter)
-
-                for record in reader:
-                    cid = record.pop("cid", None)
-                    if cid is None:
-                        raise KeyError("cid column must be provided")
-
-                    fields = record
-
-                    response = self.request(
-                        method=requests.patch,
-                        url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
-                        json=fields,
-                    )
-                    yield response
-            finally:
-                if csv_file is not sys.stdin:
-                    csv_file.close()
-
-        else:
-            response = self.request(
-                method=requests.patch,
-                url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
-                json=fields,
-            )
-            yield response
+        response = self.request(
+            method=requests.patch,
+            url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
+            json=fields,
+        )
+        return response
 
     @utils.session_required
-    def suppress(self, pathogen_code, cid=None, csv_path=None, delimiter=None):
+    def csv_update(self, pathogen_code, csv_path, delimiter=None):
         """
-        Suppress pathogen records in the database.
+        Use a .csv or .tsv to update pathogen records in the database.
         """
-        if (cid is not None) and (csv_path is not None):
-            raise Exception("Cannot provide both cid and csv_path")
-
-        if (cid is None) and (csv_path is None):
-            raise Exception("Must provide either cid or csv_path")
-
-        if csv_path is not None:
-            if csv_path == "-":
-                csv_file = sys.stdin
-            else:
-                csv_file = open(csv_path)
-            try:
-                if delimiter is None:
-                    reader = csv.DictReader(csv_file)
-                else:
-                    reader = csv.DictReader(csv_file, delimiter=delimiter)
-
-                for record in reader:
-                    cid = record.get("cid")
-
-                    if cid is None:
-                        raise KeyError("cid column must be provided")
-
-                    response = self.request(
-                        method=requests.delete,
-                        url=os.path.join(
-                            self.endpoints["data"], pathogen_code + "/", cid + "/"
-                        ),
-                    )
-                    yield response
-            finally:
-                if csv_file is not sys.stdin:
-                    csv_file.close()
-
+        if csv_path == "-":
+            csv_file = sys.stdin
         else:
-            response = self.request(
-                method=requests.delete,
-                url=os.path.join(
-                    self.endpoints["data"], pathogen_code + "/", cid + "/"  # type: ignore
-                ),
-            )
-            yield response
+            csv_file = open(csv_path)
+        try:
+            if delimiter is None:
+                reader = csv.DictReader(csv_file)
+            else:
+                reader = csv.DictReader(csv_file, delimiter=delimiter)
+
+            for record in reader:
+                cid = record.pop("cid", None)
+                if cid is None:
+                    raise KeyError("cid column must be provided")
+
+                response = self.request(
+                    method=requests.patch,
+                    url=os.path.join(
+                        self.endpoints["data"], pathogen_code + "/", cid + "/"
+                    ),
+                    json=record,
+                )
+                yield response
+        finally:
+            if csv_file is not sys.stdin:
+                csv_file.close()
+
+    @utils.session_required
+    def suppress(self, pathogen_code, cid):
+        """
+        Suppress a pathogen record in the database.
+        """
+        response = self.request(
+            method=requests.delete,
+            url=os.path.join(
+                self.endpoints["data"], pathogen_code + "/", cid + "/"  # type: ignore
+            ),
+        )
+        return response
+
+    @utils.session_required
+    def csv_suppress(self, pathogen_code, csv_path, delimiter=None):
+        """
+        Use a .csv or .tsv to suppress pathogen records in the database.
+        """
+        if csv_path == "-":
+            csv_file = sys.stdin
+        else:
+            csv_file = open(csv_path)
+        try:
+            if delimiter is None:
+                reader = csv.DictReader(csv_file)
+            else:
+                reader = csv.DictReader(csv_file, delimiter=delimiter)
+
+            for record in reader:
+                cid = record.get("cid")
+                if cid is None:
+                    raise KeyError("cid column must be provided")
+
+                response = self.request(
+                    method=requests.delete,
+                    url=os.path.join(
+                        self.endpoints["data"], pathogen_code + "/", cid + "/"
+                    ),
+                )
+                yield response
+        finally:
+            if csv_file is not sys.stdin:
+                csv_file.close()
 
 
 class Session:
-    def __init__(self, username, env_password=False, login=False, logout=False):
+    def __init__(self, username=None, env_password=False, login=False, logout=False):
         self.config = Config()
         self.client = Client(self.config)
         self.username = username
@@ -477,10 +464,16 @@ class Session:
 
     def __enter__(self):
         if self.login:
-            response = self.client.login(self.username, env_password=self.env_password)
+            response = self.client.login(
+                username=self.username,
+                env_password=self.env_password,
+            )
             response.raise_for_status()
         else:
-            self.client.continue_session(self.username, env_password=self.env_password)
+            self.client.continue_session(
+                username=self.username,
+                env_password=self.env_password,
+            )
         return self.client
 
     def __exit__(self, type, value, traceback):
