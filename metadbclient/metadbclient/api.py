@@ -14,21 +14,26 @@ class Client:
         Initialise the client with a given config.
         """
         self.config = config
-        self.url = f"http://{self.config.host}:{self.config.port}"
+        self.url = f"https://{self.config.host}:{self.config.port}"
         self.endpoints = {
             # accounts
             "register": f"{self.url}/accounts/register/",
             "login": f"{self.url}/accounts/login/",
             "logout": f"{self.url}/accounts/logout/",
             "logoutall": f"{self.url}/accounts/logoutall/",
-            "site_approve": f"{self.url}/accounts/site/approve/",
+            "site_approve": lambda x: f"{self.url}/accounts/site/approve/{x}/",
             "site_waiting": f"{self.url}/accounts/site/waiting/",
             "site_users": f"{self.url}/accounts/site/users/",
-            "admin_approve": f"{self.url}/accounts/admin/approve/",
+            "admin_approve": lambda x: f"{self.url}/accounts/admin/approve/{x}/",
             "admin_waiting": f"{self.url}/accounts/admin/waiting/",
             "admin_users": f"{self.url}/accounts/admin/users/",
             # data
-            "data": f"{self.url}/data/",
+            "pathogens": f"{self.url}/data/pathogens/",
+            "query": lambda x: f"{self.url}/data/{x}/query/",
+            "create": lambda x: f"{self.url}/data/{x}/",
+            "get": lambda x: f"{self.url}/data/{x}/",
+            "update": lambda x, y: f"{self.url}/data/{x}/{y}/",
+            "suppress": lambda x, y: f"{self.url}/data/{x}/{y}",
         }
 
     def request(self, method, **kwargs):
@@ -135,20 +140,8 @@ class Client:
         If no user is provided, the `default_user` in the config is used.
         """
 
-        # Load previous session
-        # If no user was provided, the previous session of the default_user is used
+        # Assigns username/env_password flag to the client
         self.continue_session(username, env_password=env_password)
-
-        if isinstance(self.token, str):
-            # Log out the current token just in case
-            # Is cleaner this way, I think so at least
-            # Helps ensure each user of the config is tied to only one token at a particular time
-            # Of course this is not a hard enforcement but slows users from spam creating new tokens they don't use
-            # If a user needs logins on different machines, this is still possible via multiple configs
-            response = self.request(
-                method=requests.post,
-                url=self.endpoints["logout"],
-            )
 
         # Get the password
         password = self.get_password()
@@ -203,7 +196,7 @@ class Client:
         """
         response = self.request(
             method=requests.patch,
-            url=os.path.join(self.endpoints["site_approve"], username + "/"),
+            url=self.endpoints["site_approve"](username),
         )
         return response
 
@@ -212,7 +205,10 @@ class Client:
         """
         List users waiting for site approval.
         """
-        response = self.request(method=requests.get, url=self.endpoints["site_waiting"])
+        response = self.request(
+            method=requests.get,
+            url=self.endpoints["site_waiting"],
+        )
         return response
 
     @utils.session_required
@@ -220,7 +216,10 @@ class Client:
         """
         Get the current users within the site of the requesting user.
         """
-        response = self.request(method=requests.get, url=self.endpoints["site_users"])
+        response = self.request(
+            method=requests.get,
+            url=self.endpoints["site_users"],
+        )
         return response
 
     @utils.session_required
@@ -230,7 +229,7 @@ class Client:
         """
         response = self.request(
             method=requests.patch,
-            url=os.path.join(self.endpoints["admin_approve"], username + "/"),
+            url=self.endpoints["admin_approve"](username),
         )
         return response
 
@@ -240,7 +239,8 @@ class Client:
         List users waiting for admin approval.
         """
         response = self.request(
-            method=requests.get, url=self.endpoints["admin_waiting"]
+            method=requests.get,
+            url=self.endpoints["admin_waiting"],
         )
         return response
 
@@ -249,7 +249,10 @@ class Client:
         """
         List all users.
         """
-        response = self.request(method=requests.get, url=self.endpoints["admin_users"])
+        response = self.request(
+            method=requests.get,
+            url=self.endpoints["admin_users"],
+        )
         return response
 
     @utils.session_required
@@ -258,7 +261,8 @@ class Client:
         List the current pathogens within the database.
         """
         response = self.request(
-            method=requests.get, url=os.path.join(self.endpoints["data"], "pathogens/")
+            method=requests.get,
+            url=self.endpoints["pathogens"],
         )
         return response
 
@@ -269,7 +273,7 @@ class Client:
         """
         response = self.request(
             method=requests.post,
-            url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
+            url=self.endpoints["create"](pathogen_code),
             json=fields,
         )
         return response
@@ -292,7 +296,7 @@ class Client:
             for record in reader:
                 response = self.request(
                     method=requests.post,
-                    url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
+                    url=self.endpoints["create"](pathogen_code),
                     json=record,
                 )
                 yield response
@@ -326,7 +330,7 @@ class Client:
 
         response = self.request(
             method=requests.get,
-            url=os.path.join(self.endpoints["data"], pathogen_code + "/"),
+            url=self.endpoints["get"](pathogen_code),
             params=fields,
         )
         yield response
@@ -358,7 +362,7 @@ class Client:
 
         response = self.request(
             method=requests.post,
-            url=os.path.join(self.endpoints["data"], pathogen_code + "/query/"),
+            url=self.endpoints["query"](pathogen_code),
             json=query.query,
         )
 
@@ -371,7 +375,7 @@ class Client:
         """
         response = self.request(
             method=requests.patch,
-            url=os.path.join(self.endpoints["data"], pathogen_code + "/", cid + "/"),  # type: ignore
+            url=self.endpoints["update"](pathogen_code, cid),
             json=fields,
         )
         return response
@@ -398,9 +402,7 @@ class Client:
 
                 response = self.request(
                     method=requests.patch,
-                    url=os.path.join(
-                        self.endpoints["data"], pathogen_code + "/", cid + "/"
-                    ),
+                    url=self.endpoints["update"](pathogen_code, cid),
                     json=record,
                 )
                 yield response
@@ -415,9 +417,7 @@ class Client:
         """
         response = self.request(
             method=requests.delete,
-            url=os.path.join(
-                self.endpoints["data"], pathogen_code + "/", cid + "/"  # type: ignore
-            ),
+            url=self.endpoints["suppress"](pathogen_code, cid),
         )
         return response
 
@@ -443,9 +443,7 @@ class Client:
 
                 response = self.request(
                     method=requests.delete,
-                    url=os.path.join(
-                        self.endpoints["data"], pathogen_code + "/", cid + "/"
-                    ),
+                    url=self.endpoints["suppress"](pathogen_code, cid),
                 )
                 yield response
         finally:
