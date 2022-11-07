@@ -14,7 +14,7 @@ class Client:
         Initialise the client with a given config.
         """
         self.config = config
-        self.url = f"https://{self.config.host}:{self.config.port}"
+        self.url = f"http://{self.config.host}:{self.config.port}"
         self.endpoints = {
             # accounts
             "register": f"{self.url}/accounts/register/",
