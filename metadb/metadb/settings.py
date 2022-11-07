@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 import os
 
@@ -42,10 +43,16 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "rest_framework_simplejwt",
+    "knox",
     "django_filters",
+    # "axes",
     "data",
     "accounts",
+]
+
+AUTHENTICATION_BACKENDS = [
+    # "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 MIDDLEWARE = [
@@ -56,6 +63,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "metadb.urls"
@@ -86,10 +94,10 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "metadb",
-        "USER": os.getenv("POSTGRES_METADB_USER"),
-        "PASSWORD": os.getenv("POSTGRES_METADB_PASSWORD"),
-        "HOST": "localhost",
-        "PORT": "5432",
+        # "USER": os.getenv("POSTGRES_METADB_USER"),
+        # "PASSWORD": os.getenv("POSTGRES_METADB_PASSWORD"),
+        # "HOST": "localhost",
+        # "PORT": "5432",
     }
 }
 
@@ -140,13 +148,18 @@ AUTH_USER_MODEL = "accounts.User"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.BasicAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ]
+        "knox.auth.TokenAuthentication",
+    ],
+    "DEFAULT_RENDERER_CLASSES": ("utils.renderers.METADBJSONRenderer",),
+}
+
+REST_KNOX = {
+    "TOKEN_TTL": timedelta(hours=1),
+    "TOKEN_LIMIT_PER_USER": None,
 }
 
 # Custom settings used in the project
 CURSOR_PAGINATION_PAGE_SIZE = 5000
-
 LOG_FILE = os.getenv("METADB_LOG_FILE")
-LOG_FILE_MAX_BYTES = 100000
+LOG_FILE_MAX_BYTES = 10000000
 LOG_FILE_NUM_BACKUPS = 5
