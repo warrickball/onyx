@@ -6,8 +6,8 @@ class Command(base.BaseCommand):
     help = "Create a new site in the database."
 
     def add_arguments(self, parser):
-        parser.add_argument("-n", "--name")
-        parser.add_argument("-c", "--code")
+        parser.add_argument("-n", "--name", required=True)
+        parser.add_argument("-c", "--code", required=True)
 
     def handle(self, *args, **options):
         name = options["name"]
