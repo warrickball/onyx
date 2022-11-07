@@ -11,8 +11,10 @@ dependencies:
     - psycopg2
     - django
     - djangorestframework
-    - djangorestframework-simplejwt
+    - django-rest-knox
     - django-filter
+    - django-model-utils
+    # - django-axes
     - requests
     - pysam
     - numpy
