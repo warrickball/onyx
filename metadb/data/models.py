@@ -7,6 +7,10 @@ from secrets import token_hex
 
 from accounts.models import Site
 from utils.fields import YearMonthField, LowerCharField
+from utils.functions import (
+    enforce_optional_value_groups_create,
+    enforce_optional_value_groups_update,
+)
 from utils import fieldserializers
 
 
@@ -56,6 +60,12 @@ class PathogenCode(models.Model):
     code = LowerCharField(max_length=8, unique=True)
 
 
+# class Base(models.Model):
+#     created = models.DateTimeField(auto_now_add=True)
+#     last_modified = models.DateTimeField(auto_now=True)
+#     suppressed = models.BooleanField(default=False)
+
+
 class Pathogen(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
@@ -75,12 +85,7 @@ class Pathogen(models.Model):
     bam_path = models.TextField()
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["pathogen_code", "sample_id", "run_name"],
-                name="pathogen_sample_run_unique_together",
-            )
-        ]
+        unique_together = ["pathogen_code", "sample_id", "run_name"]
         indexes = [
             models.Index(fields=["cid"]),
             models.Index(fields=["sample_id"]),
@@ -92,18 +97,14 @@ class Pathogen(models.Model):
         ]
 
     FIELD_PERMISSIONS = {
-        "id": ["hidden"],
-        "created": ["hidden"],
-        "last_modified": ["hidden"],
-        "suppressed": ["hidden"],
-        "pathogen_code": ["create", "no update"],
-        "site": ["create", "no update"],
-        "cid": ["no create", "no update"],
-        "sample_id": ["create", "no update"],
-        "run_name": ["create", "no update"],
+        "pathogen_code": ["create"],
+        "site": ["create"],
+        "cid": [],
+        "sample_id": ["create"],
+        "run_name": ["create"],
         "collection_month": ["create", "update"],
         "received_month": ["create", "update"],
-        "published_date": ["no create", "no update"],
+        "published_date": [],
         "fasta_path": ["create", "update"],
         "bam_path": ["create", "update"],
     }
@@ -133,93 +134,37 @@ class Pathogen(models.Model):
 
     OPTIONAL_VALUE_GROUPS = []
 
-    # loop through user groups
-    # loop through site groups
-
     @classmethod
     def user_fields(cls, user):
-        if user.is_staff:
-            fields = "__all__"
-
-        elif user.site.is_pha:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "hidden" not in perms
-            ]
-
-        else:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "hidden" not in perms and "pha_only" not in perms
-            ]
-
-        return fields
+        return [field for field, perms in cls.FIELD_PERMISSIONS.items()]
 
     @classmethod
     def create_fields(cls, user):
-        if user.is_staff or user.site.is_pha:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "create" in perms
-            ]
-        else:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "create" in perms and "pha_only" not in perms
-            ]
-        return fields
+        return [
+            field for field, perms in cls.FIELD_PERMISSIONS.items() if "create" in perms
+        ]
 
     @classmethod
     def no_create_fields(cls, user):
-        if user.is_staff or user.site.is_pha:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "no create" in perms
-            ]
-        else:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "no create" in perms and "pha_only" not in perms
-            ]
-        return fields
+        return [
+            field
+            for field, perms in cls.FIELD_PERMISSIONS.items()
+            if "create" not in perms
+        ]
 
     @classmethod
     def update_fields(cls, user):
-        if user.is_staff or user.site.is_pha:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "update" in perms
-            ]
-        else:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "update" in perms and "pha_only" not in perms
-            ]
-        return fields
+        return [
+            field for field, perms in cls.FIELD_PERMISSIONS.items() if "update" in perms
+        ]
 
     @classmethod
     def no_update_fields(cls, user):
-        if user.is_staff or user.site.is_pha:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "no update" in perms
-            ]
-        else:
-            fields = [
-                field
-                for field, perms in cls.FIELD_PERMISSIONS.items()
-                if "no update" in perms and "pha_only" not in perms
-            ]
-        return fields
+        return [
+            field
+            for field, perms in cls.FIELD_PERMISSIONS.items()
+            if "update" not in perms
+        ]
 
     @classmethod
     def filter_fields(cls, user):
@@ -260,46 +205,20 @@ class Pathogen(models.Model):
 
                 Creation is indicated by `self.instance = None`
                 """
-                errors = {}
                 model = self.Meta.model
 
                 if self.instance:
-                    # An update is occuring
-
-                    # Want to ensure each group still has at least one non-null field after update
-                    for group in model.OPTIONAL_VALUE_GROUPS:
-                        # List of non-null fields from the group
-                        instance_group_fields = [
-                            field
-                            for field in group
-                            if getattr(self.instance, field) is not None
-                        ]
-
-                        # List of fields specified by the request data that are going to be nullified
-                        fields_to_nullify = [
-                            field
-                            for field in group
-                            if field in data and data[field] is None
-                        ]
-
-                        # If the resulting set is empty, it means one of two not-good things:
-                        # The request contains enough fields from the group being nullified that there will be no non-null fields left from the group
-                        # There were (somehow) no non-null fields in the group to begin with
-                        if set(instance_group_fields) - set(fields_to_nullify) == set():
-                            errors.setdefault("at_least_one_required", []).append(group)
+                    errors = enforce_optional_value_groups_update(
+                        instance=self.instance,
+                        data=data,
+                        groups=model.OPTIONAL_VALUE_GROUPS,
+                    )
 
                 else:
-                    # Creation is occuring
-                    # Want to ensure each group has at least one non-null field when creating
-                    for group in model.OPTIONAL_VALUE_GROUPS:
-                        for field in group:
-                            if field in data and data[field] is not None:
-                                break
-                        else:
-                            # If you're reading this I'm sorry
-                            # I couldn't help but try a for-else
-                            # I just found out it can be done, so I did it :)
-                            errors.setdefault("at_least_one_required", []).append(group)
+                    errors = enforce_optional_value_groups_create(
+                        data=data,
+                        groups=model.OPTIONAL_VALUE_GROUPS,
+                    )
 
                 if errors:
                     raise serializers.ValidationError(errors)
@@ -352,7 +271,7 @@ class Mpx(Pathogen):
             ("ni", "ni"),
         ],
     )
-    da_region = LowerCharField(
+    ukhsa_region = LowerCharField(
         max_length=50, choices=[("phe", "phe"), ("phw", "phw"), ("other", "other")]
     )
     outer_postcode = models.CharField(
@@ -418,7 +337,7 @@ class Mpx(Pathogen):
         "sample_site": ["create", "update"],
         "patient_ageband": ["create", "update"],
         "country": ["create", "update"],
-        "da_region": ["create", "update"],
+        "ukhsa_region": ["create", "update"],
         "outer_postcode": ["create", "update"],
         "epi_cluster": ["create", "update"],
         "travel_status": ["create", "update"],
@@ -428,11 +347,11 @@ class Mpx(Pathogen):
         "seq_protocol": ["create", "update"],
         "run_layout": ["create", "update"],
         "enrichment_method": ["create", "update"],
-        "source_library": ["create", "update"],
+        "source_of_library": ["create", "update"],
         "seq_strategy": ["create", "update"],
         "bioinfo_pipe_name": ["create", "update"],
         "bioinfo_pipe_version": ["create", "update"],
-        "csv_template_version": ["hidden", "create", "no update"],
+        "csv_template_version": ["create"],
     }
 
     FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
@@ -440,7 +359,7 @@ class Mpx(Pathogen):
         "sample_site": {"type": LowerCharField, "choices": True},
         "patient_ageband": {"type": LowerCharField, "choices": True},
         "country": {"type": LowerCharField, "choices": True},
-        "da_region": {"type": LowerCharField, "choices": True},
+        "ukhsa_region": {"type": LowerCharField, "choices": True},
         "outer_postcode": {"type": models.CharField},
         "epi_cluster": {"type": models.TextField},
         "travel_status": {"type": LowerCharField, "choices": True},
@@ -475,8 +394,8 @@ class Mpx(Pathogen):
             country = fieldserializers.LowerChoiceField(
                 choices=Mpx._meta.get_field("country").choices,
             )
-            da_region = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("da_region").choices,
+            ukhsa_region = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("ukhsa_region").choices,
             )
             travel_status = fieldserializers.LowerChoiceField(
                 choices=Mpx._meta.get_field("travel_status").choices,

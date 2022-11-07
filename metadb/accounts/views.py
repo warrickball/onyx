@@ -134,7 +134,8 @@ class AdminApproveView(METADBAPIView):
 
         # Approve target user
         user.is_admin_approved = True
-        user.save(update_fields=["is_admin_approved"])
+        user.date_admin_approved = datetime.now()
+        user.save(update_fields=["is_admin_approved", "date_admin_approved"])
 
         return Response(
             {
@@ -166,12 +167,19 @@ class SiteWaitingView(METADBListAPIView):
     serializer_class = SiteWaitingUserSerializer
 
     def get_queryset(self):
-        return (
-            User.objects.filter(is_active=True)
-            .filter(site=self.request.user.site)  # type: ignore
-            .filter(is_site_approved=False)
-            .order_by("-date_joined")
-        )
+        if self.request.user.is_staff:  # type: ignore
+            return (
+                User.objects.filter(is_active=True)
+                .filter(is_site_approved=False)
+                .order_by("-date_joined")
+            )
+        else:
+            return (
+                User.objects.filter(is_active=True)
+                .filter(site=self.request.user.site)  # type: ignore
+                .filter(is_site_approved=False)
+                .order_by("-date_joined")
+            )
 
 
 class AdminWaitingView(METADBListAPIView):

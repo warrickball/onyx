@@ -56,30 +56,6 @@ def get_pathogen_model(pathogen_code, accept_base=False):
     return None
 
 
-def enforce_optional_value_groups(data, groups):
-    """
-    For each group in `groups`, verify that at least one field in the group is contained in `data`.
-    """
-    errors = {"required_fields": []}
-    # A group is a list of field names where at least one of them is required
-    for group in groups:
-        for field in group:
-            if field in data:
-                break
-        else:
-            # If you're reading this I'm sorry
-            # I couldn't help but try a for-else
-            # I just found out it can be done, so I did it :)
-            errors["required_fields"].append(
-                {"At least one of the following fields is required.": group}
-            )
-
-    if errors["required_fields"]:
-        return errors
-    else:
-        return {}
-
-
 def enforce_field_set(data, accepted_fields, rejected_fields):
     """
     Check `data` for unknown fields, or known fields which cannot be accepted.
