@@ -90,14 +90,20 @@ WSGI_APPLICATION = "metadb.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": "metadb",
+#         # "USER": os.getenv("POSTGRES_METADB_USER"),
+#         # "PASSWORD": os.getenv("POSTGRES_METADB_PASSWORD"),
+#         # "HOST": "localhost",
+#         # "PORT": "5432",
+#     }
+# }
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "metadb",
-        # "USER": os.getenv("POSTGRES_METADB_USER"),
-        # "PASSWORD": os.getenv("POSTGRES_METADB_PASSWORD"),
-        # "HOST": "localhost",
-        # "PORT": "5432",
+        "ENGINE" : "django.db.backends.sqlite3",
+        "NAME" : os.getenv("METADB_DB_PATH")
     }
 }
 
