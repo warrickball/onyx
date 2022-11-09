@@ -131,8 +131,8 @@ class ConfigCommands:
             "--port", type=int, help="METADB port number."
         )
         create_config_parser.add_argument(
-            "--config-dest",
-            help="Directory where the config directory will be generated and stored.",
+            "--config-dir",
+            help="Path to the config directory.",
         )
 
         set_default_user_parser = config_commands_parser.add_parser(
@@ -159,7 +159,7 @@ class ConfigCommands:
         )
 
     @classmethod
-    def create(cls, host=None, port=None, config_dest=None):
+    def create(cls, host=None, port=None, config_dir=None):
         """
         Generate the config directory and config file.
         """
@@ -169,51 +169,47 @@ class ConfigCommands:
         if port is None:
             port = utils.get_input("port", type=int)
 
-        if config_dest is None:
-            config_dest = utils.get_input("location to create a config directory")
+        if config_dir is None:
+            config_dir = utils.get_input("config directory")
 
-        config_dest = config_dest.replace("~", os.path.expanduser("~"))
-        if not os.path.isdir(config_dest):
-            raise FileNotFoundError(f"No such directory: {config_dest}")
+        config_dir = config_dir.replace("~", os.path.expanduser("~"))
 
-        config_dir_path = os.path.join(config_dest, settings.CONFIG_DIR_NAME)
-        if os.path.isdir(config_dir_path):
-            raise FileExistsError(f"Config directory already exists: {config_dir_path}")
+        if os.path.isfile(config_dir):
+            raise FileExistsError("Provided path to a file, not a directory")
 
-        os.mkdir(config_dir_path)
+        if not os.path.isdir(config_dir):
+            os.mkdir(config_dir)
 
-        # Read-write-execute for OS user only
-        os.chmod(config_dir_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        config_file = os.path.join(config_dir, settings.CONFIG_FILE_NAME)
 
-        config_file_path = os.path.join(config_dir_path, settings.CONFIG_FILE_NAME)
-        if os.path.isfile(config_file_path):
-            raise FileExistsError(f"Config file already exists: {config_file_path}")
+        if os.path.isfile(config_file):
+            raise FileExistsError(f"Config file already exists: {config_file}")
 
-        with open(config_file_path, "w") as config_file:
+        with open(config_file, "w") as config:
             json.dump(
                 {"host": host, "port": port, "users": {}, "default_user": None},
-                config_file,
+                config,
                 indent=4,
             )
 
         # Read-write for OS user only
-        os.chmod(config_file_path, stat.S_IRUSR | stat.S_IWUSR)
+        os.chmod(config_file, stat.S_IRUSR | stat.S_IWUSR)
 
         print("")
-        print("Config directory and config file created successfully.")
+        print("Config created successfully.")
         print(
-            f"Please create the following environment variable by typing the following in your shell:"
+            "Please create the following environment variable to store the path to your config:"
         )
         print("")
-        print(f"export METADB_CONFIG_DIR={config_dir_path}")
+        print(f"export METADB_CONFIG_DIR={config_dir}")
         print("")
         print(
-            "IMPORTANT: DO NOT CHANGE CONFIG DIRECTORY PERMISSIONS".center(
+            "IMPORTANT: DO NOT CHANGE PERMISSIONS OF CONFIG FILE(S)".center(
                 settings.MESSAGE_BAR_WIDTH, "!"
             )
         )
         warning_message = [
-            "Your config directory (and files within) store sensitive information such as tokens.",
+            "The file(s) within your config directory store sensitive information such as tokens.",
             "They have been created with the permissions needed to keep your information safe.",
             "DO NOT CHANGE THESE PERMISSIONS. Doing so may allow other users to read your tokens!",
         ]
@@ -596,7 +592,7 @@ def run(args):
             ConfigCommands.create(
                 host=args.host,
                 port=args.port,
-                config_dest=args.config_dest,
+                config_dir=args.config_dir,
             )
         else:
             config_commands = ConfigCommands()
