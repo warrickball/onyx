@@ -20,21 +20,20 @@ def register():
     email = utils.get_input("email address")
     site = utils.get_input("site code")
 
-    match = False
-    while not match:
+    password = utils.get_input("password", password=True)
+    password2 = utils.get_input("password (again)", password=True)
+
+    while password != password2:
+        print("Passwords do not match. Please try again.")
         password = utils.get_input("password", password=True)
         password2 = utils.get_input("password (again)", password=True)
-        if password == password2:
-            match = True
-        else:
-            print("Passwords do not match. Please try again.")
 
     registration = client.register(
         first_name=first_name,
         last_name=last_name,
         email=email,
         site=site,
-        password=password,  # type: ignore
+        password=password,
     )
 
     utils.print_response(registration)
@@ -127,6 +126,14 @@ class ConfigCommands:
         create_config_parser = config_commands_parser.add_parser(
             "create", help="Create a config for the client."
         )
+        create_config_parser.add_argument("--host", help="METADB host name.")
+        create_config_parser.add_argument(
+            "--port", type=int, help="METADB port number."
+        )
+        create_config_parser.add_argument(
+            "--config-dest",
+            help="Directory where the config directory will be generated and stored.",
+        )
 
         set_default_user_parser = config_commands_parser.add_parser(
             "set-default-user", help="Set the default user in the config of the client."
@@ -152,19 +159,24 @@ class ConfigCommands:
         )
 
     @classmethod
-    def create(cls):
+    def create(cls, host=None, port=None, config_dest=None):
         """
         Generate the config directory and config file.
         """
-        host = utils.get_input("host")
-        port = utils.get_input("port", type=int)
+        if host is None:
+            host = utils.get_input("host")
 
-        config_dir_location = utils.get_input("location to create a config directory")
-        config_dir_location = config_dir_location.replace("~", os.path.expanduser("~"))
-        if not os.path.isdir(config_dir_location):
-            raise FileNotFoundError(f"No such directory: {config_dir_location}")
+        if port is None:
+            port = utils.get_input("port", type=int)
 
-        config_dir_path = os.path.join(config_dir_location, settings.CONFIG_DIR_NAME)
+        if config_dest is None:
+            config_dest = utils.get_input("location to create a config directory")
+
+        config_dest = config_dest.replace("~", os.path.expanduser("~"))
+        if not os.path.isdir(config_dest):
+            raise FileNotFoundError(f"No such directory: {config_dest}")
+
+        config_dir_path = os.path.join(config_dest, settings.CONFIG_DIR_NAME)
         if os.path.isdir(config_dir_path):
             raise FileExistsError(f"Config directory already exists: {config_dir_path}")
 
@@ -581,7 +593,11 @@ class SuppressCommands:
 def run(args):
     if args.command == "config":
         if args.config_command == "create":
-            ConfigCommands.create()
+            ConfigCommands.create(
+                host=args.host,
+                port=args.port,
+                config_dest=args.config_dest,
+            )
         else:
             config_commands = ConfigCommands()
             if args.config_command == "set-default-user":

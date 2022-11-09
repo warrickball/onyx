@@ -124,9 +124,7 @@ class Client:
                 + self.username.upper()
                 + settings.PASSWORD_ENV_VAR_POSTFIX
             )
-            password = os.getenv(password_env_var)
-            if password is None:
-                raise KeyError(f"Environment variable '{password_env_var}' is not set")
+            password = os.environ[password_env_var]
         else:
             # Otherwise, prompt for the password
             print("Please enter your password.")

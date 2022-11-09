@@ -49,11 +49,7 @@ class Config:
 
         else:
             # Find the config directory
-            dir_path = os.getenv(settings.CONFIG_DIR_ENV_VAR)
-            if dir_path is None:
-                raise KeyError(
-                    f"Environment variable '{settings.CONFIG_DIR_ENV_VAR}' is not set"
-                )
+            dir_path = os.environ[settings.CONFIG_DIR_ENV_VAR]
 
             # Check config dir path is a directory
             if not os.path.isdir(dir_path):
