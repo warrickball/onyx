@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # python manage.py shell
 # from django.core.management.utils import get_random_secret_key
-SECRET_KEY = os.getenv("DJANGO_METADB_SECRET_KEY")
+SECRET_KEY = os.environ["METADB_DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -45,13 +45,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "knox",
     "django_filters",
-    # "axes",
     "data",
     "accounts",
 ]
 
 AUTHENTICATION_BACKENDS = [
-    # "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
@@ -63,7 +61,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "metadb.urls"
@@ -94,16 +91,17 @@ WSGI_APPLICATION = "metadb.wsgi.application"
 #     "default": {
 #         "ENGINE": "django.db.backends.postgresql",
 #         "NAME": "metadb",
-#         # "USER": os.getenv("POSTGRES_METADB_USER"),
-#         # "PASSWORD": os.getenv("POSTGRES_METADB_PASSWORD"),
+#         # "USER": os.environ["METADB_POSTGRES_USER"],
+#         # "PASSWORD": os.environ["METADB_POSTGRES_PASSWORD"],
 #         # "HOST": "localhost",
 #         # "PORT": "5432",
 #     }
 # }
+
 DATABASES = {
     "default": {
-        "ENGINE" : "django.db.backends.sqlite3",
-        "NAME" : os.getenv("METADB_DB_PATH")
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.environ["METADB_SQLITE_DB_PATH"],
     }
 }
 
@@ -166,6 +164,6 @@ REST_KNOX = {
 
 # Custom settings used in the project
 CURSOR_PAGINATION_PAGE_SIZE = 5000
-LOG_FILE = os.getenv("METADB_LOG_FILE")
-LOG_FILE_MAX_BYTES = 10000000
-LOG_FILE_NUM_BACKUPS = 5
+INTERNAL_SERVER_ERROR_LOG_FILE = os.environ["METADB_INTERNAL_SERVER_ERROR_LOG_FILE"]
+INTERNAL_SERVER_ERROR_LOG_FILE_MAX_BYTES = 10000000
+INTERNAL_SERVER_ERROR_LOG_FILE_NUM_BACKUPS = 5

@@ -30,9 +30,9 @@ from utils.responses import METADBAPIResponse
 logger = logging.getLogger("Rotating Log")
 logger.setLevel(logging.ERROR)
 handler = RotatingFileHandler(
-    settings.LOG_FILE,
-    maxBytes=settings.LOG_FILE_MAX_BYTES,
-    backupCount=settings.LOG_FILE_NUM_BACKUPS,
+    settings.INTERNAL_SERVER_ERROR_LOG_FILE,
+    maxBytes=settings.INTERNAL_SERVER_ERROR_LOG_FILE_MAX_BYTES,
+    backupCount=settings.INTERNAL_SERVER_ERROR_LOG_FILE_NUM_BACKUPS,
 )
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
