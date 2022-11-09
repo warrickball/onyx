@@ -229,12 +229,67 @@ class Pathogen(models.Model):
 
 
 class Mpx(Pathogen):
+    csv_template_version = models.TextField()
     sample_type = LowerCharField(
         max_length=50, choices=[("swab", "swab"), ("serum", "serum")]
     )
-    sample_site = LowerCharField(
-        max_length=50, choices=[("sore", "sore"), ("genital", "genital")], null=True
+    seq_platform = LowerCharField(
+        max_length=50,
+        choices=[
+            ("illumina", "illumina"),
+            ("oxford_nanopore", "oxford_nanopore"),
+            ("pacific_biosciences", "pacific_biosciences"),
+            ("ion_torrent", "ion_torrent"),
+        ],
     )
+    instrument_model = models.TextField()
+    enrichment_method = LowerCharField(
+        max_length=50,
+        choices=[
+            ("other", "other"),
+            ("pcr", "pcr"),
+            ("random", "random"),
+            ("random_pcr", "random_pcr"),
+            ("none", "none"),
+        ],
+    )
+    seq_strategy = LowerCharField(
+        max_length=50,
+        choices=[
+            ("amplicon", "amplicon"),
+            ("other", "other"),
+            ("targeted_capture", "targeted_capture"),
+            ("wga", "wga"),
+            ("wgs", "wgs"),
+        ],
+    )
+    source_of_library = LowerCharField(
+        max_length=50,
+        choices=[
+            ("genomic", "genomic"),
+            ("metagenomic", "metagenomic"),
+            ("metatranscriptomic", "metatranscriptomic"),
+            ("other", "other"),
+            ("transcriptomic", "transcriptomic"),
+            ("viral_rna", "viral_rna"),
+        ],
+    )
+    bioinfo_pipe_name = models.TextField()
+    bioinfo_pipe_version = models.TextField()
+    country = LowerCharField(
+        max_length=50,
+        choices=[
+            ("eng", "eng"),
+            ("wales", "wales"),
+            ("scot", "scot"),
+            ("ni", "ni"),
+        ],
+    )
+    ukhsa_region = LowerCharField(max_length=50, choices=[("ne", "ne")])
+    run_layout = LowerCharField(
+        max_length=50, choices=[("single", "single"), ("paired", "paired")]
+    )
+
     patient_ageband = LowerCharField(
         max_length=50,
         choices=[
@@ -262,75 +317,17 @@ class Mpx(Pathogen):
         ],
         null=True,
     )
-    country = LowerCharField(
-        max_length=50,
-        choices=[
-            ("eng", "eng"),
-            ("wales", "wales"),
-            ("scot", "scot"),
-            ("ni", "ni"),
-        ],
-    )
-    ukhsa_region = LowerCharField(
-        max_length=50, choices=[("phe", "phe"), ("phw", "phw"), ("other", "other")]
+    travel_status = LowerCharField(
+        max_length=50, choices=[("yes", "yes"), ("no", "no")], null=True
     )
     outer_postcode = models.CharField(
         max_length=5, validators=[MinLengthValidator(3)], null=True
     )
     epi_cluster = models.TextField(null=True)
-    travel_status = LowerCharField(
-        max_length=50, choices=[("yes", "yes"), ("no", "no")], null=True
+    patient_id = models.TextField(null=True)
+    sample_site = LowerCharField(
+        max_length=50, choices=[("sore", "sore"), ("genital", "genital")], null=True
     )
-    patient_id = models.TextField()
-    seq_platform = LowerCharField(
-        max_length=50,
-        choices=[
-            ("illumina", "illumina"),
-            ("oxford_nanopore", "oxford_nanopore"),
-            ("pacific_biosciences", "pacific_biosciences"),
-            ("ion_torrent", "ion_torrent"),
-        ],
-    )
-    instrument_model = models.TextField()
-    seq_protocol = models.TextField()
-    run_layout = LowerCharField(
-        max_length=50, choices=[("single", "single"), ("paired", "paired")]
-    )
-    enrichment_method = LowerCharField(
-        max_length=50,
-        choices=[
-            ("other", "other"),
-            ("pcr", "pcr"),
-            ("random", "random"),
-            ("random_pcr", "random_pcr"),
-            ("none", "none"),
-        ],
-    )
-    source_of_library = LowerCharField(
-        max_length=50,
-        choices=[
-            ("genomic", "genomic"),
-            ("metagenomic", "metagenomic"),
-            ("metatranscriptomic", "metatranscriptomic"),
-            ("other", "other"),
-            ("transcriptomic", "transcriptomic"),
-            ("viral_rna", "viral_rna"),
-        ],
-        null=True,
-    )
-    seq_strategy = LowerCharField(
-        max_length=50,
-        choices=[
-            ("amplicon", "amplicon"),
-            ("other", "other"),
-            ("targeted_capture", "targeted_capture"),
-            ("wga", "wga"),
-            ("wgs", "wgs"),
-        ],
-    )
-    bioinfo_pipe_name = models.TextField()
-    bioinfo_pipe_version = models.TextField()
-    csv_template_version = models.TextField()
 
     FIELD_PERMISSIONS = Pathogen.FIELD_PERMISSIONS | {
         "sample_type": ["create", "update"],
@@ -344,7 +341,6 @@ class Mpx(Pathogen):
         "patient_id": ["create", "update"],
         "seq_platform": ["create", "update"],
         "instrument_model": ["create", "update"],
-        "seq_protocol": ["create", "update"],
         "run_layout": ["create", "update"],
         "enrichment_method": ["create", "update"],
         "source_of_library": ["create", "update"],
@@ -366,7 +362,6 @@ class Mpx(Pathogen):
         "patient_id": {"type": models.TextField},
         "seq_platform": {"type": LowerCharField, "choices": True},
         "instrument_model": {"type": models.TextField},
-        "seq_protocol": {"type": models.TextField},
         "run_layout": {"type": LowerCharField, "choices": True},
         "enrichment_method": {"type": LowerCharField, "choices": True},
         "source_of_library": {"type": LowerCharField, "choices": True},
@@ -381,15 +376,17 @@ class Mpx(Pathogen):
             sample_type = fieldserializers.LowerChoiceField(
                 choices=Mpx._meta.get_field("sample_type").choices
             )
-            sample_site = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("sample_site").choices,
-                required=False,
-                allow_null=True,
+            seq_platform = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("seq_platform").choices
             )
-            patient_ageband = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("patient_ageband").choices,
-                required=False,
-                allow_null=True,
+            enrichment_method = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("enrichment_method").choices
+            )
+            seq_strategy = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("seq_strategy").choices
+            )
+            source_of_library = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("source_of_library").choices,
             )
             country = fieldserializers.LowerChoiceField(
                 choices=Mpx._meta.get_field("country").choices,
@@ -397,27 +394,24 @@ class Mpx(Pathogen):
             ukhsa_region = fieldserializers.LowerChoiceField(
                 choices=Mpx._meta.get_field("ukhsa_region").choices,
             )
+            run_layout = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("run_layout").choices
+            )
+
+            patient_ageband = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("patient_ageband").choices,
+                required=False,
+                allow_null=True,
+            )
             travel_status = fieldserializers.LowerChoiceField(
                 choices=Mpx._meta.get_field("travel_status").choices,
                 required=False,
                 allow_null=True,
             )
-            seq_platform = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("seq_platform").choices
-            )
-            run_layout = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("run_layout").choices
-            )
-            enrichment_method = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("enrichment_method").choices
-            )
-            source_of_library = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("source_of_library").choices,
+            sample_site = fieldserializers.LowerChoiceField(
+                choices=Mpx._meta.get_field("sample_site").choices,
                 required=False,
                 allow_null=True,
-            )
-            seq_strategy = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("seq_strategy").choices
             )
 
             class Meta:
