@@ -1,5 +1,6 @@
 from django.core.management import base
 from accounts.serializers import UserSerializer
+import json
 import os
 
 
@@ -34,7 +35,9 @@ class Command(base.BaseCommand):
             "password": password,
         }
         serializer = UserSerializer(data=data)  # type: ignore
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        print(f"Created user: {username}")
+        
+        if serializer.is_valid():
+            serializer.save()
+            print(f"Created user: {username}")
+        else:
+            print(json.dumps(serializer.errors, indent=4))

@@ -1,4 +1,5 @@
 from django.core.management import base
+from django.db.utils import IntegrityError
 from ...models import PathogenCode
 
 
@@ -10,8 +11,18 @@ class Command(base.BaseCommand):
 
     def handle(self, *args, **options):
         code = options["code"]
-        pathogen_code = PathogenCode.objects.create(code=code)
 
-        pathogen_code = PathogenCode.objects.get(code=code.lower())
-        print("PathogenCode created successfully.")
-        print("Code:", pathogen_code.code)
+        exists = False
+        try:
+            pathogen_code = PathogenCode.objects.create(code=code)
+        except IntegrityError:
+            exists = True
+        
+        if exists:
+            pathogen_code = PathogenCode.objects.get(code=code.lower())
+            print("PathogenCode already existed.")
+            print("Code:", pathogen_code.code)
+        else:
+            pathogen_code = PathogenCode.objects.get(code=code.lower())
+            print("PathogenCode created successfully.")
+            print("Code:", pathogen_code.code)
