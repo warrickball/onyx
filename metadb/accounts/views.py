@@ -46,13 +46,23 @@ class CreateUserView(METADBCreateAPIView):
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
-        # Check for first name and last name
         errors = {}
+
         if not request.data.get("first_name"):
             errors["first_name"] = ["This field is required."]
 
+        elif not request.data.get("first_name").isalpha():
+            errors["first_name"] = [
+                "This field must only contain alphabetic characters."
+            ]
+
         if not request.data.get("last_name"):
             errors["last_name"] = ["This field is required."]
+
+        elif not request.data.get("last_name").isalpha():
+            errors["last_name"] = [
+                "This field must only contain alphabetic characters."
+            ]
 
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
