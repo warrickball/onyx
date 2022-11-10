@@ -95,8 +95,8 @@ class Config:
         # Username is case-insensitive
         username = username.lower()
 
-        token_path = os.path.join(
-            self.dir_path, username + settings.TOKENS_FILE_POSTFIX
+        token_path = os.path.abspath(
+            os.path.join(self.dir_path, username + settings.TOKENS_FILE_POSTFIX)
         )
         self.users[username] = {"token": token_path}
 
