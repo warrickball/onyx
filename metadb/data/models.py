@@ -10,6 +10,9 @@ from utils.fields import YearMonthField, LowerCharField
 from utils.functions import (
     enforce_optional_value_groups_create,
     enforce_optional_value_groups_update,
+    enforce_yearmonth_order_create,
+    enforce_yearmonth_order_update,
+    enforce_yearmonth_non_future,
 )
 from utils import fieldserializers
 
@@ -58,12 +61,6 @@ class IsNull(BuiltinLookup):
 
 class PathogenCode(models.Model):
     code = LowerCharField(max_length=8, unique=True)
-
-
-# class Base(models.Model):
-#     created = models.DateTimeField(auto_now_add=True)
-#     last_modified = models.DateTimeField(auto_now=True)
-#     suppressed = models.BooleanField(default=False)
 
 
 class Pathogen(models.Model):
@@ -206,18 +203,48 @@ class Pathogen(models.Model):
                 Creation is indicated by `self.instance = None`
                 """
                 model = self.Meta.model
+                errors = {}
 
                 if self.instance:
-                    errors = enforce_optional_value_groups_update(
+                    enforce_optional_value_groups_update(
+                        errors=errors,
                         instance=self.instance,
                         data=data,
                         groups=model.OPTIONAL_VALUE_GROUPS,
                     )
+                    enforce_yearmonth_order_update(
+                        errors=errors,
+                        instance=self.instance,
+                        lower_yearmonth="collection_month",
+                        higher_yearmonth="received_month",
+                        data=data,
+                    )
 
                 else:
-                    errors = enforce_optional_value_groups_create(
+                    enforce_optional_value_groups_create(
+                        errors=errors,
                         data=data,
                         groups=model.OPTIONAL_VALUE_GROUPS,
+                    )
+                    enforce_yearmonth_order_create(
+                        errors=errors,
+                        lower_yearmonth="collection_month",
+                        higher_yearmonth="received_month",
+                        data=data,
+                    )
+
+                if data.get("collection_month"):
+                    enforce_yearmonth_non_future(
+                        errors=errors,
+                        name="collection_month",
+                        value=data["collection_month"],
+                    )
+
+                if data.get("received_month"):
+                    enforce_yearmonth_non_future(
+                        errors=errors,
+                        name="received_month",
+                        value=data["received_month"],
                     )
 
                 if errors:
@@ -323,8 +350,12 @@ class Mpx(Pathogen):
     outer_postcode = models.CharField(
         max_length=5, validators=[MinLengthValidator(3)], null=True
     )
-    epi_cluster = models.TextField(null=True)
-    patient_id = models.TextField(null=True)
+    epi_cluster = models.CharField(
+        max_length=24, validators=[MinLengthValidator(5)], null=True
+    )
+    patient_id = models.CharField(
+        max_length=24, validators=[MinLengthValidator(5)], null=True
+    )
     sample_site = LowerCharField(
         max_length=50, choices=[("sore", "sore"), ("genital", "genital")], null=True
     )
@@ -357,9 +388,9 @@ class Mpx(Pathogen):
         "country": {"type": LowerCharField, "choices": True},
         "ukhsa_region": {"type": LowerCharField, "choices": True},
         "outer_postcode": {"type": models.CharField},
-        "epi_cluster": {"type": models.TextField},
+        "epi_cluster": {"type": models.CharField},
         "travel_status": {"type": LowerCharField, "choices": True},
-        "patient_id": {"type": models.TextField},
+        "patient_id": {"type": models.CharField},
         "seq_platform": {"type": LowerCharField, "choices": True},
         "instrument_model": {"type": models.TextField},
         "run_layout": {"type": LowerCharField, "choices": True},
