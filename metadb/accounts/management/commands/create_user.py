@@ -35,7 +35,7 @@ class Command(base.BaseCommand):
             "password": password,
         }
         serializer = UserSerializer(data=data)  # type: ignore
-        
+
         if serializer.is_valid():
             serializer.save()
             print(f"Created user: {username}")
