@@ -67,10 +67,20 @@ class CreateUserView(METADBCreateAPIView):
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Assign the username to the request
+        # Enable mutability if required
+        mutable = getattr(request.data, "_mutable", None)
+
+        if mutable is not None:
+            mutable = request.data._mutable
+            request.data._mutable = True
+
+        # Create username and add to the request
         request.data["username"] = create_username(
             request.data["first_name"], request.data["last_name"]
         )
+
+        if mutable is not None:
+            request.data._mutable = mutable
 
         # Create the user
         return super().post(request, *args, **kwargs)

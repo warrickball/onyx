@@ -1,18 +1,14 @@
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
 from .models import User, Site
 from django.core.exceptions import ValidationError
 import django.contrib.auth.password_validation as validators
-from utils import fieldserializers
+
+# from utils import fieldserializers
 
 
 class UserSerializer(serializers.ModelSerializer):
-    username = fieldserializers.LowerCharField(
-        validators=[UniqueValidator(queryset=User.objects.all())]
-    )
-    email = fieldserializers.LowerCharField(
-        validators=[UniqueValidator(queryset=User.objects.all())]
-    )
+    # username = fieldserializers.LowerCharField() # TODO: understand why having validators here wiped validators on model
+    # email = fieldserializers.LowerCharField()
     password = serializers.CharField(write_only=True)
     site = serializers.SlugRelatedField(queryset=Site.objects.all(), slug_field="code")
 
