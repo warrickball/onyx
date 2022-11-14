@@ -2,15 +2,15 @@ name: metadb
 channels:
   - defaults
 dependencies:
-  - gunicorn
   - pip
   - pip:
-    - psycopg2-binary
+    - gunicorn
     - django
     - djangorestframework
     - django-rest-knox
     - django-filter
     - django-model-utils
+    - django-cursor-pagination
+    - celery
     - requests
     - pandas
-
