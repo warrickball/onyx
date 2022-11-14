@@ -59,6 +59,11 @@ class IsNull(BuiltinLookup):
             return "%s IS NOT NULL" % sql, params
 
 
+class Signal(models.Model):
+    code = LowerCharField(max_length=8, unique=True)
+    modified = models.DateTimeField()
+
+
 class PathogenCode(models.Model):
     code = LowerCharField(max_length=8, unique=True)
 
