@@ -1,27 +1,27 @@
 # `metadb`
 
-## Setup & registration
+## Create a config
 ```
-$ metadbclient make-config
+$ metadb config create
 ```
-
+## Register a user
 ```
-$ metadbclient register
-```
-
-## Uploading data
-
-```
-$ metadbclient create <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
-$ metadbclient csv-create <PATHOGEN_CODE> <CSV_FILE>
-$ metadbclient tsv-create <PATHOGEN_CODE> <TSV_FILE>
+$ metadb register
 ```
 
-## Filtering data
+## Upload data
 
 ```
-$ metadbclient get <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
-$ metadbclient get <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb create <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb csv-create <PATHOGEN_CODE> <CSV_FILE>
+$ metadb tsv-create <PATHOGEN_CODE> <TSV_FILE>
+```
+
+## Get data
+
+```
+$ metadb get <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb get <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
 ```
 
 ### Table of lookups
@@ -56,23 +56,23 @@ $ metadbclient get <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD>
 ### Examples
 
 ```
-$ metadbclient get covid --field cid C-123456
-$ metadbclient get covid --field sample_type__in SWAB,SERUM
-$ metadbclient get covid --field collection_month__range 2022-03,2022-07
-$ metadbclient get covid --field received_month__isnull true
-$ metadbclient get covid --field published_date__iso_week__range 33,37 --field published_date__iso_year 2022
+$ metadb get mpx C-123456
+$ metadb get mpx --field sample_type__in SWAB,SERUM
+$ metadb get mpx --field collection_month__range 2022-03,2022-07
+$ metadb get mpx --field received_month__isnull true
+$ metadb get mpx --field published_date__iso_week__range 33,37 --field published_date__iso_year 2022
 ```
 
-## Updating data
+## Update data
 ```
-$ metadbclient update <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
-$ metadbclient csv-update <PATHOGEN_CODE> <CSV>
-$ metadbclient tsv-update <PATHOGEN_CODE> <TSV>
+$ metadb update <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb csv-update <PATHOGEN_CODE> <CSV>
+$ metadb tsv-update <PATHOGEN_CODE> <TSV>
 ```
 
-## Suppressing data
+## Suppress data
 ```
-$ metadbclient suppress <PATHOGEN_CODE> <CID>
-$ metadbclient csv-suppress <PATHOGEN_CODE> <CSV>
-$ metadbclient tsv-suppress <PATHOGEN_CODE> <TSV>
+$ metadb suppress <PATHOGEN_CODE> <CID>
+$ metadb csv-suppress <PATHOGEN_CODE> <CSV>
+$ metadb tsv-suppress <PATHOGEN_CODE> <TSV>
 ```
