@@ -7,10 +7,13 @@ import random
 
 class METADBTestCase(APITestCase):
     def setup_authenticated_user(self, username, site):
+        first_name = username[-1]
+        last_name = username[0:-1]
         response = self.client.post(
             "/accounts/register/",
             data={
-                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
                 "site": site,
@@ -22,10 +25,13 @@ class METADBTestCase(APITestCase):
         return user
 
     def setup_approved_user(self, username, site):
+        first_name = username[-1]
+        last_name = username[0:-1]
         response = self.client.post(
             "/accounts/register/",
             data={
-                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
                 "site": site,
@@ -38,10 +44,13 @@ class METADBTestCase(APITestCase):
         return user
 
     def setup_authority_user(self, username, site):
+        first_name = username[-1]
+        last_name = username[0:-1]
         response = self.client.post(
             "/accounts/register/",
             data={
-                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
                 "site": site,
@@ -55,10 +64,13 @@ class METADBTestCase(APITestCase):
         return user
 
     def setup_admin_user(self, username, site):
+        first_name = username[-1]
+        last_name = username[0:-1]
         response = self.client.post(
             "/accounts/register/",
             data={
-                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
                 "password": "pass123456",
                 "email": f"{username}@test.com",
                 "site": site,
@@ -111,25 +123,6 @@ def get_covid_data(site):
         "site": site,
         "fasta_path": f"{sample_id}.{run_name}.fasta",
         "bam_path": f"{sample_id}.{run_name}.bam",
-        "is_external": random.choice([True, False]),
-        "fasta_header": random.choice(["MN908947.3", "NC_045512", "hello", "goodbye"]),
-        "sample_type": random.choice(["SWAB", "SERUM"]),
+        "received_month": f"{random.choice(['2020', '2021'])}-{random.randint(1, 12)}",
     }
-    coin = random.randint(0, 2)
-    if coin == 0:
-        pathogen_dict[
-            "collection_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-    elif coin == 1:
-        pathogen_dict[
-            "received_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-    else:
-        pathogen_dict[
-            "collection_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-        pathogen_dict[
-            "received_month"
-        ] = f"{random.choice(['2021', '2022'])}-{random.randint(1, 12)}"
-
     return pathogen_dict

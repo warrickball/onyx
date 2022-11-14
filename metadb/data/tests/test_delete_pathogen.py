@@ -31,9 +31,7 @@ class TestDeletePathogen(METADBTestCase):
 
     def test_authenticated_delete(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authenticated_user(
-                "authenticated-user", site=self.site.code
-            )
+            user=self.setup_authenticated_user("authenticateduser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.delete(
@@ -43,7 +41,7 @@ class TestDeletePathogen(METADBTestCase):
 
     def test_approved_delete(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_approved_user("approved-user", site=self.site.code)
+            user=self.setup_approved_user("approveduser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.delete(
@@ -53,7 +51,7 @@ class TestDeletePathogen(METADBTestCase):
 
     def test_authority_delete(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authority_user("authority-user", site=self.site.code)
+            user=self.setup_authority_user("authorityuser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.delete(
@@ -63,7 +61,7 @@ class TestDeletePathogen(METADBTestCase):
 
     def test_admin_delete(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_admin_user("admin-user", site=self.site.code)
+            user=self.setup_admin_user("adminuser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.delete(

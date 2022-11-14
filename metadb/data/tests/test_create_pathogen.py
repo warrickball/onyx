@@ -1,5 +1,5 @@
 from rest_framework import status
-from data.models import Covid
+from data.models import Covid, PathogenCode
 from accounts.models import Site
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
@@ -13,7 +13,8 @@ class TestCreatePathogen(METADBTestCase):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
         )
-        self.user = self.setup_admin_user("test-user", self.site.code)
+        self.covid = PathogenCode.objects.create(code="COVID")
+        self.user = self.setup_admin_user("testuser", self.site.code)
 
         settings.CURSOR_PAGINATION_PAGE_SIZE = 20
         self.covid_data = []
@@ -27,30 +28,28 @@ class TestCreatePathogen(METADBTestCase):
 
     def test_authenticated_create(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authenticated_user(
-                "authenticated-user", site=self.site.code
-            )
+            user=self.setup_authenticated_user("authenticateduser", site=self.site.code)
         )
         response = self.client.post("/data/covid/", data=self.covid_data[0])
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_approved_create(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_approved_user("approved-user", site=self.site.code)
+            user=self.setup_approved_user("approveduser", site=self.site.code)
         )
         response = self.client.post("/data/covid/", data=self.covid_data[0])
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_authority_create(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authority_user("authority-user", site=self.site.code)
+            user=self.setup_authority_user("authorityuser", site=self.site.code)
         )
         response = self.client.post("/data/covid/", data=self.covid_data[0])
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_admin_create(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_admin_user("admin-user", site=self.site.code)
+            user=self.setup_admin_user("adminuser", site=self.site.code)
         )
         response = self.client.post("/data/covid/", data=self.covid_data[0])
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

@@ -36,7 +36,7 @@ class TestUpdatePathogen(METADBTestCase):
     def test_authenticated_update(self):
         self.client.force_authenticate(  # type: ignore
             user=self.setup_authenticated_user(
-                "authenticated-user", site=self.site.code
+                "authenticateduser", site=self.site.code
             )
         )
         for cid in self.cids:
@@ -48,7 +48,7 @@ class TestUpdatePathogen(METADBTestCase):
     def test_approved_update(self):
         self.client.force_authenticate(  # type: ignore
             user=self.setup_approved_user(
-                "approved-user", site=self.site.code
+                "approveduser", site=self.site.code
             )
         )
         for cid in self.cids:
@@ -60,7 +60,7 @@ class TestUpdatePathogen(METADBTestCase):
     def test_authority_update(self):
         self.client.force_authenticate(  # type: ignore
             user=self.setup_authority_user(
-                "authority-user", site=self.site.code
+                "authorityuser", site=self.site.code
             )
         )
         for cid in self.cids:
@@ -71,7 +71,7 @@ class TestUpdatePathogen(METADBTestCase):
 
     def test_admin_update(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_admin_user("admin-user", site=self.site.code)
+            user=self.setup_admin_user("adminuser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.patch(

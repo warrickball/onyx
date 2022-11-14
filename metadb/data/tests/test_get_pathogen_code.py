@@ -10,7 +10,7 @@ class TestGetPathogenCode(METADBTestCase):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
         )
-        self.user = self.setup_approved_user("test-user", self.site.code)
+        self.user = self.setup_approved_user("testuser", self.site.code)
 
         settings.CURSOR_PAGINATION_PAGE_SIZE = 20
         for _ in range(settings.CURSOR_PAGINATION_PAGE_SIZE * 5):
@@ -25,9 +25,7 @@ class TestGetPathogenCode(METADBTestCase):
 
     def test_authenticated_get(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authenticated_user(
-                "authenticated-user", site=self.site.code
-            )
+            user=self.setup_authenticated_user("authenticateduser", site=self.site.code)
         )
         results = self.client_get_paginated(
             "/data/pathogens/", expected_status_code=status.HTTP_403_FORBIDDEN
@@ -35,7 +33,7 @@ class TestGetPathogenCode(METADBTestCase):
 
     def test_approved_get(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_approved_user("approved-user", site=self.site.code)
+            user=self.setup_approved_user("approveduser", site=self.site.code)
         )
         results = self.client_get_paginated(
             "/data/pathogens/", expected_status_code=status.HTTP_200_OK
@@ -43,7 +41,7 @@ class TestGetPathogenCode(METADBTestCase):
 
     def test_authority_get(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authority_user("authority-user", site=self.site.code)
+            user=self.setup_authority_user("authorityuser", site=self.site.code)
         )
         results = self.client_get_paginated(
             "/data/pathogens/", expected_status_code=status.HTTP_200_OK
@@ -51,7 +49,7 @@ class TestGetPathogenCode(METADBTestCase):
 
     def test_admin_get(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_admin_user("admin-user", site=self.site.code)
+            user=self.setup_admin_user("adminuser", site=self.site.code)
         )
         results = self.client_get_paginated(
             "/data/pathogens/", expected_status_code=status.HTTP_200_OK
