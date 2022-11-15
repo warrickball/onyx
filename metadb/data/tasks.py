@@ -1,29 +1,32 @@
 from django.utils import timezone
 from data.models import Mpx, Signal
-from accounts.models import User
 from celery import shared_task
+from .serializers import MpxSerializer, PhaMpxSerializer
 from cursor_pagination import CursorPaginator
 import csv
 import os
 
 
-# from utils.stats import calculate_bam_stats, calculate_fasta_stats
-# from data.models import Pathogen, FastaStats, BamStats, VAF
+# from utils.stats import calculate_fasta_stats
+# from data.models import FastaStatistics, Pathogen
 
 
 # @shared_task
-# def generate_stats(cid, fasta_path, bam_path):
+# def generate_fasta_statistics(cid, fasta_path):
 #     fasta_data = calculate_fasta_stats(fasta_path)
-#     bam_data = calculate_bam_stats(bam_path)
-#     vafs = bam_data.pop("vafs")
+#     metadata = Pathogen.objects.get(cid=cid)
+#     fasta = FastaStatistics.objects.create(metadata=metadata, **fasta_data)
+#     metadata.fasta_statistics = True
+#     metadata.save(update_fields=["fasta_statistics"])
 
-#     instance = Pathogen.objects.get(cid=cid)
-#     fasta = FastaStats.objects.create(metadata=instance, **fasta_data)
-#     bam = BamStats.objects.create(metadata=instance, **bam_data)
-#     for vaf in vafs:
-#         VAF.objects.create(bam_stats=bam, **vaf)
 
-#
+# @shared_task
+# def generate_bam_statistics(cid, bam_path):
+#     bam_data = calculate_fasta_stats(bam_path)
+#     metadata = Pathogen.objects.get(cid=cid)
+#     bam = BamStatistics.objects.create(metadata=metadata, **bam_data)
+#     metadata.bam_statistics = True
+#     metadata.save(update_fields=["bam_statistics"])
 
 
 def paginator(qs, cursor=None, page_size=5000):
@@ -38,10 +41,10 @@ def paginator(qs, cursor=None, page_size=5000):
 
 
 @shared_task
-def create_mpx_table():
+def create_mpx_tables():
     signal, created = Signal.objects.get_or_create(code="mpx")
 
-    if (not created) or (
+    if (not created) and (
         (timezone.now() - signal.modified).total_seconds()
         > int(os.environ["METADB_CELERY_BEAT_TIME"])
     ):
@@ -50,34 +53,43 @@ def create_mpx_table():
 
     print("changes detected")
 
-    user = User.objects.get(
-        username="briert"
-    )  # TODO: either remove username requirement or move to env var
+    temp_mpx_file = f"{os.environ['METADB_MPX_TSV']}.temp"
+    final_mpx_file = os.environ["METADB_MPX_TSV"]
+    temp_pha_mpx_file = f"{os.environ['METADB_PHA_MPX_TSV']}.temp"
+    final_pha_mpx_file = os.environ["METADB_PHA_MPX_TSV"]
 
-    serializer = Mpx.get_serializer(user=user)
-
-    temp_file = f"{os.environ['METADB_MPX_TSV']}.temp"
-    final_file = os.environ["METADB_MPX_TSV"]
-
-    with open(temp_file, "w") as temp:
-        writer = csv.DictWriter(
-            temp,
-            fieldnames=serializer.Meta.fields,
+    with open(temp_mpx_file, "w") as temp_mpx, open(
+        temp_pha_mpx_file, "w"
+    ) as temp_pha_mpx:
+        mpx_writer = csv.DictWriter(
+            temp_mpx,
+            fieldnames=MpxSerializer.Meta.fields,
             delimiter="\t",
         )
-        writer.writeheader()
+        mpx_writer.writeheader()
+
+        pha_mpx_writer = csv.DictWriter(
+            temp_pha_mpx,
+            fieldnames=PhaMpxSerializer.Meta.fields,
+            delimiter="\t",
+        )
+        pha_mpx_writer.writeheader()
 
         cursor = None
         has_next = True
         while has_next:
             data = paginator(Mpx.objects.filter(suppressed=False), cursor=cursor)
-            serialized = serializer(data["objects"], many=True).data
 
-            writer.writerows(serialized)
+            mpx_serialized = MpxSerializer(data["objects"], many=True).data
+            mpx_writer.writerows(mpx_serialized)
+
+            pha_mpx_serialized = PhaMpxSerializer(data["objects"], many=True).data
+            pha_mpx_writer.writerows(pha_mpx_serialized)
 
             cursor = data["cursor"]
             has_next = data["has_next"]
 
-    os.rename(temp_file, final_file)
+    os.rename(temp_mpx_file, final_mpx_file)
+    os.rename(temp_pha_mpx_file, final_pha_mpx_file)
 
     print("changes acted on successfully")

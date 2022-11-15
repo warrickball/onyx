@@ -1,6 +1,7 @@
 import os
 
 from celery import Celery
+from celery.schedules import crontab
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "metadb.settings")
@@ -23,9 +24,9 @@ def debug_task(self):
 
 
 app.conf.beat_schedule = {
-    "create-mpx-table-task": {
-        "task": "data.tasks.create_mpx_table",
-        "schedule": int(os.environ["METADB_CELERY_BEAT_TIME"]),
+    "create-mpx-tables-task": {
+        "task": "data.tasks.create_mpx_tables",
+        "schedule": crontab(minute=f"*/{os.environ['METADB_CELERY_BEAT_TIME']}"),
     }
 }
-app.conf.task_routes = {"data.tasks.create_mpx_table": {"queue": "create_mpx_table"}}
+app.conf.task_routes = {"data.tasks.create_mpx_tables": {"queue": "create_mpx_tables"}}
