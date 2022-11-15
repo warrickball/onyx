@@ -13,6 +13,7 @@ import functools
 from . import models
 from .filters import METADBFilter
 from .models import Pathogen
+from .serializers import get_serializer
 from accounts.permissions import (
     IsAuthenticated,
     IsActiveUser,
@@ -102,7 +103,7 @@ class PathogenCodeView(METADBAPIView):
             logger.error(str(e))
             logger.error(traceback.format_exc())
             return Response(
-                {(type(e)).__name__: str(e)},
+                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -150,9 +151,7 @@ class CreateGetPathogenView(METADBAPIView):
             )
 
             # Serializer also carries out validation of input data
-            serializer = pathogen_model.get_serializer(user=request.user)(
-                data=request.data
-            )
+            serializer = get_serializer(pathogen_model, request.user)(data=request.data)
 
             # Rejected fields (e.g. CID) are not allowed during creation
             errors = {}
@@ -174,7 +173,7 @@ class CreateGetPathogenView(METADBAPIView):
             logger.error(str(e))
             logger.error(traceback.format_exc())
             return Response(
-                {(type(e)).__name__: str(e)},
+                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -267,9 +266,7 @@ class CreateGetPathogenView(METADBAPIView):
                 qs = qs.distinct(distinct)
 
                 # Serialize the results
-                serializer = pathogen_model.get_serializer(user=request.user)(
-                    qs, many=True
-                )
+                serializer = get_serializer(pathogen_model, request.user)(qs, many=True)
 
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:
@@ -289,7 +286,7 @@ class CreateGetPathogenView(METADBAPIView):
                 result_page = paginator.paginate_queryset(instances, request)
 
                 # Serialize the results
-                serializer = pathogen_model.get_serializer(user=request.user)(
+                serializer = get_serializer(pathogen_model, request.user)(
                     result_page, many=True
                 )
 
@@ -301,7 +298,7 @@ class CreateGetPathogenView(METADBAPIView):
             logger.error(str(e))
             logger.error(traceback.format_exc())
             return Response(
-                {(type(e)).__name__: str(e)},
+                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -359,7 +356,7 @@ class QueryPathogenView(METADBAPIView):
             qs = qs.filter(query)
 
             # Serialize the results
-            serializer = pathogen_model.get_serializer(user=request.user)(qs, many=True)
+            serializer = get_serializer(pathogen_model, request.user)(qs, many=True)
 
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -367,7 +364,7 @@ class QueryPathogenView(METADBAPIView):
             logger.error(str(e))
             logger.error(traceback.format_exc())
             return Response(
-                {(type(e)).__name__: str(e)},
+                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -427,7 +424,7 @@ class UpdateSuppressPathogenView(METADBAPIView):
             self.API_RESPONSE.warnings.update(unknown)
 
             # Serializer also carries out validation of input data
-            serializer = pathogen_model.get_serializer(user=request.user)(
+            serializer = get_serializer(pathogen_model, request.user)(
                 instance=instance, data=request.data, partial=True
             )
 
@@ -449,7 +446,7 @@ class UpdateSuppressPathogenView(METADBAPIView):
             logger.error(str(e))
             logger.error(traceback.format_exc())
             return Response(
-                {(type(e)).__name__: str(e)},
+                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -501,7 +498,7 @@ class UpdateSuppressPathogenView(METADBAPIView):
             logger.error(str(e))
             logger.error(traceback.format_exc())
             return Response(
-                {(type(e)).__name__: str(e)},
+                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -545,6 +542,6 @@ class DeletePathogenView(METADBAPIView):
             logger.error(str(e))
             logger.error(traceback.format_exc())
             return Response(
-                {(type(e)).__name__: str(e)},
+                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
