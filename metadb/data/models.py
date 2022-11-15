@@ -2,25 +2,23 @@ from django.db import models
 from django.core.validators import MinLengthValidator
 from django.db.models import Field
 from django.db.models.lookups import BuiltinLookup
-from rest_framework import serializers
 from secrets import token_hex
-
-from accounts.models import Site
 from utils.fields import YearMonthField, LowerCharField
-from utils.functions import (
-    enforce_optional_value_groups_create,
-    enforce_optional_value_groups_update,
-    enforce_yearmonth_order_create,
-    enforce_yearmonth_order_update,
-    enforce_yearmonth_non_future,
-)
-from utils import fieldserializers
 
 
 def generate_cid():
+    """
+    Simple recursive function that generates a random new CID.
+
+    The CID consists of the prefix `C-` followed by 8 random hex digits.
+
+    This means there are `16^8 = 4,294,967,296` CIDs to choose from - should be enough!
+    """
     cid = "C-" + "".join(token_hex(4).upper())
+
     if Pathogen.objects.filter(cid=cid).exists():
         cid = generate_cid()
+
     return cid
 
 
@@ -59,6 +57,28 @@ class IsNull(BuiltinLookup):
             return "%s IS NOT NULL" % sql, params
 
 
+# class FastaStatistics(models.Model):
+#     metadata = models.OneToOneField(
+#         "data.Pathogen", on_delete=models.CASCADE, related_name="fasta"
+#     )
+#     fasta_header = models.CharField(max_length=100)
+#     num_seqs = models.IntegerField()
+#     num_bases = models.IntegerField()
+#     pc_acgt = models.FloatField()
+#     gc_content = models.FloatField()
+#     pc_masked = models.FloatField()
+#     pc_invalid = models.FloatField()
+#     pc_ambig = models.FloatField()
+#     pc_ambig_2 = models.FloatField()
+#     pc_ambig_3 = models.FloatField()
+#     longest_acgt = models.IntegerField()
+#     longest_masked = models.IntegerField()
+#     longest_invalid = models.IntegerField()
+#     longest_ambig = models.IntegerField()
+#     longest_gap = models.IntegerField()
+#     longest_ungap = models.IntegerField()
+
+
 class Signal(models.Model):
     code = LowerCharField(max_length=8, unique=True)
     modified = models.DateTimeField()
@@ -84,6 +104,8 @@ class Pathogen(models.Model):
     published_date = models.DateField(auto_now_add=True)
 
     fasta_path = models.TextField()
+    # fasta_statistics = models.BooleanField(default=False)
+
     bam_path = models.TextField()
 
     class Meta:
@@ -96,6 +118,8 @@ class Pathogen(models.Model):
             models.Index(fields=["collection_month"]),
             models.Index(fields=["received_month"]),
             models.Index(fields=["published_date"]),
+            models.Index(fields=["fasta_path"]),
+            models.Index(fields=["bam_path"]),
         ]
 
     FIELD_PERMISSIONS = {
@@ -137,17 +161,13 @@ class Pathogen(models.Model):
     OPTIONAL_VALUE_GROUPS = []
 
     @classmethod
-    def user_fields(cls, user):
-        return [field for field, perms in cls.FIELD_PERMISSIONS.items()]
-
-    @classmethod
-    def create_fields(cls, user):
+    def create_fields(cls):
         return [
             field for field, perms in cls.FIELD_PERMISSIONS.items() if "create" in perms
         ]
 
     @classmethod
-    def no_create_fields(cls, user):
+    def no_create_fields(cls):
         return [
             field
             for field, perms in cls.FIELD_PERMISSIONS.items()
@@ -155,13 +175,13 @@ class Pathogen(models.Model):
         ]
 
     @classmethod
-    def update_fields(cls, user):
+    def update_fields(cls):
         return [
             field for field, perms in cls.FIELD_PERMISSIONS.items() if "update" in perms
         ]
 
     @classmethod
-    def no_update_fields(cls, user):
+    def no_update_fields(cls):
         return [
             field
             for field, perms in cls.FIELD_PERMISSIONS.items()
@@ -169,99 +189,11 @@ class Pathogen(models.Model):
         ]
 
     @classmethod
-    def filter_fields(cls, user):
-        if user.is_staff or user.site.is_pha:
-            filter_fields = cls.FILTER_FIELDS
-        else:
-            filter_fields = {}
-            for k, v in cls.FILTER_FIELDS.items():
-                if "root_field" in v:
-                    k = v["root_field"]
-                if "pha_only" not in cls.FIELD_PERMISSIONS[k]:
-                    filter_fields[k] = v
-        return filter_fields
-
-    @classmethod
-    def get_serializer(cls, user):
-        class PathogenSerializer(serializers.ModelSerializer):
-            pathogen_code = serializers.SlugRelatedField(
-                queryset=PathogenCode.objects.all(), slug_field="code"
-            )
-            site = serializers.SlugRelatedField(
-                queryset=Site.objects.all(), slug_field="code"
-            )
-            collection_month = fieldserializers.YearMonthField(
-                required=False, allow_null=True
-            )
-            received_month = fieldserializers.YearMonthField()
-
-            class Meta:
-                model = cls
-                fields = cls.user_fields(user)
-
-            def validate(self, data):
-                """
-                Additional validation carried out on either object creation or update
-
-                Update is indicated by the existence of a `self.instance`
-
-                Creation is indicated by `self.instance = None`
-                """
-                model = self.Meta.model
-                errors = {}
-
-                if self.instance:
-                    enforce_optional_value_groups_update(
-                        errors=errors,
-                        instance=self.instance,
-                        data=data,
-                        groups=model.OPTIONAL_VALUE_GROUPS,
-                    )
-                    enforce_yearmonth_order_update(
-                        errors=errors,
-                        instance=self.instance,
-                        lower_yearmonth="collection_month",
-                        higher_yearmonth="received_month",
-                        data=data,
-                    )
-
-                else:
-                    enforce_optional_value_groups_create(
-                        errors=errors,
-                        data=data,
-                        groups=model.OPTIONAL_VALUE_GROUPS,
-                    )
-                    enforce_yearmonth_order_create(
-                        errors=errors,
-                        lower_yearmonth="collection_month",
-                        higher_yearmonth="received_month",
-                        data=data,
-                    )
-
-                if data.get("collection_month"):
-                    enforce_yearmonth_non_future(
-                        errors=errors,
-                        name="collection_month",
-                        value=data["collection_month"],
-                    )
-
-                if data.get("received_month"):
-                    enforce_yearmonth_non_future(
-                        errors=errors,
-                        name="received_month",
-                        value=data["received_month"],
-                    )
-
-                if errors:
-                    raise serializers.ValidationError(errors)
-
-                return data
-
-        return PathogenSerializer
+    def filter_fields(cls):
+        return cls.FILTER_FIELDS
 
 
 class Mpx(Pathogen):
-    csv_template_version = models.TextField()
     sample_type = LowerCharField(
         max_length=50, choices=[("swab", "swab"), ("serum", "serum")]
     )
@@ -321,7 +253,6 @@ class Mpx(Pathogen):
     run_layout = LowerCharField(
         max_length=50, choices=[("single", "single"), ("paired", "paired")]
     )
-
     patient_ageband = LowerCharField(
         max_length=50,
         choices=[
@@ -364,6 +295,7 @@ class Mpx(Pathogen):
     sample_site = LowerCharField(
         max_length=50, choices=[("sore", "sore"), ("genital", "genital")], null=True
     )
+    csv_template_version = models.TextField()
 
     FIELD_PERMISSIONS = Pathogen.FIELD_PERMISSIONS | {
         "sample_type": ["create", "update"],
@@ -405,64 +337,3 @@ class Mpx(Pathogen):
         "bioinfo_pipe_name": {"type": models.TextField},
         "bioinfo_pipe_version": {"type": models.TextField},
     }
-
-    @classmethod
-    def get_serializer(cls, user):
-        class MpxSerializer(super().get_serializer(user)):
-            sample_type = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("sample_type").choices
-            )
-            seq_platform = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("seq_platform").choices
-            )
-            enrichment_method = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("enrichment_method").choices
-            )
-            seq_strategy = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("seq_strategy").choices
-            )
-            source_of_library = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("source_of_library").choices,
-            )
-            country = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("country").choices,
-            )
-            ukhsa_region = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("ukhsa_region").choices,
-            )
-            run_layout = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("run_layout").choices
-            )
-
-            patient_ageband = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("patient_ageband").choices,
-                required=False,
-                allow_null=True,
-            )
-            travel_status = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("travel_status").choices,
-                required=False,
-                allow_null=True,
-            )
-            sample_site = fieldserializers.LowerChoiceField(
-                choices=Mpx._meta.get_field("sample_site").choices,
-                required=False,
-                allow_null=True,
-            )
-
-            class Meta:
-                model = cls
-                fields = cls.user_fields(user)
-
-        return MpxSerializer
-
-
-class Covid(Pathogen):
-    @classmethod
-    def get_serializer(cls, user):
-        class CovidSerializer(super().get_serializer(user)):
-            class Meta:
-                model = cls
-                fields = cls.user_fields(user)
-
-        return CovidSerializer
