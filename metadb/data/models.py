@@ -188,10 +188,6 @@ class Pathogen(models.Model):
             if "update" not in perms
         ]
 
-    @classmethod
-    def filter_fields(cls):
-        return cls.FILTER_FIELDS
-
 
 class Mpx(Pathogen):
     sample_type = LowerCharField(

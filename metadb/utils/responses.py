@@ -1,11 +1,10 @@
-from rest_framework import status
-from rest_framework.response import Response
-
-
 class METADBAPIResponse:
     NOT_FOUND = "Not found."  # Generic 404 message
     UNKNOWN_FIELD = "This field is unknown."
     NON_ACCEPTED_FIELD = "This field cannot be accepted."
+    INTERNAL_SERVER_ERROR = (
+        "Congratulations. The server imploded because of your actions!"  # hehehe
+    )
 
     def __init__(self):
         self.errors = {}
@@ -23,32 +22,3 @@ class METADBAPIResponse:
             "warnings": self.warnings,
             "results": self.results,
         }
-
-
-class Responses:
-    # OK
-    _200_user_approved = Response(
-        {"detail": f"user was successfully approved"}, status=status.HTTP_200_OK
-    )
-
-    # Bad request
-    _400_mismatch_pathogen_code = Response(
-        {
-            "detail": "pathogen_code provided in request body does not match pathogen code in URL"
-        },
-        status=status.HTTP_400_BAD_REQUEST,
-    )
-    _400_no_updates_provided = Response(
-        {"detail": "no fields were provided for update"},
-        status=status.HTTP_400_BAD_REQUEST,
-    )
-
-    # Forbidden
-    _403_different_site = Response(
-        {"detail": "cannot approve this user. they belong to a different site"},
-        status=status.HTTP_403_FORBIDDEN,
-    )
-    _403_incorrect_site_for_user = Response(
-        {"detail": "provided site code does not match user's site code"},
-        status=status.HTTP_403_FORBIDDEN,
-    )

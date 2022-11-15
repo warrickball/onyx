@@ -1,4 +1,4 @@
-import basecount
+# import basecount
 
 
 # This function was written by Heng Li
@@ -182,34 +182,34 @@ def calculate_fasta_stats(fasta_path, decimal_places=None):
     }
 
 
-def calculate_bam_stats(bam_path, decimal_places=None):
-    if decimal_places is None:
-        decimal_places = 5
+# def calculate_bam_stats(bam_path, decimal_places=None):
+#     if decimal_places is None:
+#         decimal_places = 5
     
-    bc = basecount.BaseCount(bam_path, min_base_quality=0, min_mapping_quality=0)
+#     bc = basecount.BaseCount(bam_path, min_base_quality=0, min_mapping_quality=0)
 
-    pc_coverage = 100 * (len([record["coverage"] for record in bc.records() if record["coverage"] != 0]) / sum(bc.reference_lengths.values()))
-    bam_stats = {
-        "num_reads" : bc.num_reads(),
-        "pc_coverage" : round(pc_coverage, decimal_places),
-        "mean_depth" : round(bc.mean_coverage(), decimal_places),
-        "mean_entropy" : round(bc.mean_entropy(), decimal_places),
-        "vafs" : []
-    }
+#     pc_coverage = 100 * (len([record["coverage"] for record in bc.records() if record["coverage"] != 0]) / sum(bc.reference_lengths.values()))
+#     bam_stats = {
+#         "num_reads" : bc.num_reads(),
+#         "pc_coverage" : round(pc_coverage, decimal_places),
+#         "mean_depth" : round(bc.mean_coverage(), decimal_places),
+#         "mean_entropy" : round(bc.mean_entropy(), decimal_places),
+#         "vafs" : []
+#     }
 
-    records_gt_100 = [record for record in bc.records() if record["coverage"] >= 100]
-    top_vafs = sorted(records_gt_100, key=lambda d: d["entropy"], reverse=True)[:10]
-    for vaf in top_vafs:
-        bam_stats["vafs"].append(
-            {
-                "reference" : vaf["reference"],
-                "position" : vaf["position"],
-                "depth" : vaf["coverage"],
-                "num_a" : vaf["num_a"],
-                "num_c" : vaf["num_c"],
-                "num_g" : vaf["num_g"],
-                "num_t" : vaf["num_t"],
-                "num_ds" : vaf["num_ds"]
-            }
-        )
-    return bam_stats
+#     records_gt_100 = [record for record in bc.records() if record["coverage"] >= 100]
+#     top_vafs = sorted(records_gt_100, key=lambda d: d["entropy"], reverse=True)[:10]
+#     for vaf in top_vafs:
+#         bam_stats["vafs"].append(
+#             {
+#                 "reference" : vaf["reference"],
+#                 "position" : vaf["position"],
+#                 "depth" : vaf["coverage"],
+#                 "num_a" : vaf["num_a"],
+#                 "num_c" : vaf["num_c"],
+#                 "num_g" : vaf["num_g"],
+#                 "num_t" : vaf["num_t"],
+#                 "num_ds" : vaf["num_ds"]
+#             }
+#         )
+#     return bam_stats
