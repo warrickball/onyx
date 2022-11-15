@@ -144,3 +144,75 @@ class IsSameSiteAsUser(permissions.BasePermission):
 
         # Check that request user is in the same site as the target user
         return bool(request.user and getattr(request.user, "site", False) == obj.site)
+
+
+# Useful permissions groupings
+Any = [
+    AllowAny,
+]
+
+Admin = [
+    IsAuthenticated,
+    IsActiveSite,
+    IsActiveUser,
+    IsAdminUser,
+]
+
+ApprovedOrAdmin = [
+    IsAuthenticated,
+    IsActiveSite,
+    IsActiveUser,
+    (
+        [
+            IsSiteApproved,
+            IsAdminApproved,
+        ],
+        IsAdminUser,
+    ),
+]
+
+
+SiteAuthorityOrAdmin = [
+    IsAuthenticated,
+    IsActiveSite,
+    IsActiveUser,
+    (
+        [
+            IsSiteApproved,
+            IsAdminApproved,
+            IsSiteAuthority,
+        ],
+        IsAdminUser,
+    ),
+]
+
+
+SameSiteAuthorityAsUnsuppressedCIDOrAdmin = [
+    IsAuthenticated,
+    IsActiveSite,
+    IsActiveUser,
+    (
+        [
+            IsSiteApproved,
+            IsAdminApproved,
+            IsSiteAuthority,
+            IsSameSiteAsUnsuppressedCID,
+        ],
+        IsAdminUser,
+    ),
+]
+
+SameSiteAuthorityAsUserOrAdmin = [
+    IsAuthenticated,
+    IsActiveSite,
+    IsActiveUser,
+    (
+        [
+            IsSiteApproved,
+            IsAdminApproved,
+            IsSiteAuthority,
+            IsSameSiteAsUser,
+        ],
+        IsAdminUser,
+    ),
+]
