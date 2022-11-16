@@ -46,7 +46,7 @@ def create_mpx_tables():
 
     if (not created) and (
         (timezone.now() - signal.modified).total_seconds()
-        > int(os.environ["METADB_CELERY_BEAT_TIME"])
+        > 60 * int(os.environ["METADB_CELERY_BEAT_TIME"])
     ):
         print("no changes detected")
         return None
