@@ -12,15 +12,11 @@ from .serializers import (
 from utils.responses import METADBAPIResponse
 from utils.views import METADBAPIView, METADBCreateAPIView, METADBListAPIView
 from .permissions import (
-    AllowAny,
-    IsAuthenticated,
-    IsActiveUser,
-    IsActiveSite,
-    IsSiteApproved,
-    IsAdminApproved,
-    IsSiteAuthority,
-    IsAdminUser,
-    IsSameSiteAsUser,
+    Any,
+    Admin,
+    ApprovedOrAdmin,
+    SiteAuthorityOrAdmin,
+    SameSiteAuthorityAsUserOrAdmin,
 )
 
 
@@ -41,7 +37,7 @@ class CreateUserView(METADBCreateAPIView):
     Create a user.
     """
 
-    permission_classes = [AllowAny]
+    permission_classes = Any
     serializer_class = UserSerializer
     queryset = User.objects.all()
 
@@ -91,20 +87,7 @@ class SiteApproveView(METADBAPIView):
     Grant site approval to a user.
     """
 
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveSite,
-        IsActiveUser,
-        (
-            [
-                IsSiteApproved,
-                IsAdminApproved,
-                IsSiteAuthority,
-                IsSameSiteAsUser,
-            ],
-            IsAdminUser,
-        ),
-    ]
+    permission_classes = SameSiteAuthorityAsUserOrAdmin
 
     def patch(self, request, username):
         # Get user to be approved
@@ -135,12 +118,7 @@ class AdminApproveView(METADBAPIView):
     Grant admin approval to a user.
     """
 
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveSite,
-        IsActiveUser,
-        IsAdminUser,
-    ]
+    permission_classes = Admin
 
     def patch(self, request, username):
         # Get user to be approved
@@ -171,19 +149,7 @@ class SiteWaitingView(METADBListAPIView):
     List all users waiting for site approval.
     """
 
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveSite,
-        IsActiveUser,
-        (
-            [
-                IsSiteApproved,
-                IsAdminApproved,
-                IsSiteAuthority,
-            ],
-            IsAdminUser,
-        ),
-    ]
+    permission_classes = SiteAuthorityOrAdmin
     serializer_class = SiteWaitingUserSerializer
 
     def get_queryset(self):
@@ -207,12 +173,7 @@ class AdminWaitingView(METADBListAPIView):
     List all users waiting for admin approval.
     """
 
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveSite,
-        IsActiveUser,
-        IsAdminUser,
-    ]
+    permission_classes = Admin
     serializer_class = AdminWaitingUserSerializer
 
     def get_queryset(self):
@@ -229,12 +190,7 @@ class SiteUsersView(METADBListAPIView):
     List all users in the site of the requesting user.
     """
 
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveSite,
-        IsActiveUser,
-        ([IsSiteApproved, IsAdminApproved], IsAdminUser),
-    ]
+    permission_classes = ApprovedOrAdmin
     serializer_class = UserSerializer
 
     def get_queryset(self):
@@ -246,12 +202,7 @@ class AdminUsersView(METADBListAPIView):
     List all users.
     """
 
-    permission_classes = [
-        IsAuthenticated,
-        IsActiveSite,
-        IsActiveUser,
-        IsAdminUser,
-    ]
+    permission_classes = Admin
     serializer_class = UserSerializer
 
     def get_queryset(self):
