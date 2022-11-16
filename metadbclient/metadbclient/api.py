@@ -351,17 +351,23 @@ class Client:
                 _next = None
 
     @utils.session_required
-    def query(self, pathogen_code, query):
+    def query(self, pathogen_code, query, group=None):
         """
         Get records from the database.
         """
         if not isinstance(query, Field):
             raise Exception("Query must be of type Field")
 
+        params = {}
+
+        if group is not None:
+            params["group"] = group
+
         response = self.request(
             method=requests.post,
             url=self.endpoints["query"](pathogen_code),
             json=query.query,
+            params=params,
         )
 
         return response

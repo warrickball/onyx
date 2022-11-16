@@ -13,6 +13,9 @@ class Field:
         check_kwargs(kwargs)
         field, value = next(iter(kwargs.items()))
 
+        if (field not in ["&", "|", "^", "~"]) and type(value) in [list, tuple]:
+            value = ",".join(value)
+
         if isinstance(value, tuple):
             value = list(value)
 
