@@ -188,27 +188,35 @@ class AdminMpxSerializer(PhaMpxSerializer):
 
 serializer_map = {
     Pathogen: {
-        "all": PathogenSerializer,
-        "pha": PathogenSerializer,
+        "any": PathogenSerializer,
         "admin": AdminPathogenSerializer,
     },
     Mpx: {
-        "all": MpxSerializer,
+        "any": MpxSerializer,
         "pha": PhaMpxSerializer,
         "admin": AdminMpxSerializer,
     },
 }
 
 
-def get_serializer(model, user):
+def get_serializer(model, user, group=None):
     """
     Function that returns the appropriate serializer for the given model, depending on the user's permissions.
     """
-    if user.is_staff:
-        return serializer_map[model]["admin"]
+    if group == "admin":
+        if user.is_staff:
+            return serializer_map[model].get("admin", serializer_map[model]["any"])
+        else:
+            return "You do not have permission to view this."
 
-    elif user.site.is_pha:
-        return serializer_map[model]["pha"]
+    elif group == "pha":
+        if user.is_staff or user.site.is_pha:
+            return serializer_map[model].get("pha", serializer_map[model]["any"])
+        else:
+            return "You do not have permission to view this."
+
+    elif group == "any" or group is None:
+        return serializer_map[model]["any"]
 
     else:
-        return serializer_map[model]["all"]
+        return "Not found."

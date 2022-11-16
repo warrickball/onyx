@@ -87,27 +87,29 @@ BOOLEAN_CHOICES = (
 
 
 class METADBFilter(filters.FilterSet):
-    def __init__(self, pathogen_model, user, *args, **kwargs):
+    def __init__(self, pathogen_model, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        user_fields = pathogen_model.filter_fields(user=user)
+        pathogen_fields = pathogen_model.FILTER_FIELDS
 
         for field, value in self.data.items():
-            if user_fields.get(field):
+            if pathogen_fields.get(field):
                 if isinstance(value, str):
-                    if user_fields[field].get("choices") or user_fields[field].get(
-                        "db_choices"
-                    ):
+                    if pathogen_fields[field].get("choices") or pathogen_fields[
+                        field
+                    ].get("db_choices"):
                         self.data[field] = value.lower()
             else:
-                for f, f_d in user_fields.items():
+                for f, f_d in pathogen_fields.items():
                     if "alias" in f_d and f_d["alias"] == field:
                         if isinstance(value, str):
                             if f_d.get("choices") or f_d.get("db_choices"):
                                 self.data[field] = value.lower()
                         break
 
-        for field, field_data in user_fields.items():
+        self.base_filters = []
+
+        for field, field_data in pathogen_fields.items():
             # Name for the field, used by the user when filtering
             # An alias allows for renaming of fields, e.g. site__code is renamed to site
             filter_name = field_data["alias"] if "alias" in field_data else field
@@ -116,6 +118,8 @@ class METADBFilter(filters.FilterSet):
             # then we know its not needed and can be skipped
             if not any(x.startswith(filter_name) for x in self.data):
                 continue
+
+            self.base_filters.append(filter_name)
 
             # Column type for the field
             field_type = field_data["type"]
