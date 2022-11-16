@@ -434,8 +434,6 @@ class QueryPathogenView(METADBAPIView):
                     data=filterset_data,
                     queryset=pathogen_model.objects.none(),
                 )
-                # Retrieve the resulting filtered queryset
-                qs = filterset.qs
 
                 # On first pass, append any unknown fields to error dict
                 if i == 0:
