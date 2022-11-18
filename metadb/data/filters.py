@@ -34,14 +34,11 @@ class DBValuesRangeFilter(filters.BaseRangeFilter, DBValuesFilter):
     pass
 
 
-class NumericInFilter(filters.BaseInFilter, filters.NumberFilter):
+class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
     pass
 
 
-# filters.NumericRangeFilter was the wrong choice to begin with
-# https://django-filter.readthedocs.io/en/latest/ref/filters.html#numericrangefilter
-# Thank you tests for highlighting this
-class NumericRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
+class NumberRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
     pass
 
 
@@ -232,6 +229,30 @@ class METADBFilter(filters.FilterSet):
                         field_name=field, lookup_expr=lookup
                     )
 
+            elif field_type in [models.IntegerField, models.FloatField]:
+                self.filters[filter_name] = filters.NumberFilter(field_name=field)
+
+                self.filters[filter_name + "__in"] = NumberInFilter(
+                    field_name=field, lookup_expr="in"
+                )
+                self.filters[filter_name + "__notin"] = NumberInFilter(
+                    field_name=field, lookup_expr="in", exclude=True
+                )
+                self.filters[filter_name + "__range"] = NumberRangeFilter(
+                    field_name=field, lookup_expr="range"
+                )
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
+                    field_name=field,
+                    choices=BOOLEAN_CHOICES,
+                    coerce=strtobool,
+                    lookup_expr="isnull",
+                )
+
+                for lookup in BASE_LOOKUPS:
+                    self.filters[filter_name + "__" + lookup] = filters.NumberFilter(
+                        field_name=field, lookup_expr=lookup
+                    )
+
             elif field_type == YearMonthField:
                 self.filters[filter_name] = filters.DateFilter(
                     field_name=field, input_formats=["%Y-%m"]
@@ -259,11 +280,11 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__iso_year"] = filters.NumberFilter(
                     field_name=field, lookup_expr="iso_year"
                 )
-                self.filters[filter_name + "__iso_year__in"] = NumericInFilter(
+                self.filters[filter_name + "__iso_year__in"] = NumberInFilter(
                     field_name=field,
                     lookup_expr="iso_year__in",
                 )
-                self.filters[filter_name + "__iso_year__range"] = NumericRangeFilter(
+                self.filters[filter_name + "__iso_year__range"] = NumberRangeFilter(
                     field_name=field,
                     lookup_expr="iso_year__range",
                 )
@@ -298,22 +319,22 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__iso_year"] = filters.NumberFilter(
                     field_name=field, lookup_expr="iso_year"
                 )
-                self.filters[filter_name + "__iso_year__in"] = NumericInFilter(
+                self.filters[filter_name + "__iso_year__in"] = NumberInFilter(
                     field_name=field,
                     lookup_expr="iso_year__in",
                 )
-                self.filters[filter_name + "__iso_year__range"] = NumericRangeFilter(
+                self.filters[filter_name + "__iso_year__range"] = NumberRangeFilter(
                     field_name=field,
                     lookup_expr="iso_year__range",
                 )
                 self.filters[filter_name + "__iso_week"] = filters.NumberFilter(
                     field_name=field, lookup_expr="week"
                 )
-                self.filters[filter_name + "__iso_week__in"] = NumericInFilter(
+                self.filters[filter_name + "__iso_week__in"] = NumberInFilter(
                     field_name=field,
                     lookup_expr="week__in",
                 )
-                self.filters[filter_name + "__iso_week__range"] = NumericRangeFilter(
+                self.filters[filter_name + "__iso_week__range"] = NumberRangeFilter(
                     field_name=field,
                     lookup_expr="week__range",
                 )
