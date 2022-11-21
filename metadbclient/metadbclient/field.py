@@ -11,13 +11,11 @@ def check_field(field):
 class Field:
     def __init__(self, **kwargs):
         check_kwargs(kwargs)
+
         field, value = next(iter(kwargs.items()))
 
-        if (field not in ["&", "|", "^", "~"]) and type(value) in [list, tuple]:
-            value = ",".join(value)
-
-        if isinstance(value, tuple):
-            value = list(value)
+        if (field not in ["&", "|", "^", "~"]) and (type(value) in [list, tuple, set]):
+            value = ",".join(map(str, value))
 
         self.query = {field: value}
 
