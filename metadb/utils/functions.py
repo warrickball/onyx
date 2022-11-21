@@ -1,6 +1,14 @@
 from datetime import datetime
 
 
+def init_queryset(pathogen_model, user):
+    if user.is_staff:
+        qs = pathogen_model.objects.all()
+    else:
+        qs = pathogen_model.objects.filter(suppressed=False)
+    return qs
+
+
 def enforce_optional_value_groups_create(errors, data, groups):
     """
     Ensure each of the provided groups of fields has at least one non-null field on instance creation.

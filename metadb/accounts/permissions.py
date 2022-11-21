@@ -1,6 +1,7 @@
 from rest_framework import permissions, exceptions
 from data.models import Pathogen
 from accounts.models import User
+from utils.functions import init_queryset
 
 
 class AllowAny(permissions.BasePermission):
@@ -108,16 +109,16 @@ class IsAdminUser(permissions.BasePermission):
         return bool(request.user and getattr(request.user, "is_staff", False))
 
 
-class IsSameSiteAsUnsuppressedCID(permissions.BasePermission):
+class IsSameSiteAsCID(permissions.BasePermission):
     """
-    Allows access only to users of the same site as the (unsuppressed) cid they are accessing.
+    Allows access only to users of the same site as the cid they are accessing.
     """
 
     def has_permission(self, request, view):
         cid = view.kwargs["cid"]
 
         try:
-            obj = Pathogen.objects.get(suppressed=False, cid=cid)
+            obj = init_queryset(Pathogen, request.user).get(cid=cid)
         except Pathogen.DoesNotExist:
             raise exceptions.NotFound({cid: "Not found."})
 
@@ -196,7 +197,7 @@ SameSiteAuthorityAsUnsuppressedCIDOrAdmin = [
             IsSiteApproved,
             IsAdminApproved,
             IsSiteAuthority,
-            IsSameSiteAsUnsuppressedCID,
+            IsSameSiteAsCID,
         ],
         IsAdminUser,
     ),
