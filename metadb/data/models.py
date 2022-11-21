@@ -8,7 +8,7 @@ from utils.fields import YearMonthField, LowerCharField
 
 def generate_cid():
     """
-    Simple recursive function that generates a random new CID.
+    Simple function that generates a random new CID.
 
     The CID consists of the prefix `C-` followed by 8 random hex digits.
 
@@ -104,8 +104,6 @@ class Pathogen(models.Model):
     published_date = models.DateField(auto_now_add=True)
 
     fasta_path = models.TextField()
-    # fasta_statistics = models.BooleanField(default=False)
-
     bam_path = models.TextField()
 
     class Meta:
@@ -123,6 +121,10 @@ class Pathogen(models.Model):
         ]
 
     FIELD_PERMISSIONS = {
+        "id": [],
+        "created": [],
+        "last_modified": [],
+        "suppressed": [],
         "pathogen_code": ["create"],
         "site": ["create"],
         "cid": [],
@@ -136,17 +138,19 @@ class Pathogen(models.Model):
     }
 
     FILTER_FIELDS = {
+        "id": {"type": models.IntegerField},
+        "created": {"type": models.DateTimeField},
+        "last_modified": {"type": models.DateTimeField},
+        "suppressed": {"type": models.BooleanField},
         "pathogen_code__code": {
             "type": models.CharField,
             "db_choices": True,
             "alias": "pathogen_code",
-            "root_field": "pathogen_code",
         },
         "site__code": {
             "type": models.CharField,
             "db_choices": True,
             "alias": "site",
-            "root_field": "site",
         },
         "cid": {"type": models.CharField},
         "sample_id": {"type": models.CharField},
@@ -332,4 +336,5 @@ class Mpx(Pathogen):
         "seq_strategy": {"type": LowerCharField, "choices": True},
         "bioinfo_pipe_name": {"type": models.TextField},
         "bioinfo_pipe_version": {"type": models.TextField},
+        "csv_template_version": {"type": models.TextField},
     }

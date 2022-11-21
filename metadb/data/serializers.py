@@ -97,6 +97,7 @@ class AdminPathogenSerializer(PathogenSerializer):
     class Meta:
         model = Pathogen
         fields = PathogenSerializer.Meta.fields + [
+            "id",
             "created",
             "last_modified",
             "suppressed",
@@ -179,6 +180,7 @@ class AdminMpxSerializer(PhaMpxSerializer):
     class Meta:
         model = Mpx
         fields = PhaMpxSerializer.Meta.fields + [
+            "id",
             "created",
             "last_modified",
             "suppressed",

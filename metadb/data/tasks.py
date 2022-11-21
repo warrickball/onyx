@@ -17,7 +17,7 @@ import os
 #     metadata = Pathogen.objects.get(cid=cid)
 #     fasta = FastaStatistics.objects.create(metadata=metadata, **fasta_data)
 #     metadata.fasta_statistics = True
-#     metadata.save(update_fields=["fasta_statistics"])
+#     metadata.save(update_fields=["fasta_statistics", "last_modified"])
 
 
 # @shared_task
@@ -26,7 +26,7 @@ import os
 #     metadata = Pathogen.objects.get(cid=cid)
 #     bam = BamStatistics.objects.create(metadata=metadata, **bam_data)
 #     metadata.bam_statistics = True
-#     metadata.save(update_fields=["bam_statistics"])
+#     metadata.save(update_fields=["bam_statistics", "last_modified"])
 
 
 def paginator(qs, cursor=None, page_size=5000):
