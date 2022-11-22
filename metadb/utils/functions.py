@@ -1,12 +1,42 @@
+from .responses import METADBAPIResponse
 from datetime import datetime
 
 
-def init_queryset(pathogen_model, user):
+def init_pathogen_queryset(pathogen_model, user):
+    """
+    Return an initial queryset of the provided `pathogen_model`.
+
+    If `user.is_staff = True`, returns all objects, otherwise only returns objects with `suppressed = False`.
+    """
     if user.is_staff:
         qs = pathogen_model.objects.all()
     else:
         qs = pathogen_model.objects.filter(suppressed=False)
     return qs
+
+
+def enforce_field_set(data, user_fields, accepted_fields, rejected_fields):
+    """
+    Check `data` for unknown fields, or known fields which cannot be accepted.
+    """
+    rejected = {}
+    unknown = {}
+
+    for field in data:
+        # Fields that are always rejected in the given scenario
+        if field in rejected_fields:
+            rejected[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
+
+        # Neither accepted or rejected, must be unknown
+        elif field not in accepted_fields:
+            unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
+
+        # By this stage, the field must be acceptable for the given scenario
+        # But it may not be acceptable for this particular user
+        elif field not in user_fields:
+            rejected[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
+
+    return rejected, unknown
 
 
 def enforce_optional_value_groups_create(errors, data, groups):

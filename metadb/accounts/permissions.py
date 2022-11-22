@@ -1,7 +1,7 @@
 from rest_framework import permissions, exceptions
 from data.models import Pathogen
 from accounts.models import User
-from utils.functions import init_queryset
+from utils.functions import init_pathogen_queryset
 
 
 class AllowAny(permissions.BasePermission):
@@ -118,7 +118,7 @@ class IsSameSiteAsCID(permissions.BasePermission):
         cid = view.kwargs["cid"]
 
         try:
-            obj = init_queryset(Pathogen, request.user).get(cid=cid)
+            obj = init_pathogen_queryset(Pathogen, request.user).get(cid=cid)
         except Pathogen.DoesNotExist:
             raise exceptions.NotFound({cid: "Not found."})
 

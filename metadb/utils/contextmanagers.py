@@ -4,7 +4,7 @@ from contextlib import contextmanager
 @contextmanager
 def mutable(obj):
     """
-    If the provided `obj` has a `_mutable` property, this context manager temporarily sets it to true
+    If the provided `obj` has a `_mutable` property, this context manager temporarily sets it to `True`
     """
     mutable = getattr(obj, "_mutable", None)
     if mutable is not None:
