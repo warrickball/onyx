@@ -21,8 +21,11 @@ from accounts.permissions import (
 )
 from utils.views import METADBAPIView
 from utils.responses import METADBAPIResponse
+from utils.functions import init_pathogen_queryset, enforce_field_set
+from utils.contextmanagers import mutable
 
 
+# TODO: Move elsewhere
 logger = logging.getLogger("Rotating Log")
 logger.setLevel(logging.ERROR)
 handler = RotatingFileHandler(
@@ -50,30 +53,6 @@ def get_pathogen_model(pathogen_code, accept_base=False):
                 return model
 
     return None
-
-
-def enforce_field_set(data, user_fields, accepted_fields, rejected_fields):
-    """
-    Check `data` for unknown fields, or known fields which cannot be accepted.
-    """
-    rejected = {}
-    unknown = {}
-
-    for field in data:
-        # Fields that are always rejected in the given scenario
-        if field in rejected_fields:
-            rejected[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
-
-        # Neither accepted or rejected, must be unknown
-        elif field not in accepted_fields:
-            unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
-
-        # By this stage, the field must be acceptable for the given scenario
-        # But it may not be acceptable for this particular user
-        elif field not in user_fields:
-            rejected[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
-
-    return rejected, unknown
 
 
 class PathogenCodeView(METADBAPIView):
@@ -131,21 +110,11 @@ class CreateGetPathogenView(METADBAPIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # If an immutable request body was provided, temporarily set to mutable
-            # This is needed for tests to work
-            mutable = getattr(request.data, "_mutable", None)
-            if mutable is not None:
-                mutable = request.data._mutable
-                request.data._mutable = True
-
-            # While mutable, remove the group parameter from the request body
-            group = request.data.get("group")
-            if group:
-                request.data.pop("group")
-
-            # Reset request body to immutable
-            if mutable is not None:
-                request.data._mutable = mutable
+            # Remove the group parameter from the request body
+            with mutable(request.data) as data:
+                group = data.get("group")
+                if group:
+                    data.pop("group")
 
             # Get user serializer
             serializer = get_serializer(pathogen_model, request.user, group=group)
@@ -211,26 +180,19 @@ class CreateGetPathogenView(METADBAPIView):
             paginator.ordering = "created"
             paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
 
-            # Set the request query params object to mutable
-            _mutable = request.query_params._mutable
-            request.query_params._mutable = True
+            # Remove cursor, distinct and group parameters from the query params
+            with mutable(request.query_params) as query_params:
+                cursor = query_params.get(paginator.cursor_query_param)
+                if cursor:
+                    query_params.pop(paginator.cursor_query_param)
 
-            # While mutable remove cursor, distinct and group parameters from the query params
-            # These params are considered separately and are not used for filtering
-            cursor = request.query_params.get(paginator.cursor_query_param)
-            if cursor:
-                request.query_params.pop(paginator.cursor_query_param)
+                distinct = query_params.get("distinct")
+                if distinct:
+                    query_params.pop("distinct")
 
-            distinct = request.query_params.get("distinct")
-            if distinct:
-                request.query_params.pop("distinct")
-
-            group = request.query_params.get("group")
-            if group:
-                request.query_params.pop("group")
-
-            # Reset query params to immutable
-            request.query_params._mutable = _mutable
+                group = query_params.get("group")
+                if group:
+                    query_params.pop("group")
 
             # Get user serializer
             serializer = get_serializer(pathogen_model, request.user, group=group)
@@ -256,7 +218,7 @@ class CreateGetPathogenView(METADBAPIView):
             errors = {}
 
             # Initial queryset
-            qs = pathogen_model.objects.filter(suppressed=False)
+            qs = init_pathogen_queryset(pathogen_model, user=request.user)
 
             for i, filterset_data in enumerate(filterset_datas):
                 # Generate filterset of current queryset
@@ -306,10 +268,8 @@ class CreateGetPathogenView(METADBAPIView):
 
                 # Add the pagination cursor param back into the request
                 if cursor is not None:
-                    _mutable = request.query_params._mutable
-                    request.query_params._mutable = True
-                    request.query_params[paginator.cursor_query_param] = cursor
-                    request.query_params._mutable = _mutable
+                    with mutable(request.query_params) as query_params:
+                        query_params[paginator.cursor_query_param] = cursor
 
                 # Paginate the response
                 instances = qs.order_by("id")
@@ -332,6 +292,53 @@ class CreateGetPathogenView(METADBAPIView):
             )
 
 
+class QField:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+
+
+def make_qfields(data):
+    key, value = next(iter(data.items()))
+
+    if key in ["&", "|", "^", "~"]:
+        for k_v in value:
+            make_qfields(k_v)
+    else:
+        data[key] = QField(key, value)
+
+
+def get_qfields_flat(data):
+    """
+    Traverses the provided `data`, that specifies an arbitrarily complex query, and returns a list of all `(key, value)` fields.
+    """
+    key, value = next(iter(data.items()))
+
+    # AND of multiple key-value pairs
+    if key == "&":
+        k_v_objects = [get_qfields_flat(k_v) for k_v in value]
+        return functools.reduce(operator.add, k_v_objects)
+
+    # OR of multiple key-value pairs
+    elif key == "|":
+        k_v_objects = [get_qfields_flat(k_v) for k_v in value]
+        return functools.reduce(operator.add, k_v_objects)
+
+    # XOR of multiple key-value pairs
+    elif key == "^":
+        k_v_objects = [get_qfields_flat(k_v) for k_v in value]
+        return functools.reduce(operator.add, k_v_objects)
+
+    # NOT of a single key-value pair
+    elif key == "~":
+        k_v_object = [get_qfields_flat(k_v) for k_v in value][0]
+        return k_v_object
+
+    # Base case: a key-value pair we want to filter on
+    else:
+        return [(key, value)]
+
+
 def get_query(data):
     """
     Traverses the provided `data`, that specifies an arbitrarily complex query, and forms the corresponding Q object.
@@ -342,34 +349,30 @@ def get_query(data):
 
     # AND of multiple key-value pairs
     if key == "&":
-        q_objects, k_v_objects = zip(*(get_query(k_v) for k_v in value))
-        return functools.reduce(operator.and_, q_objects), functools.reduce(
-            operator.add, k_v_objects
-        )
+        q_objects = [get_query(k_v) for k_v in value]
+        return functools.reduce(operator.and_, q_objects)
 
     # OR of multiple key-value pairs
     elif key == "|":
-        q_objects, k_v_objects = zip(*(get_query(k_v) for k_v in value))
-        return functools.reduce(operator.or_, q_objects), functools.reduce(
-            operator.add, k_v_objects
-        )
+        q_objects = [get_query(k_v) for k_v in value]
+        return functools.reduce(operator.or_, q_objects)
 
     # XOR of multiple key-value pairs
     elif key == "^":
-        q_objects, k_v_objects = zip(*(get_query(k_v) for k_v in value))
-        return functools.reduce(operator.xor, q_objects), functools.reduce(
-            operator.add, k_v_objects
-        )
+        q_objects = [get_query(k_v) for k_v in value]
+        return functools.reduce(operator.xor, q_objects)
 
     # NOT of a single key-value pair
     elif key == "~":
-        q_object, k_v_object = [get_query(k_v) for k_v in value][0]
-        return ~q_object, k_v_object
+        q_object = [get_query(k_v) for k_v in value][0]
+        return ~q_object
 
     # Base case: a key-value pair we want to filter on
     else:
-        q = Q(**{key: value})
-        return q, [(key, value)]
+        q = Q(
+            **{value.key: value.value}
+        )  # value is a QField (hopefully with clean data)
+        return q
 
 
 class QueryPathogenView(METADBAPIView):
@@ -387,28 +390,29 @@ class QueryPathogenView(METADBAPIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            _mutable = request.query_params._mutable
-            request.query_params._mutable = True
+            # Remove the group parameter from the request
+            with mutable(request.query_params) as query_params:
+                group = query_params.get("group")
+                if group:
+                    query_params.pop("group")
 
-            # Remove the group parameter from the request, as its not a filter parameter
-            group = request.query_params.get("group")
-            if group:
-                request.query_params.pop("group")
+            # Turn the value of each key-value pair in request.data into a 'QField' object
+            make_qfields(request.data)
 
-            request.query_params._mutable = _mutable
+            # Get flattened list of qfields
+            qfields = get_qfields_flat(request.data)
 
             # Get user serializer
             serializer = get_serializer(pathogen_model, request.user, group=group)
 
+            # If the serializer returned a string, this is an indication something went wrong regarding the group
+            # The error string is returned along with the name of the group
             if isinstance(serializer, str):
                 return Response({group: serializer}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Get Q object for the users query, as well as the fields used to form it
-            query, fields = get_query(request.data)
-
-            # Convert the key-value pairs used to form the Q object in to a structure that resembles the get request's query_params
+            # Convert the key-value pairs into a structure that resembles the get request's query_params
             request_structured_data = {}
-            for field, value in fields:
+            for field, value in qfields:
                 request_structured_data.setdefault(field, []).append(value)
 
             # Validate this structure using the filterset
@@ -431,7 +435,7 @@ class QueryPathogenView(METADBAPIView):
                 # Slightly cursed, but it works
                 filterset = METADBFilter(
                     pathogen_model,
-                    data=filterset_data,
+                    data={k: v.value for k, v in filterset_data.items()},
                     queryset=pathogen_model.objects.none(),
                 )
 
@@ -446,18 +450,36 @@ class QueryPathogenView(METADBAPIView):
                         if field not in serializer.Meta.fields:
                             errors[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
 
-                if not filterset.is_valid():
+                if errors or not filterset.is_valid():
                     # Append any filterset errors to the errors dict
                     for field, msg in filterset.errors.items():
                         errors[field] = msg
+
+                else:
+                    # Add clean value to the qfields
+                    for k, qfield in filterset_data.items():
+                        qfield.value = filterset.form.cleaned_data[k]
+
+                    # Need to swap out provided aliases for actual field names
+                    for field, field_data in pathogen_model.FILTER_FIELDS.items():
+                        if field_data.get("alias"):
+                            for k, v in filterset_data.items():
+                                if k.startswith(
+                                    field_data["alias"]
+                                ) and not k.startswith(field):
+                                    v.key = field + v.key.removeprefix(
+                                        field_data["alias"]
+                                    )
 
             if errors:
                 return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
             # The data has been validated (to the best of my knowledge)
-            # Now form the initial queryset, and filter by the Q object
-            qs = pathogen_model.objects.filter(suppressed=False)
-            qs = qs.filter(query)
+            # Form the query (a Q object)
+            query = get_query(request.data)
+
+            # Form the queryset, then filter by the Q object
+            qs = init_pathogen_queryset(pathogen_model, user=request.user).filter(query)
 
             # Serialize the results
             serializer = serializer(qs, many=True)
@@ -493,29 +515,26 @@ class UpdateSuppressPathogenView(METADBAPIView):
 
             try:
                 # Get the instance to be updated
-                instance = pathogen_model.objects.get(suppressed=False, cid=cid)
+                instance = init_pathogen_queryset(
+                    pathogen_model, user=request.user
+                ).get(cid=cid)
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
                 return Response(
                     {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
                 )
 
-            mutable = getattr(request.data, "_mutable", None)
-            if mutable is not None:
-                mutable = request.data._mutable
-                request.data._mutable = True
-
             # Remove the group parameter from the request
-            group = request.data.get("group")
-            if group:
-                request.data.pop("group")
-
-            if mutable is not None:
-                request.data._mutable = mutable
+            with mutable(request.data) as data:
+                group = data.get("group")
+                if group:
+                    data.pop("group")
 
             # Get user serializer
             serializer = get_serializer(pathogen_model, request.user, group=group)
 
+            # If the serializer returned a string, this is an indication something went wrong regarding the group
+            # The error string is returned along with the name of the group
             if isinstance(serializer, str):
                 return Response({group: serializer}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -576,7 +595,10 @@ class UpdateSuppressPathogenView(METADBAPIView):
 
             try:
                 # Get the instance to be suppressed
-                instance = pathogen_model.objects.get(suppressed=False, cid=cid)
+                instance = init_pathogen_queryset(
+                    pathogen_model, user=request.user
+                ).get(cid=cid)
+
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
                 return Response(
@@ -585,11 +607,10 @@ class UpdateSuppressPathogenView(METADBAPIView):
 
             # Suppress and save
             instance.suppressed = True
-            instance.save(update_fields=["suppressed"])
+            instance.save(update_fields=["suppressed", "last_modified"])
 
             # Just to double check
             try:
-                # Get the instance to be suppressed
                 instance = pathogen_model.objects.get(cid=cid)
             except pathogen_model.DoesNotExist:
                 # If cid did not exist, return error
