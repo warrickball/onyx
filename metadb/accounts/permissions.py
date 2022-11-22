@@ -188,7 +188,7 @@ SiteAuthorityOrAdmin = [
 ]
 
 
-SameSiteAuthorityAsUnsuppressedCIDOrAdmin = [
+SameSiteAuthorityAsCIDOrAdmin = [
     IsAuthenticated,
     IsActiveSite,
     IsActiveUser,

@@ -17,7 +17,7 @@ from .serializers import get_serializer
 from accounts.permissions import (
     Admin,
     ApprovedOrAdmin,
-    SameSiteAuthorityAsUnsuppressedCIDOrAdmin,
+    SameSiteAuthorityAsCIDOrAdmin,
 )
 from utils.views import METADBAPIView
 from utils.responses import METADBAPIResponse
@@ -496,7 +496,7 @@ class QueryPathogenView(METADBAPIView):
 
 
 class UpdateSuppressPathogenView(METADBAPIView):
-    permission_classes = SameSiteAuthorityAsUnsuppressedCIDOrAdmin
+    permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
     def patch(self, request, pathogen_code, cid):
         """
