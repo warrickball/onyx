@@ -1,61 +1,24 @@
 from django_filters import rest_framework as filters
 from django.db import models
 from utils.fields import YearMonthField, LowerCharField
+from utils.filters import (
+    ChoiceInFilter,
+    ChoiceRangeFilter,
+    DBValuesFilter,
+    DBValuesInFilter,
+    DBValuesRangeFilter,
+    CharInFilter,
+    CharRangeFilter,
+    NumberInFilter,
+    NumberRangeFilter,
+    DateInFilter,
+    DateRangeFilter,
+    DateTimeInFilter,
+    DateTimeRangeFilter,
+    TypedChoiceInFilter,
+    TypedChoiceRangeFilter,
+)
 from distutils.util import strtobool
-
-
-class ChoiceInFilter(filters.BaseInFilter, filters.ChoiceFilter):
-    pass
-
-
-class ChoiceRangeFilter(filters.BaseRangeFilter, filters.ChoiceFilter):
-    pass
-
-
-class TypedChoiceInFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
-    pass
-
-
-class TypedChoiceRangeFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
-    pass
-
-
-class DBValuesFilter(filters.AllValuesFilter):
-    def __init__(self, *args, model, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.model = model
-
-
-class DBValuesInFilter(filters.BaseInFilter, DBValuesFilter):
-    pass
-
-
-class DBValuesRangeFilter(filters.BaseRangeFilter, DBValuesFilter):
-    pass
-
-
-class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
-    pass
-
-
-class NumberRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
-    pass
-
-
-class CharInFilter(filters.BaseInFilter, filters.CharFilter):
-    pass
-
-
-class CharRangeFilter(filters.BaseRangeFilter, filters.CharFilter):
-    pass
-
-
-class DateInFilter(filters.BaseInFilter, filters.DateFilter):
-    pass
-
-
-class DateRangeFilter(filters.BaseRangeFilter, filters.DateFilter):
-    pass
 
 
 # Lookups shared by all fields
@@ -140,9 +103,6 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__in"] = ChoiceInFilter(
                     field_name=field, choices=choices, lookup_expr="in"
                 )
-                self.filters[filter_name + "__notin"] = ChoiceInFilter(
-                    field_name=field, choices=choices, lookup_expr="in", exclude=True
-                )
                 self.filters[filter_name + "__range"] = ChoiceRangeFilter(
                     field_name=field, choices=choices, lookup_expr="range"
                 )
@@ -174,12 +134,6 @@ class METADBFilter(filters.FilterSet):
                     lookup_expr="in",
                     model=pathogen_model,
                 )
-                self.filters[filter_name + "__notin"] = DBValuesInFilter(
-                    field_name=field,
-                    lookup_expr="in",
-                    exclude=True,
-                    model=pathogen_model,
-                )
                 self.filters[filter_name + "__range"] = DBValuesRangeFilter(
                     field_name=field, lookup_expr="range", model=pathogen_model
                 )
@@ -205,9 +159,6 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name] = filters.CharFilter(field_name=field)
                 self.filters[filter_name + "__in"] = CharInFilter(
                     field_name=field, lookup_expr="in"
-                )
-                self.filters[filter_name + "__notin"] = CharInFilter(
-                    field_name=field, lookup_expr="in", exclude=True
                 )
                 self.filters[filter_name + "__range"] = CharRangeFilter(
                     field_name=field, lookup_expr="range"
@@ -235,9 +186,6 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__in"] = NumberInFilter(
                     field_name=field, lookup_expr="in"
                 )
-                self.filters[filter_name + "__notin"] = NumberInFilter(
-                    field_name=field, lookup_expr="in", exclude=True
-                )
                 self.filters[filter_name + "__range"] = NumberRangeFilter(
                     field_name=field, lookup_expr="range"
                 )
@@ -261,12 +209,6 @@ class METADBFilter(filters.FilterSet):
                     field_name=field,
                     input_formats=["%Y-%m"],
                     lookup_expr="in",
-                )
-                self.filters[filter_name + "__notin"] = DateInFilter(
-                    field_name=field,
-                    input_formats=["%Y-%m"],
-                    lookup_expr="in",
-                    exclude=True,
                 )
                 self.filters[filter_name + "__range"] = DateRangeFilter(
                     field_name=field, input_formats=["%Y-%m"], lookup_expr="range"
@@ -301,12 +243,6 @@ class METADBFilter(filters.FilterSet):
                 self.filters[filter_name + "__in"] = DateInFilter(
                     field_name=field, input_formats=["%Y-%m-%d"], lookup_expr="in"
                 )
-                self.filters[filter_name + "__notin"] = DateInFilter(
-                    field_name=field,
-                    input_formats=["%Y-%m-%d"],
-                    lookup_expr="in",
-                    exclude=True,
-                )
                 self.filters[filter_name + "__range"] = DateRangeFilter(
                     field_name=field, input_formats=["%Y-%m-%d"], lookup_expr="range"
                 )
@@ -327,20 +263,64 @@ class METADBFilter(filters.FilterSet):
                     field_name=field,
                     lookup_expr="iso_year__range",
                 )
-                self.filters[filter_name + "__iso_week"] = filters.NumberFilter(
+                self.filters[filter_name + "__week"] = filters.NumberFilter(
                     field_name=field, lookup_expr="week"
                 )
-                self.filters[filter_name + "__iso_week__in"] = NumberInFilter(
+                self.filters[filter_name + "__week__in"] = NumberInFilter(
                     field_name=field,
                     lookup_expr="week__in",
                 )
-                self.filters[filter_name + "__iso_week__range"] = NumberRangeFilter(
+                self.filters[filter_name + "__week__range"] = NumberRangeFilter(
                     field_name=field,
                     lookup_expr="week__range",
                 )
 
                 for lookup in BASE_LOOKUPS:
                     self.filters[filter_name + "__" + lookup] = filters.DateFilter(
+                        field_name=field, input_formats=["%Y-%m-%d"], lookup_expr=lookup
+                    )
+
+            elif field_type == models.DateTimeField:
+                self.filters[filter_name] = filters.DateTimeFilter(
+                    field_name=field, input_formats=["%Y-%m-%d"]
+                )
+                self.filters[filter_name + "__in"] = DateTimeInFilter(
+                    field_name=field, input_formats=["%Y-%m-%d"], lookup_expr="in"
+                )
+                self.filters[filter_name + "__range"] = DateTimeRangeFilter(
+                    field_name=field, input_formats=["%Y-%m-%d"], lookup_expr="range"
+                )
+                self.filters[filter_name + "__isnull"] = filters.TypedChoiceFilter(
+                    field_name=field,
+                    choices=BOOLEAN_CHOICES,
+                    coerce=strtobool,
+                    lookup_expr="isnull",
+                )
+                self.filters[filter_name + "__iso_year"] = filters.NumberFilter(
+                    field_name=field, lookup_expr="iso_year"
+                )
+                self.filters[filter_name + "__iso_year__in"] = NumberInFilter(
+                    field_name=field,
+                    lookup_expr="iso_year__in",
+                )
+                self.filters[filter_name + "__iso_year__range"] = NumberRangeFilter(
+                    field_name=field,
+                    lookup_expr="iso_year__range",
+                )
+                self.filters[filter_name + "__week"] = filters.NumberFilter(
+                    field_name=field, lookup_expr="week"
+                )
+                self.filters[filter_name + "__week__in"] = NumberInFilter(
+                    field_name=field,
+                    lookup_expr="week__in",
+                )
+                self.filters[filter_name + "__week__range"] = NumberRangeFilter(
+                    field_name=field,
+                    lookup_expr="week__range",
+                )
+
+                for lookup in BASE_LOOKUPS:
+                    self.filters[filter_name + "__" + lookup] = filters.DateTimeFilter(
                         field_name=field, input_formats=["%Y-%m-%d"], lookup_expr=lookup
                     )
 
@@ -353,13 +333,6 @@ class METADBFilter(filters.FilterSet):
                     choices=BOOLEAN_CHOICES,
                     coerce=strtobool,
                     lookup_expr="in",
-                )
-                self.filters[filter_name + "__notin"] = TypedChoiceInFilter(
-                    field_name=field,
-                    choices=BOOLEAN_CHOICES,
-                    coerce=strtobool,
-                    lookup_expr="in",
-                    exclude=True,
                 )
                 self.filters[filter_name + "__range"] = TypedChoiceRangeFilter(
                     field_name=field,
