@@ -544,9 +544,6 @@ class SuppressCommands:
         )
         suppress_parser.add_argument("pathogen_code")
         suppress_parser.add_argument("cid")
-        suppress_parser.add_argument(
-            "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
-        )
 
         csv_suppress_parser = command.add_parser(
             "csv-suppress",
