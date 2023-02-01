@@ -122,19 +122,12 @@ class ProjectView(METADBAPIView):
         return Response({"projects": projects}, status=status.HTTP_200_OK)
 
 
-class CreateGetPathogenView(METADBAPIView):
-    def get_permission_classes(self):
-        if self.request.method == "POST":
-            # Creating data requires being an admin user
-            permission_classes = Admin
-        else:
-            # Getting data requires being an authenticated, approved user (or an admin)
-            permission_classes = ApprovedOrAdmin
-        return permission_classes
+class CreateProjectItemView(METADBAPIView):
+    permission_classes = Admin
 
     def post(self, request, project):
         """
-        Use `request.data` to save a model instance for the model specified by `project`.
+        Use `request.data` to save an instance for the model specified by `project`.
         """
         # Get the project model
         project_model = get_project_model(project)
@@ -161,9 +154,11 @@ class CreateGetPathogenView(METADBAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Unknown fields will be a warning
+        # If unknown fields were provided, return 400
         if unknown:
-            self.API_RESPONSE.warnings["unknown_fields"] = unknown
+            return Response(
+                {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Get the model serializer, and validate the data
         serializer = get_serializer(project_model)(data=request.data)
@@ -174,6 +169,10 @@ class CreateGetPathogenView(METADBAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetProjectItemView(METADBAPIView):
+    permission_classes = ApprovedOrAdmin
 
     def get(self, request, project):
         """
@@ -390,7 +389,7 @@ def get_query(data):
         return q
 
 
-class QueryPathogenView(METADBAPIView):
+class QueryProjectItemView(METADBAPIView):
     permission_classes = ApprovedOrAdmin
 
     def post(self, request, project):
@@ -510,7 +509,7 @@ class QueryPathogenView(METADBAPIView):
             )
 
 
-class UpdateSuppressPathogenView(METADBAPIView):
+class UpdateProjectItemView(METADBAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
     def patch(self, request, project, cid):
@@ -542,16 +541,16 @@ class UpdateSuppressPathogenView(METADBAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Unknown fields will be a warning
+        # If unknown fields were provided, return 400
         if unknown:
-            self.API_RESPONSE.warnings["unknown_fields"] = unknown
+            return Response(
+                {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Get the instance to be updated
-        # If the instance does not exist, return error
+        # If the instance does not exist, return 404
         try:
-            instance = init_pathogen_queryset(project_model, user=request.user).get(
-                cid=cid
-            )
+            instance = project_model.objects.filter(suppressed=False).get(cid=cid)
         except project_model.DoesNotExist:
             return Response(
                 {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
@@ -569,95 +568,99 @@ class UpdateSuppressPathogenView(METADBAPIView):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+class SuppressProjectItemView(METADBAPIView):
+    permission_classes = SameSiteAuthorityAsCIDOrAdmin
+
     def delete(self, request, project, cid):
         """
         Use the provided `project` and `cid` to suppress a record.
         """
+        # Get the project model
+        project_model = get_project_model(project)
+
+        # If the project model does not exist, return 404
+        if not project_model:
+            return Response(
+                {project: METADBAPIResponse.NOT_FOUND},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Check user has permissions to suppress instances of the model
+        authorised, required, _ = check_permissions(
+            user=request.user,
+            model=project_model,
+            action="suppress",
+            user_fields=[],
+        )
+
+        # If not authorised, return 403
+        if not authorised:
+            return Response(
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Get the instance to be suppressed
+        # If the instance does not exist, return 404
         try:
-            # Get the corresponding model. The base class Pathogen is accepted when suppressing data
-            pathogen_model = get_project_model(project)
-
-            # If pathogen model does not exist, return error
-            if pathogen_model is None:
-                return Response(
-                    {project: METADBAPIResponse.NOT_FOUND},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            try:
-                # Get the instance to be suppressed
-                instance = init_pathogen_queryset(
-                    pathogen_model, user=request.user
-                ).get(cid=cid)
-
-            except pathogen_model.DoesNotExist:
-                # If cid did not exist, return error
-                return Response(
-                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Suppress and save
-            instance.suppressed = True
-            instance.save(update_fields=["suppressed", "last_modified"])
-
-            # Just to double check
-            try:
-                instance = pathogen_model.objects.get(cid=cid)
-            except pathogen_model.DoesNotExist:
-                # If cid did not exist, return error
-                return Response(
-                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Return the details
+            instance = project_model.objects.filter(suppressed=False).get(cid=cid)
+        except project_model.DoesNotExist:
             return Response(
-                {"cid": cid, "suppressed": instance.suppressed},
-                status=status.HTTP_200_OK,
+                {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
             )
 
-        except Exception as e:
-            logger.error(str(e))
-            logger.error(traceback.format_exc())
-            return Response(
-                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # Suppress and save
+        instance.suppressed = True  # type: ignore
+        instance.save(update_fields=["suppressed", "last_modified"])
+
+        # Return response indicating suppression
+        return Response(
+            {"cid": cid},  # type: ignore
+            status=status.HTTP_200_OK,
+        )
 
 
-class DeletePathogenView(METADBAPIView):
+class DeleteProjectItemView(METADBAPIView):
     permission_classes = Admin
 
     def delete(self, request, project, cid):
         """
         Use the provided `project` and `cid` to permanently delete a record.
         """
-        try:
-            # Get the corresponding model. The base class Pathogen is accepted when deleting data
-            pathogen_model = get_project_model(project)
+        # Get the project model
+        project_model = get_project_model(project)
 
-            # If pathogen model does not exist, return error
-            if pathogen_model is None:
-                return Response(
-                    {project: METADBAPIResponse.NOT_FOUND},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            try:
-                # Attempt to delete object with the provided cid
-                pathogen_model.objects.get(cid=cid).delete()
-            except pathogen_model.DoesNotExist:
-                # If cid did not exist, return error
-                return Response(
-                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
-                )
-
-            deleted = not pathogen_model.objects.filter(cid=cid).exists()
-            return Response({"cid": cid, "deleted": deleted}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(str(e))
-            logger.error(traceback.format_exc())
+        # If the project model does not exist, return 404
+        if not project_model:
             return Response(
-                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {project: METADBAPIResponse.NOT_FOUND},
+                status=status.HTTP_404_NOT_FOUND,
             )
+
+        # Check user has permissions to delete instances of the model
+        authorised, required, _ = check_permissions(
+            user=request.user,
+            model=project_model,
+            action="delete",
+            user_fields=[],
+        )
+
+        # If not authorised, return 403
+        if not authorised:
+            return Response(
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Attempt to delete the instance
+        # If the instance does not exist, return 404
+        try:
+            project_model.objects.get(cid=cid).delete()
+        except project_model.DoesNotExist:
+            return Response(
+                {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Return response indicating deletion
+        return Response({"cid": cid}, status=status.HTTP_200_OK)

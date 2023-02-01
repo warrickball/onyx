@@ -27,8 +27,11 @@ def generate_cid():
 
 def generate_permissions(model_name, fields):
     return [
+        (f"{action}_{model_name}", f"Can {action} {model_name}")
+        for action in ["suppress"]
+    ] + [
         (f"{action}_{model_name}__{x}", f"Can {action} {model_name} {x}")
-        for action in ["add", "change", "delete", "view"]
+        for action in ["add", "change", "view", "delete", "suppress"]
         for x in fields
     ]
 

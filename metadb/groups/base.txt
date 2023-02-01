@@ -9,6 +9,12 @@ data,projectitem,add_projectitem__site
 #change_projectitem
 data,projectitem,change_projectitem
 
+#suppress_projectitem
+data,projectitem,suppress_projectitem
+
+#delete_projectitem
+data,projectitem,delete_projectitem
+
 #add_pathogen
 data,pathogen,add_pathogen
 data,pathogen,add_pathogen__sample_id
@@ -24,6 +30,12 @@ data,pathogen,change_pathogen__collection_month
 data,pathogen,change_pathogen__received_month
 data,pathogen,change_pathogen__fasta_path
 data,pathogen,change_pathogen__bam_path
+
+#suppress_pathogen
+data,pathogen,suppress_pathogen
+
+#delete_pathogen
+data,pathogen,delete_pathogen
 
 #add_mpx
 data,mpx,add_mpx
@@ -58,6 +70,12 @@ data,mpx,change_mpx__seq_strategy
 data,mpx,change_mpx__bioinfo_pipe_name
 data,mpx,change_mpx__bioinfo_pipe_version
 
+#suppress_mpx
+data,mpx,suppress_mpx
+
+#delete_mpx
+data,mpx,delete_mpx
+
 #add_mpxpha
 data,mpxpha,add_mpxpha
 data,mpxpha,add_mpxpha__ukhsa_region
@@ -71,3 +89,9 @@ data,mpxpha,change_mpxpha__ukhsa_region
 data,mpxpha,change_mpxpha__travel_status
 data,mpxpha,change_mpxpha__outer_postcode
 data,mpxpha,change_mpxpha__epi_cluster
+
+#suppress_mpxpha
+data,mpxpha,suppress_mpxpha
+
+#delete_mpxpha
+data,mpxpha,delete_mpxpha
