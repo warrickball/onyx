@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from accounts.models import Site
-from data.models import PathogenCode, Pathogen, Mpx
-from utils import fieldserializers
+from data.models import Project, Pathogen, Mpx, MpxPha
+from utils import fieldserializers, choices
 from utils.functions import (
     enforce_optional_value_groups_create,
     enforce_optional_value_groups_update,
@@ -12,8 +12,8 @@ from utils.functions import (
 
 
 class PathogenSerializer(serializers.ModelSerializer):
-    pathogen_code = serializers.SlugRelatedField(
-        queryset=PathogenCode.objects.all(), slug_field="code"
+    project = serializers.SlugRelatedField(
+        queryset=Project.objects.all(), slug_field="code"
     )
     site = serializers.SlugRelatedField(queryset=Site.objects.all(), slug_field="code")
     collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
@@ -22,7 +22,7 @@ class PathogenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pathogen
         fields = [
-            "pathogen_code",
+            "project",
             "site",
             "cid",
             "sample_id",
@@ -93,46 +93,50 @@ class PathogenSerializer(serializers.ModelSerializer):
         return data
 
 
-class AdminPathogenSerializer(PathogenSerializer):
-    class Meta:
-        model = Pathogen
-        fields = PathogenSerializer.Meta.fields + [
-            "id",
-            "created",
-            "last_modified",
-            "suppressed",
-        ]
-
-
 class MpxSerializer(PathogenSerializer):
     sample_type = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("sample_type").choices
+        choices=Mpx._meta.get_field("sample_type").choices,
+        error_messages={"invalid_choice": f"options: {choices.SAMPLE_TYPE_CHOICES}"},
     )
     seq_platform = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("seq_platform").choices
+        choices=Mpx._meta.get_field("seq_platform").choices,
+        error_messages={"invalid_choice": f"options: {choices.SEQ_PLATFORM_CHOICES}"},
     )
     enrichment_method = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("enrichment_method").choices
+        choices=Mpx._meta.get_field("enrichment_method").choices,
+        error_messages={
+            "invalid_choice": f"options: {choices.ENRICHMENT_METHOD_CHOICES}"
+        },
     )
     seq_strategy = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("seq_strategy").choices
+        choices=Mpx._meta.get_field("seq_strategy").choices,
+        error_messages={"invalid_choice": f"options: {choices.SEQ_STRATEGY_CHOICES}"},
     )
     source_of_library = fieldserializers.LowerChoiceField(
         choices=Mpx._meta.get_field("source_of_library").choices,
+        error_messages={
+            "invalid_choice": f"options: {choices.SOURCE_OF_LIBRARY_CHOICES}"
+        },
     )
     country = fieldserializers.LowerChoiceField(
         choices=Mpx._meta.get_field("country").choices,
+        error_messages={"invalid_choice": f"options: {choices.COUNTRY_CHOICES}"},
     )
     run_layout = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("run_layout").choices
+        choices=Mpx._meta.get_field("run_layout").choices,
+        error_messages={"invalid_choice": f"options: {choices.RUN_LAYOUT_CHOICES}"},
     )
     patient_ageband = fieldserializers.LowerChoiceField(
         choices=Mpx._meta.get_field("patient_ageband").choices,
+        error_messages={
+            "invalid_choice": f"options: {choices.PATIENT_AGEBAND_CHOICES}"
+        },
         required=False,
         allow_null=True,
     )
     sample_site = fieldserializers.LowerChoiceField(
         choices=Mpx._meta.get_field("sample_site").choices,
+        error_messages={"invalid_choice": f"options: {choices.SAMPLE_SITE_CHOICES}"},
         required=False,
         allow_null=True,
     )
@@ -156,18 +160,20 @@ class MpxSerializer(PathogenSerializer):
         ]
 
 
-class PhaMpxSerializer(MpxSerializer):
+class MpxPhaSerializer(MpxSerializer):
     ukhsa_region = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("ukhsa_region").choices,
+        choices=MpxPha._meta.get_field("ukhsa_region").choices,
+        error_messages={"invalid_choice": f"options: {choices.UKHSA_REGION_CHOICES}"},
     )
     travel_status = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("travel_status").choices,
+        choices=MpxPha._meta.get_field("travel_status").choices,
+        error_messages={"invalid_choice": f"options: {choices.TRAVEL_STATUS_CHOICES}"},
         required=False,
         allow_null=True,
     )
 
     class Meta:
-        model = Mpx
+        model = MpxPha
         fields = MpxSerializer.Meta.fields + [
             "ukhsa_region",
             "travel_status",
@@ -176,49 +182,15 @@ class PhaMpxSerializer(MpxSerializer):
         ]
 
 
-class AdminMpxSerializer(PhaMpxSerializer):
-    class Meta:
-        model = Mpx
-        fields = PhaMpxSerializer.Meta.fields + [
-            "id",
-            "created",
-            "last_modified",
-            "suppressed",
-            "csv_template_version",
-        ]
-
-
 serializer_map = {
-    Pathogen: {
-        "any": PathogenSerializer,
-        "admin": AdminPathogenSerializer,
-    },
-    Mpx: {
-        "any": MpxSerializer,
-        "pha": PhaMpxSerializer,
-        "admin": AdminMpxSerializer,
-    },
+    Pathogen: PathogenSerializer,
+    Mpx: MpxSerializer,
+    MpxPha: MpxPhaSerializer,
 }
 
 
-def get_serializer(model, user, group=None):
+def get_serializer(model):
     """
-    Function that returns the appropriate serializer for the given model, depending on the user's permissions.
+    Function that returns the appropriate serializer for the given model.
     """
-    if group == "admin":
-        if user.is_staff:
-            return serializer_map[model].get("admin", serializer_map[model]["any"])
-        else:
-            return "You do not have permission to view this."
-
-    elif group == "pha":
-        if user.is_staff or user.site.is_pha:
-            return serializer_map[model].get("pha", serializer_map[model]["any"])
-        else:
-            return "You do not have permission to view this."
-
-    elif group == "any" or group is None:
-        return serializer_map[model]["any"]
-
-    else:
-        return "Not found."
+    return serializer_map[model]

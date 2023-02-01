@@ -119,7 +119,7 @@ class TestUpdatePathogen(METADBTestCase):
             "cid": f"C.{secrets.token_hex(3)}",
             "sample_id": f"S.{secrets.token_hex(3)}",
             "run_name": f"R.{secrets.token_hex(9)}",
-            "pathogen_code": "MPX",
+            "project": "MPX",
             "published_date": "2022-01-01",
         }
         for cid in self.cids:
@@ -144,7 +144,7 @@ class TestUpdatePathogen(METADBTestCase):
             "cid": f"C.{secrets.token_hex(3)}",
             "sample_id": f"S.{secrets.token_hex(3)}",
             "run_name": f"R.{secrets.token_hex(9)}",
-            "pathogen_code": "MPX",
+            "project": "MPX",
             "published_date": "2022-01-01",
             "site": "DEPTTHINGS",
         }

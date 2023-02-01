@@ -9,9 +9,7 @@ from utils.fields import LowerCharField
 class Site(models.Model):
     code = LowerCharField(max_length=10, unique=True)
     name = models.CharField(max_length=100, unique=True)
-
     is_active = models.BooleanField(default=True)
-    is_pha = models.BooleanField(default=False)
 
 
 class User(AbstractUser):
@@ -37,11 +35,8 @@ class User(AbstractUser):
         },
     )
     site = models.ForeignKey("Site", on_delete=models.CASCADE)
-
     is_site_approved = models.BooleanField(default=False)
-    date_site_approved = models.DateTimeField(null=True)
-
     is_admin_approved = models.BooleanField(default=False)
-    date_admin_approved = models.DateTimeField(null=True)
-
     is_site_authority = models.BooleanField(default=False)
+    date_site_approved = models.DateTimeField(null=True)
+    date_admin_approved = models.DateTimeField(null=True)

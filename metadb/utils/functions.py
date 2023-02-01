@@ -2,6 +2,10 @@ from .responses import METADBAPIResponse
 from datetime import datetime
 
 
+def get_choices(cs):
+    return [(c, c) for c in cs]
+
+
 def init_pathogen_queryset(pathogen_model, user):
     """
     Return an initial queryset of the provided `pathogen_model`.
@@ -115,5 +119,5 @@ def enforce_yearmonth_non_future(errors, name, value):
     """
     Ensure yearmonth is not from the future.
     """
-    if value.year > datetime.now().year or value.month > datetime.now().month:
+    if value.year >= datetime.now().year and value.month > datetime.now().month:
         errors.setdefault(name, []).append("Yearmonth cannot be from the future.")
