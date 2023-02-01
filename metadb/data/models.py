@@ -15,7 +15,7 @@ def generate_cid():
 
     The CID consists of the prefix `C-` followed by 8 random hex digits.
 
-    This means there are `16^8 = 4,294,967,296` CIDs to choose from - should be enough!
+    This means there are `16^8 = 4,294,967,296` CIDs to choose from
     """
     cid = "C-" + "".join(token_hex(4).upper())
 
