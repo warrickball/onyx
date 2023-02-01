@@ -94,7 +94,7 @@ def logoutall(username, env_password):
     utils.print_response(response, status_only=True)
 
 
-def list_pathogen_codes(username, env_password):
+def list_projects(username, env_password):
     """
     Get the current pathogens within the database.
     """
@@ -102,8 +102,8 @@ def list_pathogen_codes(username, env_password):
     client = Client(config)
     client.continue_session(username=username, env_password=env_password)
 
-    pathogen_codes = client.list_pathogen_codes()
-    utils.print_response(pathogen_codes)
+    projects = client.list_projects()
+    utils.print_response(projects)
 
 
 class ConfigCommands:
@@ -374,7 +374,7 @@ class CreateCommands:
         create_parser = command.add_parser(
             "create", parents=[user_parser], help="Upload pathogen metadata to metadb."
         )
-        create_parser.add_argument("pathogen_code")
+        create_parser.add_argument("project")
         create_parser.add_argument(
             "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
         )
@@ -384,7 +384,7 @@ class CreateCommands:
             parents=[user_parser],
             help="Upload pathogen metadata to metadb via a .csv file.",
         )
-        csv_create_parser.add_argument("pathogen_code")
+        csv_create_parser.add_argument("project")
         csv_create_parser.add_argument("csv")
 
         tsv_create_parser = command.add_parser(
@@ -392,29 +392,29 @@ class CreateCommands:
             parents=[user_parser],
             help="Upload pathogen metadata to metadb via a .tsv file.",
         )
-        tsv_create_parser.add_argument("pathogen_code")
+        tsv_create_parser.add_argument("project")
         tsv_create_parser.add_argument("tsv")
 
-    def create(self, pathogen_code, fields):
+    def create(self, project, fields):
         """
         Post a new pathogen record to the database.
         """
         fields = utils.construct_unique_fields_dict(fields)
-        creation = self.client.create(pathogen_code, fields)
+        creation = self.client.create(project, fields)
         utils.print_response(creation)
 
-    def csv_create(self, pathogen_code, csv_path):
+    def csv_create(self, project, csv_path):
         """
         Post new pathogen records to the database, using a csv.
         """
-        creations = self.client.csv_create(pathogen_code, csv_path)
+        creations = self.client.csv_create(project, csv_path)
         utils.execute_uploads(creations)
 
-    def tsv_create(self, pathogen_code, tsv_path):
+    def tsv_create(self, project, tsv_path):
         """
         Post new pathogen records to the database, using a tsv.
         """
-        creations = self.client.csv_create(pathogen_code, tsv_path, delimiter="\t")
+        creations = self.client.csv_create(project, tsv_path, delimiter="\t")
         utils.execute_uploads(creations)
 
 
@@ -433,19 +433,19 @@ class GetCommands:
         get_parser = command.add_parser(
             "get", parents=[user_parser], help="Get pathogen metadata from metadb."
         )
-        get_parser.add_argument("pathogen_code")
+        get_parser.add_argument("project")
         get_parser.add_argument("cid", nargs="?", help="optional")
         get_parser.add_argument(
             "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
         )
 
-    def get(self, pathogen_code, cid, fields):
+    def get(self, project, cid, fields):
         """
         Get pathogen records from the database.
         """
         fields = utils.construct_fields_dict(fields)
 
-        results = self.client.get(pathogen_code, cid, fields)
+        results = self.client.get(project, cid, fields)
 
         result = next(results)
         if result.ok:
@@ -479,7 +479,7 @@ class UpdateCommands:
             parents=[user_parser],
             help="Update pathogen metadata within metadb.",
         )
-        update_parser.add_argument("pathogen_code")
+        update_parser.add_argument("project")
         update_parser.add_argument("cid")
         update_parser.add_argument(
             "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
@@ -490,7 +490,7 @@ class UpdateCommands:
             parents=[user_parser],
             help="Update pathogen metadata within metadb via a .csv file.",
         )
-        csv_update_parser.add_argument("pathogen_code")
+        csv_update_parser.add_argument("project")
         csv_update_parser.add_argument("csv")
 
         tsv_update_parser = command.add_parser(
@@ -498,29 +498,29 @@ class UpdateCommands:
             parents=[user_parser],
             help="Update pathogen metadata within metadb via a .tsv file.",
         )
-        tsv_update_parser.add_argument("pathogen_code")
+        tsv_update_parser.add_argument("project")
         tsv_update_parser.add_argument("tsv")
 
-    def update(self, pathogen_code, cid, fields):
+    def update(self, project, cid, fields):
         """
         Update a pathogen record in the database.
         """
         fields = utils.construct_unique_fields_dict(fields)
-        update = self.client.update(pathogen_code, cid, fields)
+        update = self.client.update(project, cid, fields)
         utils.print_response(update)
 
-    def csv_update(self, pathogen_code, csv_path):
+    def csv_update(self, project, csv_path):
         """
         Update pathogen records in the database, using a csv.
         """
-        updates = self.client.csv_update(pathogen_code, csv_path)
+        updates = self.client.csv_update(project, csv_path)
         utils.execute_uploads(updates)
 
-    def tsv_update(self, pathogen_code, tsv_path):
+    def tsv_update(self, project, tsv_path):
         """
         Update pathogen records in the database, using a tsv.
         """
-        updates = self.client.csv_update(pathogen_code, tsv_path, delimiter="\t")
+        updates = self.client.csv_update(project, tsv_path, delimiter="\t")
         utils.execute_uploads(updates)
 
 
@@ -542,7 +542,7 @@ class SuppressCommands:
             parents=[user_parser],
             help="Suppress pathogen metadata within metadb.",
         )
-        suppress_parser.add_argument("pathogen_code")
+        suppress_parser.add_argument("project")
         suppress_parser.add_argument("cid")
 
         csv_suppress_parser = command.add_parser(
@@ -550,7 +550,7 @@ class SuppressCommands:
             parents=[user_parser],
             help="Suppress pathogen metadata within metadb via a .csv file.",
         )
-        csv_suppress_parser.add_argument("pathogen_code")
+        csv_suppress_parser.add_argument("project")
         csv_suppress_parser.add_argument("csv")
 
         tsv_suppress_parser = command.add_parser(
@@ -558,28 +558,28 @@ class SuppressCommands:
             parents=[user_parser],
             help="Suppress pathogen metadata within metadb via a .tsv file.",
         )
-        tsv_suppress_parser.add_argument("pathogen_code")
+        tsv_suppress_parser.add_argument("project")
         tsv_suppress_parser.add_argument("tsv")
 
-    def suppress(self, pathogen_code, cid):
+    def suppress(self, project, cid):
         """
         Suppress a pathogen record in the database.
         """
-        suppression = self.client.suppress(pathogen_code, cid)
+        suppression = self.client.suppress(project, cid)
         utils.print_response(suppression)
 
-    def csv_suppress(self, pathogen_code, csv_path):
+    def csv_suppress(self, project, csv_path):
         """
         Suppress pathogen records in the database, using a csv.
         """
-        suppressions = self.client.csv_suppress(pathogen_code, csv_path)
+        suppressions = self.client.csv_suppress(project, csv_path)
         utils.execute_uploads(suppressions)
 
-    def tsv_suppress(self, pathogen_code, tsv_path):
+    def tsv_suppress(self, project, tsv_path):
         """
         Suppress pathogen records in the database, using a tsv.
         """
-        suppressions = self.client.csv_suppress(pathogen_code, tsv_path, delimiter="\t")
+        suppressions = self.client.csv_suppress(project, tsv_path, delimiter="\t")
         utils.execute_uploads(suppressions)
 
 
@@ -648,48 +648,48 @@ def run(args):
         logoutall(args.user, args.env_password)
 
     elif args.command == "list-pathogens":
-        list_pathogen_codes(args.user, args.env_password)
+        list_projects(args.user, args.env_password)
 
     elif args.command in ["create", "csv-create", "tsv-create"]:
         create_commands = CreateCommands(args.user, args.env_password)
 
         if args.command == "create":
-            create_commands.create(args.pathogen_code, args.field)
+            create_commands.create(args.project, args.field)
 
         elif args.command == "csv-create":
-            create_commands.csv_create(args.pathogen_code, args.csv)
+            create_commands.csv_create(args.project, args.csv)
 
         elif args.command == "tsv-create":
-            create_commands.tsv_create(args.pathogen_code, args.tsv)
+            create_commands.tsv_create(args.project, args.tsv)
 
     elif args.command == "get":
         get_commands = GetCommands(args.user, args.env_password)
 
-        get_commands.get(args.pathogen_code, args.cid, args.field)
+        get_commands.get(args.project, args.cid, args.field)
 
     elif args.command in ["update", "csv-update", "tsv-update"]:
         update_commands = UpdateCommands(args.user, args.env_password)
 
         if args.command == "update":
-            update_commands.update(args.pathogen_code, args.cid, args.field)
+            update_commands.update(args.project, args.cid, args.field)
 
         elif args.command == "csv-update":
-            update_commands.csv_update(args.pathogen_code, args.csv)
+            update_commands.csv_update(args.project, args.csv)
 
         elif args.command == "tsv-update":
-            update_commands.tsv_update(args.pathogen_code, args.tsv)
+            update_commands.tsv_update(args.project, args.tsv)
 
     elif args.command in ["suppress", "csv-suppress", "tsv-suppress"]:
         suppress_commands = SuppressCommands(args.user, args.env_password)
 
         if args.command == "suppress":
-            suppress_commands.suppress(args.pathogen_code, args.cid)
+            suppress_commands.suppress(args.project, args.cid)
 
         elif args.command == "csv-suppress":
-            suppress_commands.csv_suppress(args.pathogen_code, args.csv)
+            suppress_commands.csv_suppress(args.project, args.csv)
 
         elif args.command == "tsv-suppress":
-            suppress_commands.tsv_suppress(args.pathogen_code, args.tsv)
+            suppress_commands.tsv_suppress(args.project, args.tsv)
 
 
 def get_args():
@@ -743,7 +743,7 @@ def get_args():
         help="Log out of metadb everywhere.",
     )
 
-    pathogen_codes_parser = command.add_parser(
+    projects_parser = command.add_parser(
         "list-pathogens",
         parents=[user_parser],
         help="List all pathogens in metadb.",

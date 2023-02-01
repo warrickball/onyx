@@ -254,7 +254,7 @@ class Client:
         return response
 
     @utils.session_required
-    def list_pathogen_codes(self):
+    def list_projects(self):
         """
         List the current pathogens within the database.
         """
@@ -265,19 +265,19 @@ class Client:
         return response
 
     @utils.session_required
-    def create(self, pathogen_code, fields):
+    def create(self, project, fields):
         """
         Post a pathogen record to the database.
         """
         response = self.request(
             method=requests.post,
-            url=self.endpoints["create"](pathogen_code),
+            url=self.endpoints["create"](project),
             json=fields,
         )
         return response
 
     @utils.session_required
-    def csv_create(self, pathogen_code, csv_path, delimiter=None):
+    def csv_create(self, project, csv_path, delimiter=None):
         """
         Post a .csv or .tsv containing pathogen records to the database.
         """
@@ -294,7 +294,7 @@ class Client:
             for record in reader:
                 response = self.request(
                     method=requests.post,
-                    url=self.endpoints["create"](pathogen_code),
+                    url=self.endpoints["create"](project),
                     json=record,
                 )
                 yield response
@@ -303,7 +303,7 @@ class Client:
                 csv_file.close()
 
     @utils.session_required
-    def get(self, pathogen_code, cid=None, fields=None, **kwargs):
+    def get(self, project, cid=None, fields=None, **kwargs):
         """
         Get records from the database.
         """
@@ -328,7 +328,7 @@ class Client:
 
         response = self.request(
             method=requests.get,
-            url=self.endpoints["get"](pathogen_code),
+            url=self.endpoints["get"](project),
             params=fields,
         )
         yield response
@@ -351,7 +351,7 @@ class Client:
                 _next = None
 
     @utils.session_required
-    def query(self, pathogen_code, query, group=None):
+    def query(self, project, query, group=None):
         """
         Get records from the database.
         """
@@ -365,7 +365,7 @@ class Client:
 
         response = self.request(
             method=requests.post,
-            url=self.endpoints["query"](pathogen_code),
+            url=self.endpoints["query"](project),
             json=query.query,
             params=params,
         )
@@ -373,19 +373,19 @@ class Client:
         return response
 
     @utils.session_required
-    def update(self, pathogen_code, cid, fields):
+    def update(self, project, cid, fields):
         """
         Update a pathogen record in the database.
         """
         response = self.request(
             method=requests.patch,
-            url=self.endpoints["update"](pathogen_code, cid),
+            url=self.endpoints["update"](project, cid),
             json=fields,
         )
         return response
 
     @utils.session_required
-    def csv_update(self, pathogen_code, csv_path, delimiter=None):
+    def csv_update(self, project, csv_path, delimiter=None):
         """
         Use a .csv or .tsv to update pathogen records in the database.
         """
@@ -406,7 +406,7 @@ class Client:
 
                 response = self.request(
                     method=requests.patch,
-                    url=self.endpoints["update"](pathogen_code, cid),
+                    url=self.endpoints["update"](project, cid),
                     json=record,
                 )
                 yield response
@@ -415,18 +415,18 @@ class Client:
                 csv_file.close()
 
     @utils.session_required
-    def suppress(self, pathogen_code, cid):
+    def suppress(self, project, cid):
         """
         Suppress a pathogen record in the database.
         """
         response = self.request(
             method=requests.delete,
-            url=self.endpoints["suppress"](pathogen_code, cid),
+            url=self.endpoints["suppress"](project, cid),
         )
         return response
 
     @utils.session_required
-    def csv_suppress(self, pathogen_code, csv_path, delimiter=None):
+    def csv_suppress(self, project, csv_path, delimiter=None):
         """
         Use a .csv or .tsv to suppress pathogen records in the database.
         """
@@ -447,7 +447,7 @@ class Client:
 
                 response = self.request(
                     method=requests.delete,
-                    url=self.endpoints["suppress"](pathogen_code, cid),
+                    url=self.endpoints["suppress"](project, cid),
                 )
                 yield response
         finally:

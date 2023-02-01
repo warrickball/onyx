@@ -3,16 +3,15 @@ from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from django.conf import settings
 from django.db.models import Q
+from django.contrib.contenttypes.models import ContentType
 from logging.handlers import RotatingFileHandler
 import logging
 import traceback
-import inspect
 import operator
 import functools
 
-from . import models
 from .filters import METADBFilter
-from .models import Pathogen
+from .models import Project
 from .serializers import get_serializer
 from accounts.permissions import (
     Admin,
@@ -21,7 +20,7 @@ from accounts.permissions import (
 )
 from utils.views import METADBAPIView
 from utils.responses import METADBAPIResponse
-from utils.functions import init_pathogen_queryset, enforce_field_set
+from utils.functions import init_pathogen_queryset
 from utils.contextmanagers import mutable
 
 
@@ -38,51 +37,89 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def get_pathogen_model(pathogen_code, accept_base=False):
+def get_project_model(project):
     """
-    Returns the model for the given `pathogen_code`, returning `None` if it doesn't exist.
+    Returns the model for the given `project`, returning `None` if it doesn't exist.
     """
-    members = inspect.getmembers(models, inspect.isclass)
+    if Project.objects.filter(code=project.lower()).exists():
+        try:
+            model = ContentType.objects.get(
+                app_label="data", model=project.lower()
+            ).model_class()
 
-    for name, model in members:
-        # Find model with matching name (case insensitive)
-        if pathogen_code.upper() == name.upper():
-            # Confirm whether the model inherits from the Pathogen class
-            # If accept_base=True, we can also get the Pathogen class itself
-            if Pathogen in model.__bases__ or (accept_base and model == Pathogen):
-                return model
+            return model
+
+        except ContentType.DoesNotExist:
+            pass
 
     return None
 
 
-class PathogenCodeView(METADBAPIView):
+def check_permissions(user, model, action, user_fields):
+    required = []
+    unknown = []
+    model_fields = {}
+    models = [model] + model._meta.get_parent_list()
+
+    for m in models:
+        m_name = m._meta.model_name
+        m_app_label = m._meta.app_label
+        m_permission = f"{m_app_label}.{action}_{m_name}"
+
+        if not user.has_perm(m_permission):
+            required.append(m_permission)
+
+        for f in m._meta.get_fields(include_parents=False):
+            model_fields[f.name] = m
+
+    for user_field in user_fields:
+        if user_field not in model_fields:
+            unknown.append(user_field)
+            continue
+        else:
+            field_model = model_fields[user_field]
+            field_model_name = field_model._meta.model_name
+            field_model_app_label = field_model._meta.app_label
+            field_permission = (
+                f"{field_model_app_label}.{action}_{field_model_name}__{user_field}"
+            )
+
+            if not user.has_perm(field_permission):
+                required.append(field_permission)
+
+    if required:
+        has_permission = False
+    else:
+        has_permission = True
+
+    return has_permission, required, unknown
+
+
+class ProjectView(METADBAPIView):
     permission_classes = ApprovedOrAdmin
 
     def get(self, request):
         """
-        Get a list of `pathogen_codes`, that correspond to tables in the database.
+        Get a list of `projects`.
         """
-        try:
-            members = inspect.getmembers(models, inspect.isclass)
-            pathogen_codes = []
+        # Check user has permissions to view the model
+        authorised, required, _ = check_permissions(
+            user=request.user,
+            model=Project,
+            action="view",
+            user_fields=[],
+        )
 
-            # For each model in data.models, check if it inherits from Pathogen
-            # If so, add it to the list
-            for name, model in members:
-                if Pathogen in model.__bases__:
-                    pathogen_codes.append(name.upper())
-
+        # If not authorised, return 403
+        if not authorised:
             return Response(
-                {"pathogen_codes": pathogen_codes}, status=status.HTTP_200_OK
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
-        except Exception as e:
-            logger.error(str(e))
-            logger.error(traceback.format_exc())
-            return Response(
-                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # Return a response containing a list of projects
+        projects = Project.objects.all().values_list("code", flat=True)
+        return Response({"projects": projects}, status=status.HTTP_200_OK)
 
 
 class CreateGetPathogenView(METADBAPIView):
@@ -95,83 +132,61 @@ class CreateGetPathogenView(METADBAPIView):
             permission_classes = ApprovedOrAdmin
         return permission_classes
 
-    def post(self, request, pathogen_code):
+    def post(self, request, project):
         """
-        Use `request.data` to save a model instance for the model specified by `pathogen_code`.
+        Use `request.data` to save a model instance for the model specified by `project`.
         """
-        try:
-            # Get the corresponding model. The base class Pathogen is NOT accepted when creating data
-            pathogen_model = get_pathogen_model(pathogen_code, accept_base=False)
+        # Get the project model
+        project_model = get_project_model(project)
 
-            # If pathogen model does not exist, return error
-            if pathogen_model is None:
-                return Response(
-                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            # Remove the group parameter from the request body
-            with mutable(request.data) as data:
-                group = data.get("group")
-                if group:
-                    data.pop("group")
-
-            # Get user serializer
-            serializer = get_serializer(pathogen_model, request.user, group=group)
-
-            # If the serializer returned a string, this is an indication something went wrong regarding the group
-            # The error string is returned along with the name of the group
-            if isinstance(serializer, str):
-                return Response({group: serializer}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Check the request body contains only model fields allowed for creation
-            # Also checking that the request body does not contain any fields outside the user's serializer fields
-            rejected, unknown = enforce_field_set(
-                data=request.data,
-                user_fields=serializer.Meta.fields,
-                accepted_fields=pathogen_model.create_fields(),
-                rejected_fields=pathogen_model.no_create_fields(),
-            )
-
-            # Serializer carries out validation of input request body values
-            serialized = serializer(data=request.data)
-
-            # Rejected fields (e.g. CID) are not allowed during creation
-            errors = {}
-            errors.update(rejected)
-
-            # Unknown fields will show up as a warning
-            self.API_RESPONSE.warnings.update(unknown)
-
-            # If data is valid, save to the database. If not valid, return errors
-            if serialized.is_valid() and not errors:
-                serialized.save()
-                return Response(serialized.data, status=status.HTTP_201_CREATED)
-            else:
-                # Combine serializer errors with current errors
-                errors.update(serialized.errors)
-                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as e:
-            logger.error(str(e))
-            logger.error(traceback.format_exc())
+        # If the project model does not exist, return 404
+        if not project_model:
             return Response(
-                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {project: METADBAPIResponse.NOT_FOUND},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-    def get(self, request, pathogen_code):
+        # Check user has permissions to add both the model and the model fields that they want
+        authorised, required, unknown = check_permissions(
+            user=request.user,
+            model=project_model,
+            action="add",
+            user_fields=list(request.data.keys()),
+        )
+
+        # If not authorised, return 403
+        if not authorised:
+            return Response(
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Unknown fields will be a warning
+        if unknown:
+            self.API_RESPONSE.warnings["unknown_fields"] = unknown
+
+        # Get the model serializer, and validate the data
+        serializer = get_serializer(project_model)(data=request.data)
+
+        # If data is valid, save to the database. Otherwise, return 400
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def get(self, request, project):
         """
-        Use `request.query_params` to filter data for the model specified by `pathogen_code`.
+        Use `request.query_params` to filter data for the model specified by `project`.
         """
         try:
             # Get the corresponding model. The base class Pathogen is accepted when getting data
-            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
+            pathogen_model = get_project_model(project)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
                 return Response(
-                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    {project: METADBAPIResponse.NOT_FOUND},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
@@ -378,15 +393,15 @@ def get_query(data):
 class QueryPathogenView(METADBAPIView):
     permission_classes = ApprovedOrAdmin
 
-    def post(self, request, pathogen_code):
+    def post(self, request, project):
         try:
             # Get the corresponding model. The base class Pathogen is accepted when getting data
-            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
+            pathogen_model = get_project_model(project)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
                 return Response(
-                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    {project: METADBAPIResponse.NOT_FOUND},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
@@ -498,98 +513,74 @@ class QueryPathogenView(METADBAPIView):
 class UpdateSuppressPathogenView(METADBAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
-    def patch(self, request, pathogen_code, cid):
+    def patch(self, request, project, cid):
         """
-        Use `request.data` and a `cid` to update an instance for the model specified by `pathogen_code`.
+        Use `request.data` and a `cid` to update an instance for the model specified by `project`.
         """
-        try:
-            # Get the corresponding model. The base class Pathogen is accepted when updating data
-            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
+        # Get the project model
+        project_model = get_project_model(project)
 
-            # If pathogen model does not exist, return error
-            if pathogen_model is None:
-                return Response(
-                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            try:
-                # Get the instance to be updated
-                instance = init_pathogen_queryset(
-                    pathogen_model, user=request.user
-                ).get(cid=cid)
-            except pathogen_model.DoesNotExist:
-                # If cid did not exist, return error
-                return Response(
-                    {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Remove the group parameter from the request
-            with mutable(request.data) as data:
-                group = data.get("group")
-                if group:
-                    data.pop("group")
-
-            # Get user serializer
-            serializer = get_serializer(pathogen_model, request.user, group=group)
-
-            # If the serializer returned a string, this is an indication something went wrong regarding the group
-            # The error string is returned along with the name of the group
-            if isinstance(serializer, str):
-                return Response({group: serializer}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Check the request data contains only model fields allowed for updating
-            rejected, unknown = enforce_field_set(
-                data=request.data,
-                user_fields=serializer.Meta.fields,
-                accepted_fields=pathogen_model.update_fields(),
-                rejected_fields=pathogen_model.no_update_fields(),
-            )
-
-            # Rejected fields (e.g. CID) are not allowed during updates
-            errors = {}
-            errors.update(rejected)
-
-            # Unknown fields will be a warning
-            self.API_RESPONSE.warnings.update(unknown)
-
-            # Serializer also carries out validation of input data
-            serialized = serializer(instance=instance, data=request.data, partial=True)
-
-            # If data is valid, update existing record in the database. If not valid, return errors
-            if serialized.is_valid() and not errors:
-                if not serialized.validated_data:
-                    errors.setdefault("non_field_errors", []).append(
-                        "No fields were updated."
-                    )
-                    return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-                serialized.save()
-                return Response(serialized.data, status=status.HTTP_200_OK)
-            else:
-                # Combine serializer errors with current errors
-                errors.update(serialized.errors)
-                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as e:
-            logger.error(str(e))
-            logger.error(traceback.format_exc())
+        # If the project model does not exist, return 404
+        if not project_model:
             return Response(
-                {"detail": METADBAPIResponse.INTERNAL_SERVER_ERROR},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {project: METADBAPIResponse.NOT_FOUND},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-    def delete(self, request, pathogen_code, cid):
+        # Check user has permissions to change both the model and the model fields that they want
+        authorised, required, unknown = check_permissions(
+            user=request.user,
+            model=project_model,
+            action="change",
+            user_fields=list(request.data.keys()),
+        )
+
+        # If not authorised, return 403
+        if not authorised:
+            return Response(
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Unknown fields will be a warning
+        if unknown:
+            self.API_RESPONSE.warnings["unknown_fields"] = unknown
+
+        # Get the instance to be updated
+        # If the instance does not exist, return error
+        try:
+            instance = init_pathogen_queryset(project_model, user=request.user).get(
+                cid=cid
+            )
+        except project_model.DoesNotExist:
+            return Response(
+                {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get the model serializer, and validate the data
+        serializer = get_serializer(project_model)(
+            instance=instance, data=request.data, partial=True
+        )
+
+        # If data is valid, update existing record in the database. Otherwise, return 400
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, project, cid):
         """
-        Use the provided `pathogen_code` and `cid` to suppress a record.
+        Use the provided `project` and `cid` to suppress a record.
         """
         try:
             # Get the corresponding model. The base class Pathogen is accepted when suppressing data
-            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
+            pathogen_model = get_project_model(project)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
                 return Response(
-                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    {project: METADBAPIResponse.NOT_FOUND},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
@@ -636,18 +627,18 @@ class UpdateSuppressPathogenView(METADBAPIView):
 class DeletePathogenView(METADBAPIView):
     permission_classes = Admin
 
-    def delete(self, request, pathogen_code, cid):
+    def delete(self, request, project, cid):
         """
-        Use the provided `pathogen_code` and `cid` to permanently delete a record.
+        Use the provided `project` and `cid` to permanently delete a record.
         """
         try:
             # Get the corresponding model. The base class Pathogen is accepted when deleting data
-            pathogen_model = get_pathogen_model(pathogen_code, accept_base=True)
+            pathogen_model = get_project_model(project)
 
             # If pathogen model does not exist, return error
             if pathogen_model is None:
                 return Response(
-                    {pathogen_code: METADBAPIResponse.NOT_FOUND},
+                    {project: METADBAPIResponse.NOT_FOUND},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
