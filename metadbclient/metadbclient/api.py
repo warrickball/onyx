@@ -28,12 +28,12 @@ class Client:
             "admin_waiting": f"{self.url}/accounts/admin/waiting/",
             "admin_users": f"{self.url}/accounts/admin/users/",
             # data
-            "pathogens": f"{self.url}/data/pathogens/",
-            "query": lambda x: f"{self.url}/data/{x}/query/",
-            "create": lambda x: f"{self.url}/data/{x}/",
-            "get": lambda x: f"{self.url}/data/{x}/",
-            "update": lambda x, y: f"{self.url}/data/{x}/{y}/",
-            "suppress": lambda x, y: f"{self.url}/data/{x}/{y}",
+            "pathogens": f"{self.url}/data/projects/",
+            "create": lambda x: f"{self.url}/data/create/{x}/",
+            "get": lambda x: f"{self.url}/data/get/{x}/",
+            "query": lambda x: f"{self.url}/data/query/{x}/",
+            "update": lambda x, y: f"{self.url}/data/update/{x}/{y}/",
+            "suppress": lambda x, y: f"{self.url}/data/suppress/{x}/{y}/",
         }
 
     def request(self, method, **kwargs):
