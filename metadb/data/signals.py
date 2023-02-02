@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from data.models import Mpx, Signal
+from data.models import Mpx
+from internal.models import Signal
 from django.utils import timezone
 
 # from data.tasks import generate_fasta_statistics

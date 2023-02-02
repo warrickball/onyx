@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "knox",
     "django_filters",
+    "internal",
     "data",
     "accounts",
 ]
@@ -61,7 +62,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "data.middleware.SaveRequest",
+    "internal.middleware.SaveRequest",
 ]
 
 ROOT_URLCONF = "metadb.urls"
@@ -165,6 +166,6 @@ REST_KNOX = {
 
 # Custom settings used in the project
 CURSOR_PAGINATION_PAGE_SIZE = 5000
-INTERNAL_SERVER_ERROR_LOG_FILE = os.environ["METADB_INTERNAL_SERVER_ERROR_LOG_FILE"]
-INTERNAL_SERVER_ERROR_LOG_FILE_MAX_BYTES = 10000000
-INTERNAL_SERVER_ERROR_LOG_FILE_NUM_BACKUPS = 5
+# INTERNAL_SERVER_ERROR_LOG_FILE = os.environ["METADB_INTERNAL_SERVER_ERROR_LOG_FILE"]
+# INTERNAL_SERVER_ERROR_LOG_FILE_MAX_BYTES = 10000000
+# INTERNAL_SERVER_ERROR_LOG_FILE_NUM_BACKUPS = 5
