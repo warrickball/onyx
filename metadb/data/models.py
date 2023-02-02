@@ -7,6 +7,7 @@ from secrets import token_hex
 from utils.fields import YearMonthField, LowerCharField
 from utils.functions import get_choices
 from utils import choices
+from accounts.models import User
 
 
 def generate_cid():
@@ -79,6 +80,16 @@ class Signal(models.Model):
 class GroupCluster(models.Model):
     name = models.TextField(unique=True)
     groups = models.ManyToManyField(Group)
+
+
+class Request(models.Model):
+    endpoint = models.CharField(max_length=100, null=True)
+    method = models.CharField(max_length=10, null=True)
+    status = models.PositiveSmallIntegerField()
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    address = models.CharField(max_length=20, null=True)
+    exec_time = models.IntegerField(null=True)
+    date = models.DateTimeField(auto_now=True)
 
 
 class Project(models.Model):
