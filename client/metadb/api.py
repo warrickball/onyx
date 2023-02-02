@@ -331,27 +331,27 @@ class Client:
             url=self.endpoints["get"](project),
             params=fields,
         )
-        yield response
+        utils.raise_for_status(response)
 
-        if response.ok:
-            _next = response.json()["next"]
-        else:
-            _next = None
+        for x in response.json()["results"]:
+            yield x
+
+        _next = response.json()["next"]
 
         while _next is not None:
             response = self.request(
                 method=requests.get,
                 url=_next,
             )
-            yield response
+            utils.raise_for_status(response)
 
-            if response.ok:
-                _next = response.json()["next"]
-            else:
-                _next = None
+            for x in response.json()["results"]:
+                yield x
+
+            _next = response.json()["next"]
 
     @utils.session_required
-    def query(self, project, query, group=None):
+    def query(self, project, query):
         """
         Get records from the database.
         """
@@ -360,17 +360,16 @@ class Client:
 
         params = {}
 
-        if group is not None:
-            params["group"] = group
-
         response = self.request(
             method=requests.post,
             url=self.endpoints["query"](project),
             json=query.query,
             params=params,
         )
+        utils.raise_for_status(response)
 
-        return response
+        for x in response.json()["results"]:
+            yield x
 
     @utils.session_required
     def update(self, project, cid, fields):
