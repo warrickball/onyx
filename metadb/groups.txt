@@ -6,6 +6,13 @@ data,projectitem,add_projectitem
 data,projectitem,add_projectitem__project
 data,projectitem,add_projectitem__site
 
+#view_projectitem
+data,projectitem,view_projectitem
+data,projectitem,view_projectitem__project
+data,projectitem,view_projectitem__site
+data,projectitem,view_projectitem__cid
+data,projectitem,view_projectitem__published_date
+
 #change_projectitem
 data,projectitem,change_projectitem
 
@@ -23,6 +30,15 @@ data,pathogen,add_pathogen__collection_month
 data,pathogen,add_pathogen__received_month
 data,pathogen,add_pathogen__fasta_path
 data,pathogen,add_pathogen__bam_path
+
+#view_pathogen
+data,pathogen,view_pathogen
+data,pathogen,view_pathogen__sample_id
+data,pathogen,view_pathogen__run_name
+data,pathogen,view_pathogen__collection_month
+data,pathogen,view_pathogen__received_month
+data,pathogen,view_pathogen__fasta_path
+data,pathogen,view_pathogen__bam_path
 
 #change_pathogen
 data,pathogen,change_pathogen
@@ -54,6 +70,22 @@ data,mpx,add_mpx__seq_strategy
 data,mpx,add_mpx__bioinfo_pipe_name
 data,mpx,add_mpx__bioinfo_pipe_version
 
+#view_mpx
+data,mpx,view_mpx
+data,mpx,view_mpx__sample_type
+data,mpx,view_mpx__sample_site
+data,mpx,view_mpx__patient_ageband
+data,mpx,view_mpx__country
+data,mpx,view_mpx__patient_id
+data,mpx,view_mpx__seq_platform
+data,mpx,view_mpx__instrument_model
+data,mpx,view_mpx__run_layout
+data,mpx,view_mpx__enrichment_method
+data,mpx,view_mpx__source_of_library
+data,mpx,view_mpx__seq_strategy
+data,mpx,view_mpx__bioinfo_pipe_name
+data,mpx,view_mpx__bioinfo_pipe_version
+
 #change_mpx
 data,mpx,change_mpx
 data,mpx,change_mpx__sample_type
@@ -82,6 +114,13 @@ data,mpxpha,add_mpxpha__ukhsa_region
 data,mpxpha,add_mpxpha__travel_status
 data,mpxpha,add_mpxpha__outer_postcode
 data,mpxpha,add_mpxpha__epi_cluster
+
+#view_mpxpha
+data,mpxpha,view_mpxpha
+data,mpxpha,view_mpxpha__ukhsa_region
+data,mpxpha,view_mpxpha__travel_status
+data,mpxpha,view_mpxpha__outer_postcode
+data,mpxpha,view_mpxpha__epi_cluster
 
 #change_mpxpha
 data,mpxpha,change_mpxpha
