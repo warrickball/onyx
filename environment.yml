@@ -13,4 +13,3 @@ dependencies:
     - django-cursor-pagination
     - celery
     - requests
-    - pandas
