@@ -274,9 +274,12 @@ class QueryProjectItemView(METADBAPIView):
             if cursor:
                 query_params.pop(paginator.cursor_query_param)
 
-        # Turn the value of each key-value pair in request.data into a 'KeyValue' object
-        # Returns a list of the keyvalues
-        keyvalues = make_keyvalues(request.data)
+        if request.data:
+            # Turn the value of each key-value pair in request.data into a 'KeyValue' object
+            # Returns a list of the keyvalues
+            keyvalues = make_keyvalues(request.data)
+        else:
+            keyvalues = []
 
         # # Check user has permissions to view both the model and the model fields that they want
         # authorised, required, unknown = check_permissions(
@@ -361,11 +364,14 @@ class QueryProjectItemView(METADBAPIView):
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # The data has been validated so we form the query (a Q object)
-        query = get_query(request.data)
+        if request.data:
+            # The data has been validated so we form the query (a Q object)
+            query = get_query(request.data)
 
-        # Then filter using the Q object
-        qs = project_model.objects.filter(suppressed=False).filter(query)
+            # Then filter using the Q object
+            qs = project_model.objects.filter(suppressed=False).filter(query)
+        else:
+            qs = project_model.objects.filter(suppressed=False)
 
         # Add the pagination cursor param back into the request
         if cursor is not None:
@@ -380,6 +386,8 @@ class QueryProjectItemView(METADBAPIView):
         serializer = get_serializer(project_model)(result_page, many=True)
 
         # Return paginated response
+        self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
+        self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
