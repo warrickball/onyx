@@ -1,5 +1,10 @@
-from .responses import METADBAPIResponse
+from django.db.models import Q
 from datetime import datetime
+import operator
+import functools
+
+from .responses import METADBAPIResponse
+from .classes import KeyValue
 
 
 def get_choices(cs):
@@ -121,3 +126,106 @@ def enforce_yearmonth_non_future(errors, name, value):
     """
     if value.year >= datetime.now().year and value.month > datetime.now().month:
         errors.setdefault(name, []).append("Yearmonth cannot be from the future.")
+
+
+def make_keyvalues(data):
+    """
+    Traverses the provided `data` and replaces request values with `KeyValue` objects.
+    Returns a list of these `KeyValue` objects.
+    """
+    key, value = next(iter(data.items()))
+
+    if key in {"&", "|", "^", "~"}:
+        keyvalues = [make_keyvalues(k_v) for k_v in value]
+        return functools.reduce(operator.add, keyvalues)
+    else:
+        # Initialise KeyValue object
+        keyvalue = KeyValue(key, value)
+
+        # Replace the request.data value with the KeyValue object
+        data[key] = keyvalue
+
+        # Now return the Keyvalue object
+        # All this is being done so that its easy to modify the key/value in the request.data structure
+        # To modify the key/values, we will be able to change them in the returned list
+        # And because they are the same objects as in request.data, that will be altered as well
+        return [keyvalue]
+
+
+def get_query(data):
+    """
+    Traverses the provided `data` and forms the corresponding Q object.
+    """
+    key, value = next(iter(data.items()))
+
+    # AND of multiple keyvalues
+    if key == "&":
+        q_objects = [get_query(k_v) for k_v in value]
+        return functools.reduce(operator.and_, q_objects)
+
+    # OR of multiple keyvalues
+    elif key == "|":
+        q_objects = [get_query(k_v) for k_v in value]
+        return functools.reduce(operator.or_, q_objects)
+
+    # XOR of multiple keyvalues
+    elif key == "^":
+        q_objects = [get_query(k_v) for k_v in value]
+        return functools.reduce(operator.xor, q_objects)
+
+    # NOT of a single keyvalue
+    elif key == "~":
+        q_object = [get_query(k_v) for k_v in value][0]
+        return ~q_object
+
+    # Base case: a keyvalue to filter on
+    else:
+        # 'value' here is a KeyValue object
+        # That by this point, should have been cleaned and corrected to work in a query
+        q = Q(**{value.key: value.value})
+        return q
+
+
+def check_permissions(user, model, action, user_fields):
+    """
+    Check that the `user` has correct permissions to perform `action` to `user_fields` of the provided `model`.
+    """
+    request_permissions = []
+
+    # For the model (and each parent in its inheritance hierarchy)
+    # Record each permission
+    # Starting from the grandest parent model
+    model_fields = {field.name: model for field in model._meta.get_fields()}
+    models = [model] + model._meta.get_parent_list()
+    for m in reversed(models):
+        # Add global model action permission to required request permissions
+        m_permission = f"{m._meta.app_label}.{action}_{m._meta.model_name}"
+        request_permissions.append(m_permission)
+
+        for field in m._meta.get_fields(include_parents=False):
+            if field.name in model_fields:
+                model_fields[field.name] = m
+
+    # For each field provided by the user, get the corresponding permission
+    unknown = []
+    for user_field in user_fields:
+        if user_field in model_fields:
+            field_model = model_fields[user_field]
+            field_permission = f"{field_model._meta.app_label}.{action}_{field_model._meta.model_name}__{user_field}"
+            request_permissions.append(field_permission)
+        else:
+            unknown.append(user_field)
+
+    # Check the user has permissions to perform action to all provided fields
+    has_permission = user.has_perms(request_permissions)
+
+    # If not, determine the permissions they need
+    required = []
+    if not has_permission:
+        user_permissions = user.get_all_permissions()
+
+        for request_permission in request_permissions:
+            if request_permission not in user_permissions:
+                required.append(request_permission)
+
+    return has_permission, required, unknown

@@ -2,11 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from django.conf import settings
-from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
-import traceback
-import operator
-import functools
 
 from .filters import METADBFilter
 from .models import Project
@@ -18,7 +14,7 @@ from accounts.permissions import (
 )
 from utils.views import METADBAPIView
 from utils.responses import METADBAPIResponse
-from utils.functions import init_pathogen_queryset
+from utils.functions import make_keyvalues, get_query, check_permissions
 from utils.contextmanagers import mutable
 
 
@@ -38,51 +34,6 @@ def get_project_model(project):
             pass
 
     return None
-
-
-def check_permissions(user, model, action, user_fields):
-    """
-    Check that the `user` has correct permissions to perform `action` to `user_fields` of the provided `model`.
-    """
-    request_permissions = []
-
-    # For the model (and each parent in its inheritance hierarchy)
-    # Record each permission
-    # Starting from the grandest parent model
-    model_fields = {field.name: model for field in model._meta.get_fields()}
-    models = [model] + model._meta.get_parent_list()
-    for m in reversed(models):
-        # Add global model action permission to required request permissions
-        m_permission = f"{m._meta.app_label}.{action}_{m._meta.model_name}"
-        request_permissions.append(m_permission)
-
-        for field in m._meta.get_fields(include_parents=False):
-            if field.name in model_fields:
-                model_fields[field.name] = m
-
-    # For each field provided by the user, get the corresponding permission
-    unknown = []
-    for user_field in user_fields:
-        if user_field in model_fields:
-            field_model = model_fields[user_field]
-            field_permission = f"{field_model._meta.app_label}.{action}_{field_model._meta.model_name}__{user_field}"
-            request_permissions.append(field_permission)
-        else:
-            unknown.append(user_field)
-
-    # Check the user has permissions to perform action to all provided fields
-    has_permission = user.has_perms(request_permissions)
-
-    # If not, determine the permissions they need
-    required = []
-    if not has_permission:
-        user_permissions = user.get_all_permissions()
-
-        for request_permission in request_permissions:
-            if request_permission not in user_permissions:
-                required.append(request_permission)
-
-    return has_permission, required, unknown
 
 
 class ProjectView(METADBAPIView):
@@ -168,22 +119,22 @@ class GetProjectItemView(METADBAPIView):
         """
         Use `request.query_params` to filter data for the model specified by `project`.
         """
-        # Get the corresponding model. The base class Pathogen is accepted when getting data
-        pathogen_model = get_project_model(project)
+        # Get the project model
+        project_model = get_project_model(project)
 
-        # If pathogen model does not exist, return error
-        if pathogen_model is None:
+        # If the project model does not exist, return 404
+        if not project_model:
             return Response(
                 {project: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Initialise the paginator
+        # Prepare paginator
         paginator = CursorPagination()
         paginator.ordering = "created"
         paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
 
-        # Remove cursor, distinct and group parameters from the query params
+        # Take out the cursor and distinct params from the request
         with mutable(request.query_params) as query_params:
             cursor = query_params.get(paginator.cursor_query_param)
             if cursor:
@@ -193,40 +144,51 @@ class GetProjectItemView(METADBAPIView):
             if distinct:
                 query_params.pop("distinct")
 
-            group = query_params.get("group")
-            if group:
-                query_params.pop("group")
+        # # Check user has permissions to view both the model and the model fields that they want
+        # authorised, required, unknown = check_permissions(
+        #     user=request.user,
+        #     model=project_model,
+        #     action="view",
+        #     user_fields=list(request.query_params.keys()),
+        # )
 
-        # Get user serializer
-        serializer = get_serializer(pathogen_model, request.user, group=group)
+        # # If not authorised, return 403
+        # if not authorised:
+        #     return Response(
+        #         {"denied_permissions": required},
+        #         status=status.HTTP_403_FORBIDDEN,
+        #     )
 
-        # If the serializer returned a string, this is an indication something went wrong regarding the group
-        # The error string is returned along with the name of the group
-        if isinstance(serializer, str):
-            return Response({group: serializer}, status=status.HTTP_400_BAD_REQUEST)
+        # # If unknown fields were provided, return 400
+        # if unknown:
+        #     return Response(
+        #         {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
+        #     )
 
-        data = {}
-        num_filtersets = 0
+        # Turn the request query params into a series of dictionaries, each that will be passed to a filterset
+        filterset_datas = []
         for field in request.query_params:
             values = list(set(request.query_params.getlist(field)))
-            data[field] = values
-            if len(values) > num_filtersets:
-                num_filtersets = len(values)
 
-        filterset_datas = [{} for _ in range(num_filtersets)]
-        for field, values in data.items():
             for i, value in enumerate(values):
+                if len(filterset_datas) == i:
+                    filterset_datas.append({})
+
                 filterset_datas[i][field] = value
 
+        # Dictionary of filterset errors
         errors = {}
 
         # Initial queryset
-        qs = init_pathogen_queryset(pathogen_model, user=request.user)
+        qs = project_model.objects.filter(suppressed=False)
 
+        # A filterset can only take a a query with one of each field at a time
+        # So given that the get view only AND's fields together, we can represent this
+        # as a series of filtersets ANDed together
         for i, filterset_data in enumerate(filterset_datas):
             # Generate filterset of current queryset
             filterset = METADBFilter(
-                pathogen_model,
+                project_model,
                 data=filterset_data,
                 queryset=qs,
             )
@@ -240,9 +202,9 @@ class GetProjectItemView(METADBAPIView):
                     if field not in filterset.filters:
                         errors[field] = [METADBAPIResponse.UNKNOWN_FIELD]
 
-                for field in filterset.base_filters:
-                    if field not in serializer.Meta.fields:
-                        errors[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
+                # for field in filterset.base_filters:
+                #     if field not in serializer.Meta.fields:
+                #         errors[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
 
             if not filterset.is_valid():
                 # Append any filterset errors to the errors dict
@@ -250,7 +212,7 @@ class GetProjectItemView(METADBAPIView):
                     errors[field] = msg
 
         # Check the distinct field is a known field
-        if distinct and (distinct not in pathogen_model.FILTER_FIELDS):
+        if distinct and (distinct not in project_model.FILTER_FIELDS):  # type: ignore
             errors[distinct] = [METADBAPIResponse.UNKNOWN_FIELD]
 
         # Return any errors that cropped up during filtering
@@ -262,9 +224,9 @@ class GetProjectItemView(METADBAPIView):
             qs = qs.distinct(distinct)
 
             # Serialize the results
-            serialized = serializer(qs, many=True)
+            serializer = get_serializer(project_model)(qs, many=True)
 
-            return Response(serialized.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             # Non-distinct results have the potential to be quite large
             # So pagination (splitting the data into multiple pages) is used
@@ -276,187 +238,118 @@ class GetProjectItemView(METADBAPIView):
 
             # Paginate the response
             instances = qs.order_by("id")
-
             result_page = paginator.paginate_queryset(instances, request)
 
             # Serialize the results
-            serialized = serializer(result_page, many=True)
+            serializer = get_serializer(project_model)(result_page, many=True)
 
+            # Return paginated response
             self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
             self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
-            return Response(serialized.data, status=status.HTTP_200_OK)
-
-
-
-class QField:
-    def __init__(self, key, value):
-        self.key = key
-        self.value = value
-
-
-def make_qfields(data):
-    key, value = next(iter(data.items()))
-
-    if key in ["&", "|", "^", "~"]:
-        for k_v in value:
-            make_qfields(k_v)
-    else:
-        data[key] = QField(key, value)
-
-
-def get_qfields_flat(data):
-    """
-    Traverses the provided `data`, that specifies an arbitrarily complex query, and returns a list of all `(key, value)` fields.
-    """
-    key, value = next(iter(data.items()))
-
-    # AND of multiple key-value pairs
-    if key == "&":
-        k_v_objects = [get_qfields_flat(k_v) for k_v in value]
-        return functools.reduce(operator.add, k_v_objects)
-
-    # OR of multiple key-value pairs
-    elif key == "|":
-        k_v_objects = [get_qfields_flat(k_v) for k_v in value]
-        return functools.reduce(operator.add, k_v_objects)
-
-    # XOR of multiple key-value pairs
-    elif key == "^":
-        k_v_objects = [get_qfields_flat(k_v) for k_v in value]
-        return functools.reduce(operator.add, k_v_objects)
-
-    # NOT of a single key-value pair
-    elif key == "~":
-        k_v_object = [get_qfields_flat(k_v) for k_v in value][0]
-        return k_v_object
-
-    # Base case: a key-value pair we want to filter on
-    else:
-        return [(key, value)]
-
-
-def get_query(data):
-    """
-    Traverses the provided `data`, that specifies an arbitrarily complex query, and forms the corresponding Q object.
-
-    Also returns a flattened list of all `(key, value)` tuples used to form the Q object.
-    """
-    key, value = next(iter(data.items()))
-
-    # AND of multiple key-value pairs
-    if key == "&":
-        q_objects = [get_query(k_v) for k_v in value]
-        return functools.reduce(operator.and_, q_objects)
-
-    # OR of multiple key-value pairs
-    elif key == "|":
-        q_objects = [get_query(k_v) for k_v in value]
-        return functools.reduce(operator.or_, q_objects)
-
-    # XOR of multiple key-value pairs
-    elif key == "^":
-        q_objects = [get_query(k_v) for k_v in value]
-        return functools.reduce(operator.xor, q_objects)
-
-    # NOT of a single key-value pair
-    elif key == "~":
-        q_object = [get_query(k_v) for k_v in value][0]
-        return ~q_object
-
-    # Base case: a key-value pair we want to filter on
-    else:
-        q = Q(
-            **{value.key: value.value}
-        )  # value is a QField (hopefully with clean data)
-        return q
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class QueryProjectItemView(METADBAPIView):
     permission_classes = ApprovedOrAdmin
 
     def post(self, request, project):
-        # Get the corresponding model. The base class Pathogen is accepted when getting data
-        pathogen_model = get_project_model(project)
+        # Get the project model
+        project_model = get_project_model(project)
 
-        # If pathogen model does not exist, return error
-        if pathogen_model is None:
+        # If the project model does not exist, return 404
+        if not project_model:
             return Response(
                 {project: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Remove the group parameter from the request
+        # Prepare paginator
+        paginator = CursorPagination()
+        paginator.ordering = "created"
+        paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
+
+        # Take out the cursor param from the request
         with mutable(request.query_params) as query_params:
-            group = query_params.get("group")
-            if group:
-                query_params.pop("group")
+            cursor = query_params.get(paginator.cursor_query_param)
+            if cursor:
+                query_params.pop(paginator.cursor_query_param)
 
-        # Turn the value of each key-value pair in request.data into a 'QField' object
-        make_qfields(request.data)
+        # Turn the value of each key-value pair in request.data into a 'KeyValue' object
+        # Returns a list of the keyvalues
+        keyvalues = make_keyvalues(request.data)
 
-        # Get flattened list of qfields
-        qfields = get_qfields_flat(request.data)
+        # # Check user has permissions to view both the model and the model fields that they want
+        # authorised, required, unknown = check_permissions(
+        #     user=request.user,
+        #     model=project_model,
+        #     action="view",
+        #     user_fields=list(request.query_params.keys()),
+        # )
 
-        # Get user serializer
-        serializer = get_serializer(pathogen_model, request.user, group=group)
+        # # If not authorised, return 403
+        # if not authorised:
+        #     return Response(
+        #         {"denied_permissions": required},
+        #         status=status.HTTP_403_FORBIDDEN,
+        #     )
 
-        # If the serializer returned a string, this is an indication something went wrong regarding the group
-        # The error string is returned along with the name of the group
-        if isinstance(serializer, str):
-            return Response({group: serializer}, status=status.HTTP_400_BAD_REQUEST)
+        # # If unknown fields were provided, return 400
+        # if unknown:
+        #     return Response(
+        #         {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
+        #     )
 
-        # Convert the key-value pairs into a structure that resembles the get request's query_params
-        request_structured_data = {}
-        for field, value in qfields:
-            request_structured_data.setdefault(field, []).append(value)
+        # Construct a list of dictionaries from the keyvalues
+        # Each of these dictionaries will be passed to a filterset
+        # The filterset is being used just to clean and validate the input filters
+        # Until we construct the query, it doesn't matter how fields are related in the query (i.e. AND, OR, etc)
+        # All that matters is if the individual filters and their values are valid
+        filterset_datas = [{}]
+        for keyvalue in keyvalues:
+            # Place the keyvalue in the first dictionary where the key is not present
+            # If we reach the end with no placement, create a new dictionary and add it in there
+            for filterset_data in filterset_datas:
+                if keyvalue.key not in filterset_data:
+                    filterset_data[keyvalue.key] = keyvalue
+                    break
+            else:
+                filterset_datas.append({keyvalue.key: keyvalue})
 
-        # Validate this structure using the filterset
-        # This ensures the key-value pairs for this nested query go through the same validation as a standard get request
-        data = {}
-        num_filtersets = 0
-        for field, values in request_structured_data.items():
-            data[field] = values
-            if len(values) > num_filtersets:
-                num_filtersets = len(values)
-
-        filterset_datas = [{} for _ in range(num_filtersets)]
-        for field, values in data.items():
-            for i, value in enumerate(values):
-                filterset_datas[i][field] = value
-
+        # Dictionary of filterset errors
         errors = {}
 
+        # Use a filterset, applied to each dict in filterset_datas, to validate the data
         for i, filterset_data in enumerate(filterset_datas):
             # Slightly cursed, but it works
             filterset = METADBFilter(
-                pathogen_model,
+                project_model,
                 data={k: v.value for k, v in filterset_data.items()},
-                queryset=pathogen_model.objects.none(),
+                queryset=project_model.objects.none(),
             )
 
             # On first pass, append any unknown fields to error dict
+            # Don't need to do more than i == 0, as here we have all the fields
             if i == 0:
                 # Don't need to do more than i == 0, as here we have all the fields
                 for field in filterset_data:
                     if field not in filterset.filters:
                         errors[field] = [METADBAPIResponse.UNKNOWN_FIELD]
 
-                for field in filterset.base_filters:
-                    if field not in serializer.Meta.fields:
-                        errors[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
+                # for field in filterset.base_filters:
+                #     if field not in serializer.Meta.fields:
+                #         errors[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
 
-            if errors or not filterset.is_valid():
-                # Append any filterset errors to the errors dict
+            # Append any filterset errors to the errors dict
+            if not filterset.is_valid():
                 for field, msg in filterset.errors.items():
                     errors[field] = msg
-
             else:
-                # Add clean value to the qfields
-                for k, qfield in filterset_data.items():
-                    qfield.value = filterset.form.cleaned_data[k]
+                # Add the cleaned values to the KeyValue objects
+                for k, keyvalue in filterset_data.items():
+                    keyvalue.value = filterset.form.cleaned_data[k]
 
                 # Need to swap out provided aliases for actual field names
-                for field, field_data in pathogen_model.FILTER_FIELDS.items():
+                for field, field_data in project_model.FILTER_FIELDS.items():  # type: ignore
                     if field_data.get("alias"):
                         for k, v in filterset_data.items():
                             if k.startswith(field_data["alias"]) and not k.startswith(
@@ -464,19 +357,29 @@ class QueryProjectItemView(METADBAPIView):
                             ):
                                 v.key = field + v.key.removeprefix(field_data["alias"])
 
+        # Return any errors that cropped up during validation
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # The data has been validated (to the best of my knowledge)
-        # Form the query (a Q object)
+        # The data has been validated so we form the query (a Q object)
         query = get_query(request.data)
 
-        # Form the queryset, then filter by the Q object
-        qs = init_pathogen_queryset(pathogen_model, user=request.user).filter(query)
+        # Then filter using the Q object
+        qs = project_model.objects.filter(suppressed=False).filter(query)
+
+        # Add the pagination cursor param back into the request
+        if cursor is not None:
+            with mutable(request.query_params) as query_params:
+                query_params[paginator.cursor_query_param] = cursor
+
+        # Paginate the response
+        instances = qs.order_by("id")
+        result_page = paginator.paginate_queryset(instances, request)
 
         # Serialize the results
-        serializer = serializer(qs, many=True)
+        serializer = get_serializer(project_model)(result_page, many=True)
 
+        # Return paginated response
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
