@@ -13,7 +13,7 @@ from accounts.permissions import (
     SameSiteAuthorityAsCIDOrAdmin,
 )
 from utils.views import METADBAPIView
-from utils.responses import METADBAPIResponse
+from utils.classes import METADBAPIResponse
 from utils.functions import make_keyvalues, get_query, check_permissions
 from utils.contextmanagers import mutable
 
@@ -134,15 +134,11 @@ class GetProjectItemView(METADBAPIView):
         paginator.ordering = "created"
         paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
 
-        # Take out the cursor and distinct params from the request
+        # Take out the cursor param from the request
         with mutable(request.query_params) as query_params:
             cursor = query_params.get(paginator.cursor_query_param)
             if cursor:
                 query_params.pop(paginator.cursor_query_param)
-
-            distinct = query_params.get("distinct")
-            if distinct:
-                query_params.pop("distinct")
 
         # # Check user has permissions to view both the model and the model fields that they want
         # authorised, required, unknown = check_permissions(
@@ -211,42 +207,26 @@ class GetProjectItemView(METADBAPIView):
                 for field, msg in filterset.errors.items():
                     errors[field] = msg
 
-        # Check the distinct field is a known field
-        if distinct and (distinct not in project_model.FILTER_FIELDS):  # type: ignore
-            errors[distinct] = [METADBAPIResponse.UNKNOWN_FIELD]
-
         # Return any errors that cropped up during filtering
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # If a parameter was provided for getting distinct results, apply it
-        if distinct:
-            qs = qs.distinct(distinct)
+        # Add the pagination cursor param back into the request
+        if cursor is not None:
+            with mutable(request.query_params) as query_params:
+                query_params[paginator.cursor_query_param] = cursor
 
-            # Serialize the results
-            serializer = get_serializer(project_model)(qs, many=True)
+        # Paginate the response
+        instances = qs.order_by("id")
+        result_page = paginator.paginate_queryset(instances, request)
 
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            # Non-distinct results have the potential to be quite large
-            # So pagination (splitting the data into multiple pages) is used
+        # Serialize the results
+        serializer = get_serializer(project_model)(result_page, many=True)
 
-            # Add the pagination cursor param back into the request
-            if cursor is not None:
-                with mutable(request.query_params) as query_params:
-                    query_params[paginator.cursor_query_param] = cursor
-
-            # Paginate the response
-            instances = qs.order_by("id")
-            result_page = paginator.paginate_queryset(instances, request)
-
-            # Serialize the results
-            serializer = get_serializer(project_model)(result_page, many=True)
-
-            # Return paginated response
-            self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
-            self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
-            return Response(serializer.data, status=status.HTTP_200_OK)
+        # Return paginated response
+        self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
+        self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class QueryProjectItemView(METADBAPIView):
