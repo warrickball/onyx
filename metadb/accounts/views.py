@@ -9,7 +9,7 @@ from .serializers import (
     SiteWaitingUserSerializer,
     AdminWaitingUserSerializer,
 )
-from utils.responses import METADBAPIResponse
+from utils.classes import METADBAPIResponse
 from utils.views import METADBAPIView, METADBCreateAPIView, METADBListAPIView
 from .permissions import (
     Any,

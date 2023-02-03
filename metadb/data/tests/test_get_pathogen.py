@@ -2,7 +2,7 @@ from rest_framework import status
 from data.models import Covid
 from accounts.models import Site
 from data.filters import BASE_LOOKUPS, CHAR_LOOKUPS
-from utils.responses import METADBAPIResponse
+from utils.classes import METADBAPIResponse
 from django.conf import settings
 from datetime import date
 from data.tests.utils import METADBTestCase, get_covid_data

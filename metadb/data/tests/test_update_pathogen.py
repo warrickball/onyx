@@ -3,7 +3,7 @@ from data.models import Covid
 from accounts.models import Site
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
-from utils.responses import METADBAPIResponse
+from utils.classes import METADBAPIResponse
 import secrets
 import os
 

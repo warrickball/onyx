@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView
-from .responses import METADBAPIResponse
+from .classes import METADBAPIResponse
 
 
 class METADBAPIMixin:

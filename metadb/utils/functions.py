@@ -3,7 +3,7 @@ from datetime import datetime
 import operator
 import functools
 
-from .responses import METADBAPIResponse
+from .classes import METADBAPIResponse
 from .classes import KeyValue
 
 
