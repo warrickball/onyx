@@ -47,14 +47,24 @@ class Signal(models.Model):
     modified = models.DateTimeField(auto_now=True)
 
 
-class GroupCluster(models.Model):
-    name = models.TextField(unique=True)
-    groups = models.ManyToManyField(Group)
-
-
-class GroupToContentType(models.Model):
-    group = models.OneToOneField(Group, on_delete=models.CASCADE)
+class Project(models.Model):
+    code = LowerCharField(max_length=8, unique=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    add_group = models.OneToOneField(
+        Group, on_delete=models.CASCADE, related_name="add_group_project"
+    )
+    view_group = models.OneToOneField(
+        Group, on_delete=models.CASCADE, related_name="view_group_project"
+    )
+    change_group = models.OneToOneField(
+        Group, on_delete=models.CASCADE, related_name="change_group_project"
+    )
+    suppress_group = models.OneToOneField(
+        Group, on_delete=models.CASCADE, related_name="suppress_group_project"
+    )
+    delete_group = models.OneToOneField(
+        Group, on_delete=models.CASCADE, related_name="delete_group_project"
+    )
 
 
 class Request(models.Model):

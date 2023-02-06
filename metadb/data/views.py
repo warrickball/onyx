@@ -2,11 +2,6 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
-
-from .filters import METADBFilter
-from .models import Project
-from .serializers import get_serializer
 from accounts.permissions import (
     Admin,
     ApprovedOrAdmin,
@@ -14,78 +9,44 @@ from accounts.permissions import (
 )
 from utils.views import METADBAPIView
 from utils.classes import METADBAPIResponse
-from utils.functions import make_keyvalues, get_query, check_permissions
+from utils.functions import (
+    make_keyvalues,
+    get_query,
+    check_permissions,
+    get_view_permissions_and_fields,
+    get_project_and_model,
+)
 from utils.contextmanagers import mutable
+from internal.models import Project
+from .filters import METADBFilter
+from .serializers import get_serializer
 
 
-def get_project_model(project):
-    """
-    Returns the model for the given `project`, returning `None` if it doesn't exist.
-    """
-    if Project.objects.filter(code=project.lower()).exists():
-        try:
-            model = ContentType.objects.get(
-                app_label="data", model=project.lower()
-            ).model_class()
-
-            return model
-
-        except ContentType.DoesNotExist:
-            pass
-
-    return None
-
-
-class ProjectView(METADBAPIView):
-    permission_classes = ApprovedOrAdmin
-
-    def get(self, request):
-        """
-        Get a list of `projects`.
-        """
-        # Check user has permissions to view the model
-        authorised, required, _ = check_permissions(
-            user=request.user,
-            model=Project,
-            action="view",
-            user_fields=[],
-        )
-
-        # If not authorised, return 403
-        if not authorised:
-            return Response(
-                {"denied_permissions": required},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        # Return a response containing a list of projects
-        projects = Project.objects.all().values_list("code", flat=True)
-        return Response({"projects": projects}, status=status.HTTP_200_OK)
-
-
-class CreateProjectItemView(METADBAPIView):
+class CreateRecordView(METADBAPIView):
     permission_classes = Admin
 
-    def post(self, request, project):
+    def post(self, request, project_code):
         """
-        Use `request.data` to save an instance for the model specified by `project`.
+        Create an instance for the given project.
         """
-        # Get the project model
-        project_model = get_project_model(project)
-
-        # If the project model does not exist, return 404
-        if not project_model:
+        # Get the project. If it does not exist, return 404
+        project, model = get_project_and_model(project_code)
+        if not project or not model:
             return Response(
-                {project: METADBAPIResponse.NOT_FOUND},
+                {project_code: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        # Get required view permissions and their corresponding fieldnames
+        view_permissions, view_fields = get_view_permissions_and_fields(project)
 
         # Check user has permissions to add both the model and the model fields that they want
         authorised, required, unknown = check_permissions(
             user=request.user,
-            model=project_model,
+            model=model,
+            default_permissions=view_permissions,
             action="add",
-            user_fields=list(request.data.keys()),
+            user_fields=list(request.data),
         )
 
         # If not authorised, return 403
@@ -101,8 +62,12 @@ class CreateProjectItemView(METADBAPIView):
                 {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        # If a site code was not provided, use the user's site code
+        if not request.data.get("site"):
+            request.data["site"] = request.user.site.code
+
         # Get the model serializer, and validate the data
-        serializer = get_serializer(project_model)(data=request.data)
+        serializer = get_serializer(model)(data=request.data, fields=view_fields)
 
         # If data is valid, save to the database. Otherwise, return 400
         if serializer.is_valid():
@@ -112,20 +77,18 @@ class CreateProjectItemView(METADBAPIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class GetProjectItemView(METADBAPIView):
+class GetRecordView(METADBAPIView):
     permission_classes = ApprovedOrAdmin
 
-    def get(self, request, project):
+    def get(self, request, project_code):
         """
-        Use `request.query_params` to filter data for the model specified by `project`.
+        Filter and return instances for the given project.
         """
-        # Get the project model
-        project_model = get_project_model(project)
-
-        # If the project model does not exist, return 404
-        if not project_model:
+        # Get the project. If it does not exist, return 404
+        project, model = get_project_and_model(project_code)
+        if not project or not model:
             return Response(
-                {project: METADBAPIResponse.NOT_FOUND},
+                {project_code: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -140,26 +103,30 @@ class GetProjectItemView(METADBAPIView):
             if cursor:
                 query_params.pop(paginator.cursor_query_param)
 
-        # # Check user has permissions to view both the model and the model fields that they want
-        # authorised, required, unknown = check_permissions(
-        #     user=request.user,
-        #     model=project_model,
-        #     action="view",
-        #     user_fields=list(request.query_params.keys()),
-        # )
+        # Get required view permissions and their corresponding fieldnames
+        view_permissions, view_fields = get_view_permissions_and_fields(project)
 
-        # # If not authorised, return 403
-        # if not authorised:
-        #     return Response(
-        #         {"denied_permissions": required},
-        #         status=status.HTTP_403_FORBIDDEN,
-        #     )
+        # Check user has permissions to view both the model and the model fields that they want
+        authorised, required, unknown = check_permissions(
+            user=request.user,
+            model=model,
+            default_permissions=view_permissions,
+            action="view",
+            user_fields=[x.split("__")[0] for x in request.query_params],
+        )
 
-        # # If unknown fields were provided, return 400
-        # if unknown:
-        #     return Response(
-        #         {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
-        #     )
+        # If not authorised, return 403
+        if not authorised:
+            return Response(
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Turn the request query params into a series of dictionaries, each that will be passed to a filterset
         filterset_datas = []
@@ -176,7 +143,7 @@ class GetProjectItemView(METADBAPIView):
         errors = {}
 
         # Initial queryset
-        qs = project_model.objects.filter(suppressed=False)
+        qs = model.objects.filter(suppressed=False)
 
         # A filterset can only take a a query with one of each field at a time
         # So given that the get view only AND's fields together, we can represent this
@@ -184,7 +151,7 @@ class GetProjectItemView(METADBAPIView):
         for i, filterset_data in enumerate(filterset_datas):
             # Generate filterset of current queryset
             filterset = METADBFilter(
-                project_model,
+                model,
                 data=filterset_data,
                 queryset=qs,
             )
@@ -221,7 +188,7 @@ class GetProjectItemView(METADBAPIView):
         result_page = paginator.paginate_queryset(instances, request)
 
         # Serialize the results
-        serializer = get_serializer(project_model)(result_page, many=True)
+        serializer = get_serializer(model)(result_page, many=True, fields=view_fields)
 
         # Return paginated response
         self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
@@ -229,17 +196,18 @@ class GetProjectItemView(METADBAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class QueryProjectItemView(METADBAPIView):
+class QueryRecordView(METADBAPIView):
     permission_classes = ApprovedOrAdmin
 
-    def post(self, request, project):
-        # Get the project model
-        project_model = get_project_model(project)
-
-        # If the project model does not exist, return 404
-        if not project_model:
+    def post(self, request, project_code):
+        """
+        Filter and return instances for the given project.
+        """
+        # Get the project. If it does not exist, return 404
+        project, model = get_project_and_model(project_code)
+        if not project or not model:
             return Response(
-                {project: METADBAPIResponse.NOT_FOUND},
+                {project_code: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -261,26 +229,30 @@ class QueryProjectItemView(METADBAPIView):
         else:
             keyvalues = []
 
-        # # Check user has permissions to view both the model and the model fields that they want
-        # authorised, required, unknown = check_permissions(
-        #     user=request.user,
-        #     model=project_model,
-        #     action="view",
-        #     user_fields=list(request.query_params.keys()),
-        # )
+        # Get required view permissions and their corresponding fieldnames
+        view_permissions, view_fields = get_view_permissions_and_fields(project)
 
-        # # If not authorised, return 403
-        # if not authorised:
-        #     return Response(
-        #         {"denied_permissions": required},
-        #         status=status.HTTP_403_FORBIDDEN,
-        #     )
+        # Check user has permissions to view both the model and the model fields that they want
+        authorised, required, unknown = check_permissions(
+            user=request.user,
+            model=model,
+            default_permissions=view_permissions,
+            action="view",
+            user_fields=[x.key.split("__")[0] for x in keyvalues],
+        )
 
-        # # If unknown fields were provided, return 400
-        # if unknown:
-        #     return Response(
-        #         {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
-        #     )
+        # If not authorised, return 403
+        if not authorised:
+            return Response(
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                {"unknown_fields": [unknown]}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Construct a list of dictionaries from the keyvalues
         # Each of these dictionaries will be passed to a filterset
@@ -305,9 +277,9 @@ class QueryProjectItemView(METADBAPIView):
         for i, filterset_data in enumerate(filterset_datas):
             # Slightly cursed, but it works
             filterset = METADBFilter(
-                project_model,
+                model,
                 data={k: v.value for k, v in filterset_data.items()},
-                queryset=project_model.objects.none(),
+                queryset=model.objects.none(),
             )
 
             # On first pass, append any unknown fields to error dict
@@ -332,7 +304,7 @@ class QueryProjectItemView(METADBAPIView):
                     keyvalue.value = filterset.form.cleaned_data[k]
 
                 # Need to swap out provided aliases for actual field names
-                for field, field_data in project_model.FILTER_FIELDS.items():  # type: ignore
+                for field, field_data in model.FILTER_FIELDS.items():  # type: ignore
                     if field_data.get("alias"):
                         for k, v in filterset_data.items():
                             if k.startswith(field_data["alias"]) and not k.startswith(
@@ -349,9 +321,9 @@ class QueryProjectItemView(METADBAPIView):
             query = get_query(request.data)
 
             # Then filter using the Q object
-            qs = project_model.objects.filter(suppressed=False).filter(query)
+            qs = model.objects.filter(suppressed=False).filter(query)
         else:
-            qs = project_model.objects.filter(suppressed=False)
+            qs = model.objects.filter(suppressed=False)
 
         # Add the pagination cursor param back into the request
         if cursor is not None:
@@ -363,7 +335,7 @@ class QueryProjectItemView(METADBAPIView):
         result_page = paginator.paginate_queryset(instances, request)
 
         # Serialize the results
-        serializer = get_serializer(project_model)(result_page, many=True)
+        serializer = get_serializer(model)(result_page, many=True, fields=view_fields)
 
         # Return paginated response
         self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
@@ -371,29 +343,31 @@ class QueryProjectItemView(METADBAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class UpdateProjectItemView(METADBAPIView):
+class UpdateRecordView(METADBAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
-    def patch(self, request, project, cid):
+    def patch(self, request, project_code, cid):
         """
-        Use `request.data` and a `cid` to update an instance for the model specified by `project`.
+        Update an instance for the given project.
         """
-        # Get the project model
-        project_model = get_project_model(project)
-
-        # If the project model does not exist, return 404
-        if not project_model:
+        # Get the project. If it does not exist, return 404
+        project, model = get_project_and_model(project_code)
+        if not project or not model:
             return Response(
-                {project: METADBAPIResponse.NOT_FOUND},
+                {project_code: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        # Get required view permissions and their corresponding fieldnames
+        view_permissions, view_fields = get_view_permissions_and_fields(project)
 
         # Check user has permissions to change both the model and the model fields that they want
         authorised, required, unknown = check_permissions(
             user=request.user,
-            model=project_model,
+            model=model,
+            default_permissions=view_permissions,
             action="change",
-            user_fields=list(request.data.keys()),
+            user_fields=list(request.data),
         )
 
         # If not authorised, return 403
@@ -412,15 +386,15 @@ class UpdateProjectItemView(METADBAPIView):
         # Get the instance to be updated
         # If the instance does not exist, return 404
         try:
-            instance = project_model.objects.filter(suppressed=False).get(cid=cid)
-        except project_model.DoesNotExist:
+            instance = model.objects.filter(suppressed=False).get(cid=cid)
+        except model.DoesNotExist:
             return Response(
                 {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
             )
 
         # Get the model serializer, and validate the data
-        serializer = get_serializer(project_model)(
-            instance=instance, data=request.data, partial=True
+        serializer = get_serializer(model)(
+            instance=instance, data=request.data, partial=True, fields=view_fields
         )
 
         # If data is valid, update existing record in the database. Otherwise, return 400
@@ -431,27 +405,29 @@ class UpdateProjectItemView(METADBAPIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class SuppressProjectItemView(METADBAPIView):
+class SuppressRecordView(METADBAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
-    def delete(self, request, project, cid):
+    def delete(self, request, project_code, cid):
         """
-        Use the provided `project` and `cid` to suppress a record.
+        Suppress an instance of the given project.
         """
-        # Get the project model
-        project_model = get_project_model(project)
-
-        # If the project model does not exist, return 404
-        if not project_model:
+        # Get the project. If it does not exist, return 404
+        project, model = get_project_and_model(project_code)
+        if not project or not model:
             return Response(
-                {project: METADBAPIResponse.NOT_FOUND},
+                {project_code: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        # Get required view permissions and their corresponding fieldnames
+        view_permissions, _ = get_view_permissions_and_fields(project)
 
         # Check user has permissions to suppress instances of the model
         authorised, required, _ = check_permissions(
             user=request.user,
-            model=project_model,
+            model=model,
+            default_permissions=view_permissions,
             action="suppress",
             user_fields=[],
         )
@@ -466,8 +442,8 @@ class SuppressProjectItemView(METADBAPIView):
         # Get the instance to be suppressed
         # If the instance does not exist, return 404
         try:
-            instance = project_model.objects.filter(suppressed=False).get(cid=cid)
-        except project_model.DoesNotExist:
+            instance = model.objects.filter(suppressed=False).get(cid=cid)
+        except model.DoesNotExist:
             return Response(
                 {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
             )
@@ -483,27 +459,29 @@ class SuppressProjectItemView(METADBAPIView):
         )
 
 
-class DeleteProjectItemView(METADBAPIView):
+class DeleteRecordView(METADBAPIView):
     permission_classes = Admin
 
-    def delete(self, request, project, cid):
+    def delete(self, request, project_code, cid):
         """
-        Use the provided `project` and `cid` to permanently delete a record.
+        Permanently delete an instance of the given project.
         """
-        # Get the project model
-        project_model = get_project_model(project)
-
-        # If the project model does not exist, return 404
-        if not project_model:
+        # Get the project. If it does not exist, return 404
+        project, model = get_project_and_model(project_code)
+        if not project or not model:
             return Response(
-                {project: METADBAPIResponse.NOT_FOUND},
+                {project_code: METADBAPIResponse.NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        # Get required view permissions and their corresponding fieldnames
+        view_permissions, _ = get_view_permissions_and_fields(project)
 
         # Check user has permissions to delete instances of the model
         authorised, required, _ = check_permissions(
             user=request.user,
-            model=project_model,
+            model=model,
+            default_permissions=view_permissions,
             action="delete",
             user_fields=[],
         )
@@ -518,8 +496,8 @@ class DeleteProjectItemView(METADBAPIView):
         # Attempt to delete the instance
         # If the instance does not exist, return 404
         try:
-            project_model.objects.get(cid=cid).delete()
-        except project_model.DoesNotExist:
+            model.objects.get(cid=cid).delete()
+        except model.DoesNotExist:
             return Response(
                 {cid: METADBAPIResponse.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND
             )
