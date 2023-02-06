@@ -16,21 +16,16 @@ def generate_cid():
     """
     cid = "C-" + "".join(token_hex(4).upper())
 
-    if ProjectItem.objects.filter(cid=cid).exists():
+    if Record.objects.filter(cid=cid).exists():
         cid = generate_cid()
 
     return cid
 
 
-class Project(models.Model):
-    code = LowerCharField(max_length=8, unique=True)
-
-
-class ProjectItem(models.Model):
+class Record(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     suppressed = models.BooleanField(default=False)
-    project = models.ForeignKey("Project", on_delete=models.CASCADE)
     site = models.ForeignKey("accounts.Site", on_delete=models.CASCADE)
     cid = models.CharField(default=generate_cid, max_length=12, unique=True)
     published_date = models.DateField(auto_now_add=True)
@@ -43,9 +38,8 @@ class ProjectItem(models.Model):
         ]
 
         permissions = generate_permissions(
-            model_name="projectitem",
+            model_name="record",
             fields=[
-                "project",
                 "created",
                 "last_modified",
                 "suppressed",
@@ -60,11 +54,6 @@ class ProjectItem(models.Model):
         "created": {"type": models.DateTimeField},
         "last_modified": {"type": models.DateTimeField},
         "suppressed": {"type": models.BooleanField},
-        "project__code": {
-            "type": models.CharField,
-            "db_choices": True,
-            "alias": "project",
-        },
         "site__code": {
             "type": models.CharField,
             "db_choices": True,
@@ -77,7 +66,7 @@ class ProjectItem(models.Model):
     OPTIONAL_VALUE_GROUPS = []
 
 
-class Pathogen(ProjectItem):
+class Pathogen(Record):
     sample_id = models.CharField(max_length=24, validators=[MinLengthValidator(8)])
     run_name = models.CharField(max_length=96, validators=[MinLengthValidator(18)])
     collection_month = YearMonthField(null=True)
@@ -109,7 +98,7 @@ class Pathogen(ProjectItem):
             ],
         )
 
-    FILTER_FIELDS = ProjectItem.FILTER_FIELDS | {
+    FILTER_FIELDS = Record.FILTER_FIELDS | {
         "sample_id": {"type": models.CharField},
         "run_name": {"type": models.CharField},
         "collection_month": {"type": YearMonthField},
@@ -119,18 +108,27 @@ class Pathogen(ProjectItem):
     }
 
 
-class Metagenomic(ProjectItem):
+class Metagenomic(Record):
+    sample_id = models.CharField(max_length=24, validators=[MinLengthValidator(8)])
+    run_name = models.CharField(max_length=96, validators=[MinLengthValidator(18)])
+    collection_month = YearMonthField(null=True)
+    received_month = YearMonthField()
     fastq_path = models.TextField()
 
     class Meta:
         permissions = generate_permissions(
             model_name="metagenomic",
-            fields=["fastq_path"],
+            fields=[
+                "sample_id",
+                "run_name",
+                "collection_month",
+                "received_month",
+                "fastq_path",
+            ],
         )
 
 
 class Mpx(Pathogen):
-    csv_template_version = models.TextField()
     sample_type = LowerCharField(
         max_length=50,
         choices=get_choices(choices.SAMPLE_TYPE_CHOICES),
@@ -175,12 +173,29 @@ class Mpx(Pathogen):
         choices=get_choices(choices.SAMPLE_SITE_CHOICES),
         null=True,
     )
+    # PHA fields
+    ukhsa_region = LowerCharField(
+        max_length=50,
+        choices=get_choices(choices.UKHSA_REGION_CHOICES),
+        null=True,
+    )
+    travel_status = LowerCharField(
+        max_length=50,
+        choices=get_choices(choices.TRAVEL_STATUS_CHOICES),
+        null=True,
+    )
+    outer_postcode = models.CharField(
+        max_length=5, validators=[MinLengthValidator(3)], null=True
+    )
+    epi_cluster = models.CharField(
+        max_length=24, validators=[MinLengthValidator(5)], null=True
+    )
+    csv_template_version = models.TextField(null=True)
 
     class Meta:
         permissions = generate_permissions(
             model_name="mpx",
             fields=[
-                "csv_template_version",
                 "sample_type",
                 "sample_site",
                 "patient_ageband",
@@ -194,11 +209,15 @@ class Mpx(Pathogen):
                 "seq_strategy",
                 "bioinfo_pipe_name",
                 "bioinfo_pipe_version",
+                "ukhsa_region",
+                "travel_status",
+                "outer_postcode",
+                "epi_cluster",
+                "csv_template_version",
             ],
         )
 
     FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
-        "csv_template_version": {"type": models.TextField},
         "sample_type": {"type": LowerCharField, "choices": True},
         "sample_site": {"type": LowerCharField, "choices": True},
         "patient_ageband": {"type": LowerCharField, "choices": True},
@@ -212,40 +231,9 @@ class Mpx(Pathogen):
         "seq_strategy": {"type": LowerCharField, "choices": True},
         "bioinfo_pipe_name": {"type": models.TextField},
         "bioinfo_pipe_version": {"type": models.TextField},
-    }
-
-
-class MpxPha(Mpx):
-    ukhsa_region = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.UKHSA_REGION_CHOICES),
-    )
-    travel_status = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.TRAVEL_STATUS_CHOICES),
-        null=True,
-    )
-    outer_postcode = models.CharField(
-        max_length=5, validators=[MinLengthValidator(3)], null=True
-    )
-    epi_cluster = models.CharField(
-        max_length=24, validators=[MinLengthValidator(5)], null=True
-    )
-
-    class Meta:
-        permissions = generate_permissions(
-            model_name="mpxpha",
-            fields=[
-                "ukhsa_region",
-                "travel_status",
-                "outer_postcode",
-                "epi_cluster",
-            ],
-        )
-
-    FILTER_FIELDS = Mpx.FILTER_FIELDS | {
         "ukhsa_region": {"type": LowerCharField, "choices": True},
         "travel_status": {"type": LowerCharField, "choices": True},
         "outer_postcode": {"type": models.CharField},
         "epi_cluster": {"type": models.CharField},
+        "csv_template_version": {"type": models.TextField},
     }
