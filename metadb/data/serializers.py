@@ -1,6 +1,7 @@
 from rest_framework import serializers
+from internal.serializers import DynamicFieldsModelSerializer
 from accounts.models import Site
-from data.models import Project, Pathogen, Mpx, MpxPha
+from data.models import Record, Pathogen, Mpx
 from utils import fieldserializers, choices
 from utils.functions import (
     enforce_optional_value_groups_create,
@@ -11,25 +12,29 @@ from utils.functions import (
 )
 
 
-class PathogenSerializer(serializers.ModelSerializer):
-    project = serializers.SlugRelatedField(
-        queryset=Project.objects.all(), slug_field="code"
-    )
+class RecordSerializer(DynamicFieldsModelSerializer):
     site = serializers.SlugRelatedField(queryset=Site.objects.all(), slug_field="code")
+
+    class Meta:
+        model = Record
+        fields = [
+            "site",
+            "cid",
+            "published_date",
+        ]
+
+
+class PathogenSerializer(RecordSerializer):
     collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
     received_month = fieldserializers.YearMonthField()
 
     class Meta:
         model = Pathogen
-        fields = [
-            "project",
-            "site",
-            "cid",
+        fields = RecordSerializer.Meta.fields + [
             "sample_id",
             "run_name",
             "collection_month",
             "received_month",
-            "published_date",
             "fasta_path",
             "bam_path",
         ]
@@ -140,6 +145,18 @@ class MpxSerializer(PathogenSerializer):
         required=False,
         allow_null=True,
     )
+    ukhsa_region = fieldserializers.LowerChoiceField(
+        choices=Mpx._meta.get_field("ukhsa_region").choices,
+        error_messages={"invalid_choice": f"options: {choices.UKHSA_REGION_CHOICES}"},
+        required=False,
+        allow_null=True,
+    )
+    travel_status = fieldserializers.LowerChoiceField(
+        choices=Mpx._meta.get_field("travel_status").choices,
+        error_messages={"invalid_choice": f"options: {choices.TRAVEL_STATUS_CHOICES}"},
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Mpx
@@ -157,40 +174,19 @@ class MpxSerializer(PathogenSerializer):
             "patient_ageband",
             "patient_id",
             "sample_site",
-        ]
-
-
-class MpxPhaSerializer(MpxSerializer):
-    ukhsa_region = fieldserializers.LowerChoiceField(
-        choices=MpxPha._meta.get_field("ukhsa_region").choices,
-        error_messages={"invalid_choice": f"options: {choices.UKHSA_REGION_CHOICES}"},
-    )
-    travel_status = fieldserializers.LowerChoiceField(
-        choices=MpxPha._meta.get_field("travel_status").choices,
-        error_messages={"invalid_choice": f"options: {choices.TRAVEL_STATUS_CHOICES}"},
-        required=False,
-        allow_null=True,
-    )
-
-    class Meta:
-        model = MpxPha
-        fields = MpxSerializer.Meta.fields + [
             "ukhsa_region",
             "travel_status",
             "outer_postcode",
             "epi_cluster",
+            "csv_template_version",
         ]
-
-
-serializer_map = {
-    Pathogen: PathogenSerializer,
-    Mpx: MpxSerializer,
-    MpxPha: MpxPhaSerializer,
-}
 
 
 def get_serializer(model):
     """
     Function that returns the appropriate serializer for the given model.
     """
-    return serializer_map[model]
+    return {
+        Pathogen: PathogenSerializer,
+        Mpx: MpxSerializer,
+    }[model]
