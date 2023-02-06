@@ -5,6 +5,7 @@ import functools
 
 from .classes import METADBAPIResponse
 from .classes import KeyValue
+from internal.models import Project
 
 
 def get_choices(cs):
@@ -186,22 +187,24 @@ def get_query(data):
         return q
 
 
-def check_permissions(user, model, action, user_fields):
+def check_permissions(user, model, default_permissions, action, user_fields):
     """
     Check that the `user` has correct permissions to perform `action` to `user_fields` of the provided `model`.
     """
-    request_permissions = []
+    # Default permissions
+    request_permissions = [
+        f"{x.content_type.app_label}.{x.codename}" for x in default_permissions
+    ]
 
-    # For the model (and each parent in its inheritance hierarchy)
-    # Record each permission
+    # Add global model action permission to required request permissions
+    model_permission = f"{model._meta.app_label}.{action}_{model._meta.model_name}"
+    request_permissions.append(model_permission)
+
     # Starting from the grandest parent model
+    # Record which fields belong to which model in the inheritance hierarchy
     model_fields = {field.name: model for field in model._meta.get_fields()}
     models = [model] + model._meta.get_parent_list()
     for m in reversed(models):
-        # Add global model action permission to required request permissions
-        m_permission = f"{m._meta.app_label}.{action}_{m._meta.model_name}"
-        request_permissions.append(m_permission)
-
         for field in m._meta.get_fields(include_parents=False):
             if field.name in model_fields:
                 model_fields[field.name] = m
@@ -215,6 +218,8 @@ def check_permissions(user, model, action, user_fields):
             request_permissions.append(field_permission)
         else:
             unknown.append(user_field)
+
+    request_permissions = sorted(set(request_permissions))
 
     # Check the user has permissions to perform action to all provided fields
     has_permission = user.has_perms(request_permissions)
@@ -240,3 +245,22 @@ def generate_permissions(model_name, fields):
         for action in ["add", "change", "view", "delete", "suppress"]
         for x in fields
     ]
+
+
+def get_view_permissions_and_fields(project):
+    view_permissions = project.view_group.permissions.all()
+    return view_permissions, [
+        x.split("__")[1]
+        for x in view_permissions.values_list("codename", flat=True)
+        if x != f"view_{project.code}"
+    ]
+
+
+def get_project_and_model(project_code):
+    try:
+        project = Project.objects.get(code=project_code)
+        model = project.content_type.model_class()
+        return project, model
+    except Project.DoesNotExist:
+        return None, None
+    
