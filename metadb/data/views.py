@@ -225,7 +225,13 @@ class QueryRecordView(METADBAPIView):
         if request.data:
             # Turn the value of each key-value pair in request.data into a 'KeyValue' object
             # Returns a list of the keyvalues
-            keyvalues = make_keyvalues(request.data)
+            try:
+                keyvalues = make_keyvalues(request.data)
+            except Exception:
+                return Response(
+                    {"detail": "invalid query"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         else:
             keyvalues = []
 
@@ -316,14 +322,21 @@ class QueryRecordView(METADBAPIView):
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
+        # Initial queryset
+        qs = model.objects.filter(suppressed=False)
+
         if request.data:
             # The data has been validated so we form the query (a Q object)
-            query = get_query(request.data)
+            try:
+                query = get_query(request.data)
+            except Exception:
+                return Response(
+                    {"detail": "invalid query"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Then filter using the Q object
-            qs = model.objects.filter(suppressed=False).filter(query)
-        else:
-            qs = model.objects.filter(suppressed=False)
+            qs = qs.filter(query)
 
         # Add the pagination cursor param back into the request
         if cursor is not None:

@@ -2,7 +2,6 @@ from django.db.models import Q
 from datetime import datetime
 import operator
 import functools
-
 from .classes import METADBAPIResponse
 from .classes import KeyValue
 from internal.models import Project
@@ -134,11 +133,20 @@ def make_keyvalues(data):
     Traverses the provided `data` and replaces request values with `KeyValue` objects.
     Returns a list of these `KeyValue` objects.
     """
+    if len(data.items()) != 1:
+        raise Exception
+
     key, value = next(iter(data.items()))
 
-    if key in {"&", "|", "^", "~"}:
+    if key in {"&", "|", "^"}:
         keyvalues = [make_keyvalues(k_v) for k_v in value]
         return functools.reduce(operator.add, keyvalues)
+    
+    elif key == "~":
+        if len(value) != 1:
+            raise Exception
+        return make_keyvalues(value[0])
+    
     else:
         # Initialise KeyValue object
         keyvalue = KeyValue(key, value)
@@ -157,6 +165,9 @@ def get_query(data):
     """
     Traverses the provided `data` and forms the corresponding Q object.
     """
+    if len(data.items()) != 1:
+        raise Exception
+
     key, value = next(iter(data.items()))
 
     # AND of multiple keyvalues
@@ -176,8 +187,9 @@ def get_query(data):
 
     # NOT of a single keyvalue
     elif key == "~":
-        q_object = [get_query(k_v) for k_v in value][0]
-        return ~q_object
+        if len(value) != 1:
+            raise Exception
+        return ~get_query(value[0])
 
     # Base case: a keyvalue to filter on
     else:
