@@ -45,7 +45,7 @@ class IsSiteApproved(permissions.BasePermission):
     message = "You need to be approved by an authority from your site."
 
     def has_permission(self, request, view):
-        return bool(request.user and getattr(request.user, "is_site_approved", False))
+        return bool(request.user and getattr(request.user, "site_approved", False))
 
 
 class IsAdminApproved(permissions.BasePermission):
@@ -56,7 +56,7 @@ class IsAdminApproved(permissions.BasePermission):
     message = "You need to be approved by an admin."
 
     def has_permission(self, request, view):
-        return bool(request.user and getattr(request.user, "is_admin_approved", False))
+        return bool(request.user and getattr(request.user, "admin_approved", False))
 
 
 class IsSiteAuthority(permissions.BasePermission):
@@ -67,7 +67,7 @@ class IsSiteAuthority(permissions.BasePermission):
     message = "You need to be an authority for your site."
 
     def has_permission(self, request, view):
-        return bool(request.user and getattr(request.user, "is_site_authority", False))
+        return bool(request.user and getattr(request.user, "site_authority", False))
 
 
 class IsActiveSite(permissions.BasePermission):

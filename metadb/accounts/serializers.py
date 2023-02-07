@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Site
+from .models import User
 from django.core.exceptions import ValidationError
 import django.contrib.auth.password_validation as validators
 
@@ -10,7 +10,6 @@ class UserSerializer(serializers.ModelSerializer):
     # username = fieldserializers.LowerCharField() # TODO: understand why having validators here wiped validators on model
     # email = fieldserializers.LowerCharField()
     password = serializers.CharField(write_only=True)
-    site = serializers.SlugRelatedField(queryset=Site.objects.all(), slug_field="code")
 
     def create(self, validated_data):
         # User.objects.create_user() hashes the password
