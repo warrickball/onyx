@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from internal.serializers import DynamicFieldsModelSerializer
-from accounts.models import Site
 from data.models import Record, Pathogen, Mpx
 from utils import fieldserializers, choices
 from utils.functions import (
@@ -13,15 +12,66 @@ from utils.functions import (
 
 
 class RecordSerializer(DynamicFieldsModelSerializer):
-    site = serializers.SlugRelatedField(queryset=Site.objects.all(), slug_field="code")
-
     class Meta:
         model = Record
         fields = [
+            "created",
+            "last_modified",
             "site",
             "cid",
             "published_date",
         ]
+
+    def validate(self, data):
+        """
+        Additional validation carried out on either object creation or update
+        """
+        model = self.Meta.model
+        errors = {}
+
+        # Object update validation
+        if self.instance:
+            enforce_optional_value_groups_update(
+                errors=errors,
+                instance=self.instance,
+                data=data,
+                groups=model.OPTIONAL_VALUE_GROUPS,
+            )
+            for lower_yearmonth, higher_yearmonth in model.YEARMONTH_ORDERINGS:
+                enforce_yearmonth_order_update(
+                    errors=errors,
+                    instance=self.instance,
+                    lower_yearmonth=lower_yearmonth,
+                    higher_yearmonth=higher_yearmonth,
+                    data=data,
+                )
+        # Object create validation
+        else:
+            enforce_optional_value_groups_create(
+                errors=errors,
+                data=data,
+                groups=model.OPTIONAL_VALUE_GROUPS,
+            )
+            for lower_yearmonth, higher_yearmonth in model.YEARMONTH_ORDERINGS:
+                enforce_yearmonth_order_create(
+                    errors=errors,
+                    lower_yearmonth=lower_yearmonth,
+                    higher_yearmonth=higher_yearmonth,
+                    data=data,
+                )
+        # Object create and update validation
+        for yearmonth in model.YEARMONTHS:
+            if data.get(yearmonth):
+                enforce_yearmonth_non_future(
+                    errors=errors,
+                    name=yearmonth,
+                    value=data[yearmonth],
+                )
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return data
 
 
 class PathogenSerializer(RecordSerializer):
@@ -38,64 +88,6 @@ class PathogenSerializer(RecordSerializer):
             "fasta_path",
             "bam_path",
         ]
-
-    def validate(self, data):
-        """
-        Additional validation carried out on either object creation or update
-
-        Update is indicated by the existence of a `self.instance`
-
-        Creation is indicated by `self.instance = None`
-        """
-        model = self.Meta.model
-        errors = {}
-
-        if self.instance:
-            enforce_optional_value_groups_update(
-                errors=errors,
-                instance=self.instance,
-                data=data,
-                groups=model.OPTIONAL_VALUE_GROUPS,
-            )
-            enforce_yearmonth_order_update(
-                errors=errors,
-                instance=self.instance,
-                lower_yearmonth="collection_month",
-                higher_yearmonth="received_month",
-                data=data,
-            )
-
-        else:
-            enforce_optional_value_groups_create(
-                errors=errors,
-                data=data,
-                groups=model.OPTIONAL_VALUE_GROUPS,
-            )
-            enforce_yearmonth_order_create(
-                errors=errors,
-                lower_yearmonth="collection_month",
-                higher_yearmonth="received_month",
-                data=data,
-            )
-
-        if data.get("collection_month"):
-            enforce_yearmonth_non_future(
-                errors=errors,
-                name="collection_month",
-                value=data["collection_month"],
-            )
-
-        if data.get("received_month"):
-            enforce_yearmonth_non_future(
-                errors=errors,
-                name="received_month",
-                value=data["received_month"],
-            )
-
-        if errors:
-            raise serializers.ValidationError(errors)
-
-        return data
 
 
 class MpxSerializer(PathogenSerializer):
