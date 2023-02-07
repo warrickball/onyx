@@ -39,7 +39,7 @@ class METADBTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
-        user.is_site_approved = True
+        user.site_approved = True
         self.client.force_authenticate(user)  # type: ignore
         return user
 
@@ -58,8 +58,8 @@ class METADBTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(username=username)
-        user.is_site_approved = True
-        user.is_site_authority = True
+        user.site_approved = True
+        user.site_authority = True
         self.client.force_authenticate(user)  # type: ignore
         return user
 
