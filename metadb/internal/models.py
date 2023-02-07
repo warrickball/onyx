@@ -1,13 +1,12 @@
 from django.db import models
-from django.db.models import Field
 from django.db.models.lookups import BuiltinLookup
+from django.db.models.fields.related_lookups import RelatedLookupMixin
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from accounts.models import User
 from utils.fields import LowerCharField
 
 
-@Field.register_lookup
 class NotEqual(models.Lookup):
     lookup_name = "ne"
 
@@ -18,16 +17,19 @@ class NotEqual(models.Lookup):
         return "%s <> %s" % (lhs, rhs), params
 
 
-@Field.register_lookup
+class NotEqualRelated(RelatedLookupMixin, NotEqual):
+    pass
+
+
 class IsNull(BuiltinLookup):
     lookup_name = "isnull"
     prepare_rhs = False
 
     def as_sql(self, compiler, connection):
-        if str(self.rhs) in ["0", "false", "False"]:
+        if str(self.rhs).lower() in ["0", "false"]:
             self.rhs = False
 
-        elif str(self.rhs) in ["1", "false", "False"]:
+        elif str(self.rhs).lower() in ["1", "true"]:
             self.rhs = True
 
         if not isinstance(self.rhs, bool):
@@ -40,6 +42,10 @@ class IsNull(BuiltinLookup):
             return "%s IS NULL" % sql, params
         else:
             return "%s IS NOT NULL" % sql, params
+
+
+class IsNullRelated(RelatedLookupMixin, IsNull):
+    pass
 
 
 class Signal(models.Model):
@@ -75,3 +81,9 @@ class Request(models.Model):
     address = models.CharField(max_length=20, null=True)
     exec_time = models.IntegerField(null=True)
     date = models.DateTimeField(auto_now=True)
+
+
+class Choice(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    field = models.TextField()
+    choice = models.TextField()
