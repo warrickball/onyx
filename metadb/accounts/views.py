@@ -9,7 +9,7 @@ from .serializers import (
     SiteWaitingUserSerializer,
     AdminWaitingUserSerializer,
 )
-from utils.classes import METADBAPIResponse
+from utils.response import METADBAPIResponse
 from utils.views import METADBAPIView, METADBCreateAPIView, METADBListAPIView
 from .permissions import (
     Any,
@@ -95,19 +95,19 @@ class SiteApproveView(METADBAPIView):
             user = User.objects.get(username=username)
         except User.DoesNotExist:
             return Response(
-                {username: METADBAPIResponse.NOT_FOUND},
+                {username: [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # Approve user
-        user.site_approved = True
-        user.date_site_approved = datetime.now()
-        user.save(update_fields=["site_approved", "date_site_approved"])
+        user.is_site_approved = True
+        user.when_site_approved = datetime.now()
+        user.save(update_fields=["is_site_approved", "when_site_approved"])
 
         return Response(
             {
                 "username": username,
-                "site_approved": user.site_approved,
+                "is_site_approved": user.is_site_approved,
             },
             status=status.HTTP_200_OK,
         )
@@ -126,19 +126,19 @@ class AdminApproveView(METADBAPIView):
             user = User.objects.get(username=username)
         except User.DoesNotExist:
             return Response(
-                {username: METADBAPIResponse.NOT_FOUND},
+                {username: [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # Approve target user
-        user.admin_approved = True
-        user.date_admin_approved = datetime.now()
-        user.save(update_fields=["admin_approved", "date_admin_approved"])
+        user.is_admin_approved = True
+        user.when_admin_approved = datetime.now()
+        user.save(update_fields=["is_admin_approved", "when_admin_approved"])
 
         return Response(
             {
                 "username": username,
-                "admin_approved": user.admin_approved,
+                "is_admin_approved": user.is_admin_approved,
             },
             status=status.HTTP_200_OK,
         )
@@ -156,14 +156,14 @@ class SiteWaitingView(METADBListAPIView):
         if self.request.user.is_staff:  # type: ignore
             return (
                 User.objects.filter(is_active=True)
-                .filter(site_approved=False)
+                .filter(is_site_approved=False)
                 .order_by("-date_joined")
             )
         else:
             return (
                 User.objects.filter(is_active=True)
                 .filter(site=self.request.user.site)  # type: ignore
-                .filter(site_approved=False)
+                .filter(is_site_approved=False)
                 .order_by("-date_joined")
             )
 
@@ -179,9 +179,9 @@ class AdminWaitingView(METADBListAPIView):
     def get_queryset(self):
         return (
             User.objects.filter(is_active=True)
-            .filter(site_approved=True)
-            .filter(admin_approved=False)
-            .order_by("-date_site_approved")
+            .filter(is_site_approved=True)
+            .filter(is_admin_approved=False)
+            .order_by("-when_site_approved")
         )
 
 

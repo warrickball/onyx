@@ -35,8 +35,8 @@ class User(AbstractUser):
         },
     )
     site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
-    site_approved = models.BooleanField(default=False)
-    admin_approved = models.BooleanField(default=False)
-    site_authority = models.BooleanField(default=False)
-    date_site_approved = models.DateTimeField(null=True)
-    date_admin_approved = models.DateTimeField(null=True)
+    is_site_approved = models.BooleanField(default=False)
+    is_admin_approved = models.BooleanField(default=False)
+    is_site_authority = models.BooleanField(default=False)
+    when_site_approved = models.DateTimeField(null=True)
+    when_admin_approved = models.DateTimeField(null=True)

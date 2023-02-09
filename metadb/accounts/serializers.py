@@ -55,5 +55,5 @@ class AdminWaitingUserSerializer(UserSerializer):
             "username",
             "email",
             "site",
-            "date_site_approved",
+            "when_site_approved",
         ]
