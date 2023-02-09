@@ -5,7 +5,7 @@ import csv
 
 
 class Command(base.BaseCommand):
-    help = "Create groups in the database"
+    help = "Create groups in the database."
 
     def add_arguments(self, parser):
         parser.add_argument("scheme")
