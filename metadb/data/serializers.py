@@ -2,7 +2,7 @@ from rest_framework import serializers
 from internal.serializers import DynamicFieldsModelSerializer
 from data.models import Record, Pathogen, Mpx
 from utils import fieldserializers, choices
-from utils.functions import (
+from utils.validation import (
     enforce_optional_value_groups_create,
     enforce_optional_value_groups_update,
     enforce_yearmonth_order_create,

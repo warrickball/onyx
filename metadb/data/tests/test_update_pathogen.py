@@ -3,7 +3,7 @@ from data.models import Covid
 from accounts.models import Site
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
-from utils.classes import METADBAPIResponse
+from utils.response import METADBAPIResponse
 import secrets
 import os
 
@@ -86,14 +86,14 @@ class TestUpdatePathogen(METADBTestCase):
                 os.path.join("/data/hello/", cid + "/"), data={"is_external": False}
             )
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-            self.assertEqual(response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND})
+            self.assertEqual(response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]})
 
     def test_cid_not_found(self):
         response = self.client.patch(
             os.path.join("/data/covid/", "hello" + "/"), data={"is_external": False}
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND})
+        self.assertEqual(response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]})
 
     def test_no_updates(self):
         cid = self.cids[0]

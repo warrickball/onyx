@@ -5,7 +5,7 @@ from data.views import (
     enforce_optional_value_groups,
     enforce_field_set,
 )
-from utils.classes import METADBAPIResponse
+from utils.response import METADBAPIResponse
 
 
 class TestGetPathogenModel(APITestCase):

@@ -1,13 +1,3 @@
-class KeyValue:
-    """
-    Class for representing a single key-value pair.
-    """
-
-    def __init__(self, key, value):
-        self.key = key
-        self.value = value
-
-
 class METADBAPIResponse:
     NOT_FOUND = "Not found."  # Generic 404 message
     UNKNOWN_FIELD = "This field is unknown."
@@ -20,15 +10,18 @@ class METADBAPIResponse:
         self.next = None
         self.previous = None
         self.errors = {}
-        self.warnings = {}
         self.results = []
 
     @property
     def data(self):
-        return {
-            "next": self.next,
-            "previous": self.previous,
+        d = {
             "errors": self.errors,
-            "warnings": self.warnings,
             "results": self.results,
         }
+        if self.next:
+            d["next"] = self.next
+
+        if self.previous:
+            d["previous"] = self.previous
+
+        return d

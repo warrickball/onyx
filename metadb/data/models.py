@@ -2,8 +2,10 @@ from django.db import models
 from django.core.validators import MinLengthValidator
 from secrets import token_hex
 from utils.fields import YearMonthField, LowerCharField
-from utils.functions import get_choices, generate_permissions
+from utils.choices import get_choices
+from utils.permissions import generate_permissions
 from utils import choices
+from accounts.models import Site
 
 
 def generate_cid():
@@ -12,9 +14,9 @@ def generate_cid():
 
     The CID consists of the prefix `C-` followed by 8 random hex digits.
 
-    This means there are `16^8 = 4,294,967,296` CIDs to choose from
+    This means there are `16^10 = 1,099,511,627,776` CIDs to choose from
     """
-    cid = "C-" + "".join(token_hex(4).upper())
+    cid = "C-" + "".join(token_hex(5).upper())
 
     if Record.objects.filter(cid=cid).exists():
         cid = generate_cid()
@@ -22,11 +24,15 @@ def generate_cid():
     return cid
 
 
+# TODO: Can add choices to site. What would it do?
+# TODO: Might be worth trying limit_choices_to for storing all choice fields in a table
+
+
 class Record(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     suppressed = models.BooleanField(default=False)
-    site = models.ForeignKey("accounts.Site", on_delete=models.CASCADE)
+    site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
     cid = models.CharField(default=generate_cid, max_length=12, unique=True)
     published_date = models.DateField(auto_now_add=True)
 
@@ -49,21 +55,11 @@ class Record(models.Model):
             ],
         )
 
-    FILTER_FIELDS = {
-        "id": {"type": models.IntegerField},
-        "created": {"type": models.DateTimeField},
-        "last_modified": {"type": models.DateTimeField},
-        "suppressed": {"type": models.BooleanField},
-        "site__code": {
-            "type": models.CharField,
-            "db_choices": True,
-            "alias": "site",
-        },
-        "cid": {"type": models.CharField},
-        "published_date": {"type": models.DateField},
-    }
-
+    CHOICE_FIELDS = []
+    DB_CHOICE_FIELDS = ["site"]
     OPTIONAL_VALUE_GROUPS = []
+    YEARMONTHS = []
+    YEARMONTH_ORDERINGS = []
 
 
 class Pathogen(Record):
@@ -98,14 +94,10 @@ class Pathogen(Record):
             ],
         )
 
-    FILTER_FIELDS = Record.FILTER_FIELDS | {
-        "sample_id": {"type": models.CharField},
-        "run_name": {"type": models.CharField},
-        "collection_month": {"type": YearMonthField},
-        "received_month": {"type": YearMonthField},
-        "fasta_path": {"type": models.TextField},
-        "bam_path": {"type": models.TextField},
-    }
+    YEARMONTHS = Record.YEARMONTHS + ["collection_month", "received_month"]
+    YEARMONTH_ORDERINGS = Record.YEARMONTH_ORDERINGS + [
+        ("collection_month", "received_month")
+    ]
 
 
 class Metagenomic(Record):
@@ -190,6 +182,7 @@ class Mpx(Pathogen):
     epi_cluster = models.CharField(
         max_length=24, validators=[MinLengthValidator(5)], null=True
     )
+    # Admin fields
     csv_template_version = models.TextField(null=True)
 
     class Meta:
@@ -217,23 +210,16 @@ class Mpx(Pathogen):
             ],
         )
 
-    FILTER_FIELDS = Pathogen.FILTER_FIELDS | {
-        "sample_type": {"type": LowerCharField, "choices": True},
-        "sample_site": {"type": LowerCharField, "choices": True},
-        "patient_ageband": {"type": LowerCharField, "choices": True},
-        "country": {"type": LowerCharField, "choices": True},
-        "patient_id": {"type": models.CharField},
-        "seq_platform": {"type": LowerCharField, "choices": True},
-        "instrument_model": {"type": models.TextField},
-        "run_layout": {"type": LowerCharField, "choices": True},
-        "enrichment_method": {"type": LowerCharField, "choices": True},
-        "source_of_library": {"type": LowerCharField, "choices": True},
-        "seq_strategy": {"type": LowerCharField, "choices": True},
-        "bioinfo_pipe_name": {"type": models.TextField},
-        "bioinfo_pipe_version": {"type": models.TextField},
-        "ukhsa_region": {"type": LowerCharField, "choices": True},
-        "travel_status": {"type": LowerCharField, "choices": True},
-        "outer_postcode": {"type": models.CharField},
-        "epi_cluster": {"type": models.CharField},
-        "csv_template_version": {"type": models.TextField},
-    }
+    CHOICE_FIELDS = Pathogen.CHOICE_FIELDS + [
+        "sample_type",
+        "sample_site",
+        "patient_ageband",
+        "country",
+        "seq_platform",
+        "run_layout",
+        "enrichment_method",
+        "source_of_library",
+        "seq_strategy",
+        "ukhsa_region",
+        "travel_status",
+    ]

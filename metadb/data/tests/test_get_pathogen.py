@@ -2,7 +2,7 @@ from rest_framework import status
 from data.models import Covid
 from accounts.models import Site
 from data.filters import BASE_LOOKUPS, CHAR_LOOKUPS
-from utils.classes import METADBAPIResponse
+from utils.response import METADBAPIResponse
 from django.conf import settings
 from datetime import date
 from data.tests.utils import METADBTestCase, get_covid_data
@@ -62,7 +62,7 @@ class TestGetPathogen(METADBTestCase):
         response = self.client.get("/data/hello/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(
-            response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND}
+            response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]}
         )
 
     def test_get(self):

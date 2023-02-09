@@ -1,3 +1,7 @@
+def get_choices(cs):
+    return [(c, c) for c in cs]
+
+
 SAMPLE_TYPE_CHOICES = ["swab", "serum"]
 SEQ_PLATFORM_CHOICES = [
     "illumina",
