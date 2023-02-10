@@ -1,0 +1,11 @@
+data,mpx,sample_type,swab,serum
+data,mpx,seq_platform,illumina,oxford_nanopore,pacific_biosciences,ion_torrent
+data,mpx,enrichment_method,other,pcr,random,random_pcr,none
+data,mpx,seq_strategy,amplicon,other,targeted_capture,wga,wgs
+data,mpx,source_of_library,genomic,metagenomic,transcriptomic,metatranscriptomic,other,viral_rna
+data,mpx,country,eng,wales,scot,ni
+data,mpx,run_layout,single,paired
+data,mpx,patient_ageband,0-5,6-10,11-15,16-20,21-25,26-30,31-35,36-40,41-45,46-50,51-55,56-60,61-65,66-70,71-75,76-80,81-85,86-90,91-95,96-100,100+
+data,mpx,sample_site,sore,genital
+data,mpx,ukhsa_region,ne
+data,mpx,travel_status,yes,no
