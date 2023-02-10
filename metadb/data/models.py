@@ -1,11 +1,10 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from secrets import token_hex
-from utils.fields import YearMonthField, LowerCharField
-from utils.choices import get_choices
+from utils.fields import YearMonthField
 from utils.permissions import generate_permissions
-from utils import choices
 from accounts.models import Site
+from internal.models import Choice
 
 
 def generate_cid():
@@ -22,10 +21,6 @@ def generate_cid():
         cid = generate_cid()
 
     return cid
-
-
-# TODO: Can add choices to site. What would it do?
-# TODO: Might be worth trying limit_choices_to for storing all choice fields in a table
 
 
 class Record(models.Model):
@@ -55,11 +50,11 @@ class Record(models.Model):
             ],
         )
 
-    CHOICE_FIELDS = []
-    DB_CHOICE_FIELDS = ["site"]
-    OPTIONAL_VALUE_GROUPS = []
-    YEARMONTHS = []
-    YEARMONTH_ORDERINGS = []
+    class CustomMeta:
+        db_choice_fields = ["site"]
+        optional_value_groups = []
+        yearmonths = []
+        yearmonth_orderings = []
 
 
 class Pathogen(Record):
@@ -94,10 +89,14 @@ class Pathogen(Record):
             ],
         )
 
-    YEARMONTHS = Record.YEARMONTHS + ["collection_month", "received_month"]
-    YEARMONTH_ORDERINGS = Record.YEARMONTH_ORDERINGS + [
-        ("collection_month", "received_month")
-    ]
+    class CustomMeta(Record.CustomMeta):
+        yearmonths = Record.CustomMeta.yearmonths + [
+            "collection_month",
+            "received_month",
+        ]
+        yearmonth_orderings = Record.CustomMeta.yearmonth_orderings + [
+            ("collection_month", "received_month")
+        ]
 
 
 class Metagenomic(Record):
@@ -120,67 +119,98 @@ class Metagenomic(Record):
         )
 
 
+# TODO: Might be worth trying limit_choices_to for storing all choice fields in a table
+
+
 class Mpx(Pathogen):
-    sample_type = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.SAMPLE_TYPE_CHOICES),
+    sample_type = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="sample_type",
     )
-    seq_platform = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.SEQ_PLATFORM_CHOICES),
+    seq_platform = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="seq_platform",
     )
-    instrument_model = models.TextField()
-    enrichment_method = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.ENRICHMENT_METHOD_CHOICES),
+    enrichment_method = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="enrichment_method",
     )
-    seq_strategy = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.SEQ_STRATEGY_CHOICES),
+    seq_strategy = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="seq_strategy",
     )
-    source_of_library = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.SOURCE_OF_LIBRARY_CHOICES),
+    source_of_library = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="source_of_library",
     )
-    bioinfo_pipe_name = models.TextField()
-    bioinfo_pipe_version = models.TextField()
-    country = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.COUNTRY_CHOICES),
+    country = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="country",
     )
-    run_layout = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.RUN_LAYOUT_CHOICES),
+    run_layout = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="run_layout",
     )
-    patient_ageband = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.PATIENT_AGEBAND_CHOICES),
+    patient_ageband = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="patient_ageband",
         null=True,
     )
-    patient_id = models.CharField(
-        max_length=24, validators=[MinLengthValidator(5)], null=True
+    sample_site = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="sample_site",
+        null=True,
     )
-    sample_site = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.SAMPLE_SITE_CHOICES),
+    instrument_model = models.TextField()
+    bioinfo_pipe_name = models.TextField()
+    bioinfo_pipe_version = models.TextField()
+    patient_id = models.CharField(
+        max_length=24,
+        validators=[MinLengthValidator(5)],
         null=True,
     )
     # PHA fields
-    ukhsa_region = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.UKHSA_REGION_CHOICES),
+    ukhsa_region = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="ukhsa_region",
         null=True,
     )
-    travel_status = LowerCharField(
-        max_length=50,
-        choices=get_choices(choices.TRAVEL_STATUS_CHOICES),
+    travel_status = models.ForeignKey(
+        Choice,
+        to_field="choice_key",
+        on_delete=models.CASCADE,
+        related_name="travel_status",
         null=True,
     )
     outer_postcode = models.CharField(
-        max_length=5, validators=[MinLengthValidator(3)], null=True
+        max_length=5,
+        validators=[MinLengthValidator(3)],
+        null=True,
     )
     epi_cluster = models.CharField(
-        max_length=24, validators=[MinLengthValidator(5)], null=True
+        max_length=24,
+        validators=[MinLengthValidator(5)],
+        null=True,
     )
     # Admin fields
     csv_template_version = models.TextField(null=True)
@@ -209,17 +239,3 @@ class Mpx(Pathogen):
                 "csv_template_version",
             ],
         )
-
-    CHOICE_FIELDS = Pathogen.CHOICE_FIELDS + [
-        "sample_type",
-        "sample_site",
-        "patient_ageband",
-        "country",
-        "seq_platform",
-        "run_layout",
-        "enrichment_method",
-        "source_of_library",
-        "seq_strategy",
-        "ukhsa_region",
-        "travel_status",
-    ]

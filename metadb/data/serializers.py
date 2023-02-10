@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from internal.serializers import DynamicFieldsModelSerializer
+from internal.models import Choice
 from data.models import Record, Pathogen, Mpx
-from utils import fieldserializers, choices
+from utils import fieldserializers
 from utils.validation import (
     enforce_optional_value_groups_create,
     enforce_optional_value_groups_update,
@@ -35,9 +36,12 @@ class RecordSerializer(DynamicFieldsModelSerializer):
                 errors=errors,
                 instance=self.instance,
                 data=data,
-                groups=model.OPTIONAL_VALUE_GROUPS,
+                groups=model.CustomMeta.optional_value_groups,
             )
-            for lower_yearmonth, higher_yearmonth in model.YEARMONTH_ORDERINGS:
+            for (
+                lower_yearmonth,
+                higher_yearmonth,
+            ) in model.CustomMeta.yearmonth_orderings:
                 enforce_yearmonth_order_update(
                     errors=errors,
                     instance=self.instance,
@@ -50,9 +54,12 @@ class RecordSerializer(DynamicFieldsModelSerializer):
             enforce_optional_value_groups_create(
                 errors=errors,
                 data=data,
-                groups=model.OPTIONAL_VALUE_GROUPS,
+                groups=model.CustomMeta.optional_value_groups,
             )
-            for lower_yearmonth, higher_yearmonth in model.YEARMONTH_ORDERINGS:
+            for (
+                lower_yearmonth,
+                higher_yearmonth,
+            ) in model.CustomMeta.yearmonth_orderings:
                 enforce_yearmonth_order_create(
                     errors=errors,
                     lower_yearmonth=lower_yearmonth,
@@ -60,7 +67,7 @@ class RecordSerializer(DynamicFieldsModelSerializer):
                     data=data,
                 )
         # Object create and update validation
-        for yearmonth in model.YEARMONTHS:
+        for yearmonth in model.CustomMeta.yearmonths:
             if data.get(yearmonth):
                 enforce_yearmonth_non_future(
                     errors=errors,
@@ -91,61 +98,30 @@ class PathogenSerializer(RecordSerializer):
 
 
 class MpxSerializer(PathogenSerializer):
-    sample_type = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("sample_type").choices,
-        error_messages={"invalid_choice": f"options: {choices.SAMPLE_TYPE_CHOICES}"},
-    )
-    seq_platform = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("seq_platform").choices,
-        error_messages={"invalid_choice": f"options: {choices.SEQ_PLATFORM_CHOICES}"},
-    )
-    enrichment_method = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("enrichment_method").choices,
-        error_messages={
-            "invalid_choice": f"options: {choices.ENRICHMENT_METHOD_CHOICES}"
-        },
-    )
-    seq_strategy = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("seq_strategy").choices,
-        error_messages={"invalid_choice": f"options: {choices.SEQ_STRATEGY_CHOICES}"},
-    )
-    source_of_library = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("source_of_library").choices,
-        error_messages={
-            "invalid_choice": f"options: {choices.SOURCE_OF_LIBRARY_CHOICES}"
-        },
-    )
-    country = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("country").choices,
-        error_messages={"invalid_choice": f"options: {choices.COUNTRY_CHOICES}"},
-    )
-    run_layout = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("run_layout").choices,
-        error_messages={"invalid_choice": f"options: {choices.RUN_LAYOUT_CHOICES}"},
-    )
-    patient_ageband = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("patient_ageband").choices,
-        error_messages={
-            "invalid_choice": f"options: {choices.PATIENT_AGEBAND_CHOICES}"
-        },
+    sample_type = fieldserializers.ChoiceField(queryset=Choice.objects.all())
+    seq_platform = fieldserializers.ChoiceField(queryset=Choice.objects.all())
+    enrichment_method = fieldserializers.ChoiceField(queryset=Choice.objects.all())
+    seq_strategy = fieldserializers.ChoiceField(queryset=Choice.objects.all())
+    source_of_library = fieldserializers.ChoiceField(queryset=Choice.objects.all())
+    country = fieldserializers.ChoiceField(queryset=Choice.objects.all())
+    run_layout = fieldserializers.ChoiceField(queryset=Choice.objects.all())
+    patient_ageband = fieldserializers.ChoiceField(
+        queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    sample_site = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("sample_site").choices,
-        error_messages={"invalid_choice": f"options: {choices.SAMPLE_SITE_CHOICES}"},
+    sample_site = fieldserializers.ChoiceField(
+        queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    ukhsa_region = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("ukhsa_region").choices,
-        error_messages={"invalid_choice": f"options: {choices.UKHSA_REGION_CHOICES}"},
+    ukhsa_region = fieldserializers.ChoiceField(
+        queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    travel_status = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("travel_status").choices,
-        error_messages={"invalid_choice": f"options: {choices.TRAVEL_STATUS_CHOICES}"},
+    travel_status = fieldserializers.ChoiceField(
+        queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
