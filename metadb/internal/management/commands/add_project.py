@@ -9,6 +9,7 @@ class Command(base.BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("code")
         parser.add_argument("model")
+        parser.add_argument("--hidden", action="store_true")
 
     def handle(self, *args, **options):
         app, model = options["model"].split(".")
@@ -22,12 +23,13 @@ class Command(base.BaseCommand):
  
         project, created = Project.objects.get_or_create(
             code=options["code"],
+            hidden=options["hidden"],
             content_type=content_type,
             add_group=add_group,
             view_group=view_group,
             change_group=change_group,
             suppress_group=suppress_group,
-            delete_group=delete_group
+            delete_group=delete_group,
         )
 
         if created:

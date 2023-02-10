@@ -55,6 +55,7 @@ class Signal(models.Model):
 
 class Project(models.Model):
     code = LowerCharField(max_length=8, unique=True)
+    hidden = models.BooleanField(default=False)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     add_group = models.OneToOneField(
         Group, on_delete=models.CASCADE, related_name="add_group_project"
@@ -84,6 +85,13 @@ class Request(models.Model):
 
 
 class Choice(models.Model):
+    choice_key = LowerCharField(max_length=100, unique=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     field = models.TextField()
-    choice = models.TextField()
+    choice = LowerCharField(max_length=100)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["choice_key"]),
+            models.Index(fields=["content_type", "field"]),
+        ]
