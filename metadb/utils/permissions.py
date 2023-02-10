@@ -1,8 +1,18 @@
+from rest_framework.response import Response
+from rest_framework import status
 from utils.response import METADBAPIResponse
 
 
+# TODO: Make this nicer. Certainly some bits are not needed
 def check_permissions(
-    user, model, default_permissions, action, user_fields, view_fields
+    project,
+    project_code,
+    user,
+    model,
+    default_permissions,
+    action,
+    user_fields,
+    view_fields,
 ):
     """
     Check that the `user` has correct permissions to perform `action` to `user_fields` of the provided `model`.
@@ -49,7 +59,24 @@ def check_permissions(
             if request_permission not in user_permissions:
                 required.append(request_permission)
 
-    return has_permission, required, unknown
+    # If not authorised
+    if not has_permission:
+        if project.hidden:
+            # If project is secret, return 404
+            return Response(
+                {project_code: [METADBAPIResponse.NOT_FOUND]},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        else:
+            # Otherwise, return 403
+            return Response(
+                {"denied_permissions": required},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+    # If unknown fields were provided, return 400
+    if unknown:
+        return Response(unknown, status=status.HTTP_400_BAD_REQUEST)
 
 
 def generate_permissions(model_name, fields):
