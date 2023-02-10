@@ -31,6 +31,14 @@ class DBValuesRangeFilter(filters.BaseRangeFilter, DBValuesFilter):
     pass
 
 
+class ModelChoiceInFilter(filters.BaseInFilter, filters.ModelChoiceFilter):
+    pass
+
+
+class ModelChoiceRangeFilter(filters.BaseRangeFilter, filters.ModelChoiceFilter):
+    pass
+
+
 class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
     pass
 
