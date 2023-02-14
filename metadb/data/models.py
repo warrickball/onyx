@@ -3,7 +3,7 @@ from django.core.validators import MinLengthValidator
 from secrets import token_hex
 from utils.fields import YearMonthField
 from utils.permissions import generate_permissions
-from accounts.models import Site
+from accounts.models import Site, User
 from internal.models import Choice
 
 
@@ -27,6 +27,7 @@ class Record(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     suppressed = models.BooleanField(default=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
     cid = models.CharField(default=generate_cid, max_length=12, unique=True)
     published_date = models.DateField(auto_now_add=True)
@@ -44,6 +45,7 @@ class Record(models.Model):
                 "created",
                 "last_modified",
                 "suppressed",
+                "user",
                 "site",
                 "cid",
                 "published_date",
@@ -117,9 +119,6 @@ class Metagenomic(Record):
                 "fastq_path",
             ],
         )
-
-
-# TODO: Might be worth trying limit_choices_to for storing all choice fields in a table
 
 
 class Mpx(Pathogen):
