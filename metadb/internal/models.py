@@ -84,6 +84,29 @@ class Request(models.Model):
     date = models.DateTimeField(auto_now=True)
 
 
+class History(models.Model):
+    record = models.ForeignKey("data.Record", on_delete=models.PROTECT)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    action = LowerCharField(
+        max_length=10,
+        choices=[
+            ("add", "add"),
+            ("change", "change"),
+            ("suppress", "suppress"),
+            ("delete", "delete"),
+        ],
+    )
+    taken = models.DateTimeField(auto_now_add=True)
+    changes = models.TextField(null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["record"]),
+            models.Index(fields=["user"]),
+            models.Index(fields=["record", "user"]),
+        ]
+
+
 class Choice(models.Model):
     choice_key = LowerCharField(max_length=100, unique=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

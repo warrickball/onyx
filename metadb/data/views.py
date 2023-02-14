@@ -28,12 +28,13 @@ from utils.query import (
 from utils.mutable import mutable
 from .filters import METADBFilter
 from .serializers import get_serializer
+from internal.models import History
 
 
 class CreateRecordView(METADBAPIView):
     permission_classes = Admin
 
-    def post(self, request, project_code):
+    def post(self, request, project_code, test=False):
         """
         Create an instance for the given project.
         """
@@ -76,12 +77,20 @@ class CreateRecordView(METADBAPIView):
         serializer = get_serializer(model)(
             data=request.data,
             fields=view_fields,
-            context={"project": project},
+            context={"project": project, "request": request},
         )
 
         # If data is valid, save to the database. Otherwise, return 400
         if serializer.is_valid():
-            serializer.save()
+            if not test:
+                instance = serializer.save()
+
+                History.objects.create(
+                    record=instance,
+                    user=request.user,
+                    action="add",
+                )
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -301,7 +310,7 @@ class QueryRecordView(METADBAPIView):
 class UpdateRecordView(METADBAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
-    def patch(self, request, project_code, cid):
+    def patch(self, request, project_code, cid, test=False):
         """
         Update an instance for the given project.
         """
@@ -356,7 +365,16 @@ class UpdateRecordView(METADBAPIView):
 
         # If data is valid, update existing record in the database. Otherwise, return 400
         if serializer.is_valid():
-            serializer.save()
+            if not test:
+                instance = serializer.save()
+
+                History.objects.create(
+                    record=instance,
+                    user=request.user,
+                    action="change",
+                    changes=",".join(update_fields),
+                )
+
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -365,7 +383,7 @@ class UpdateRecordView(METADBAPIView):
 class SuppressRecordView(METADBAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
-    def delete(self, request, project_code, cid):
+    def delete(self, request, project_code, cid, test=False):
         """
         Suppress an instance of the given project.
         """
@@ -415,8 +433,15 @@ class SuppressRecordView(METADBAPIView):
             return response
 
         # Suppress and save
-        instance.suppressed = True  # type: ignore
-        instance.save(update_fields=["suppressed", "last_modified"])
+        if not test:
+            instance.suppressed = True  # type: ignore
+            instance.save(update_fields=["suppressed", "last_modified"])
+
+            History.objects.create(
+                record=instance,
+                user=request.user,
+                action="suppress",
+            )
 
         # Return response indicating suppression
         return Response(
@@ -428,7 +453,7 @@ class SuppressRecordView(METADBAPIView):
 class DeleteRecordView(METADBAPIView):
     permission_classes = Admin
 
-    def delete(self, request, project_code, cid):
+    def delete(self, request, project_code, cid, test=False):
         """
         Permanently delete an instance of the given project.
         """
@@ -478,7 +503,14 @@ class DeleteRecordView(METADBAPIView):
             return response
 
         # Delete the instance
-        instance.delete()
+        if not test:
+            instance.delete()
+
+            History.objects.create(
+                record=instance,
+                user=request.user,
+                action="delete",
+            )
 
         # Return response indicating deletion
         return Response({"cid": cid}, status=status.HTTP_200_OK)
