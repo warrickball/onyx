@@ -5,6 +5,7 @@ dependencies:
   - pip
   - pip:
     - gunicorn
+    - psycopg2-binary
     - django
     - djangorestframework
     - django-rest-knox
