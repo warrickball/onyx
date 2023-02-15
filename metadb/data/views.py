@@ -148,13 +148,16 @@ class GetRecordView(METADBAPIView):
         # Turn the request query params into a series of dictionaries, each that will be passed to a filterset
         filterset_datas = get_filterset_datas_from_query_params(request.query_params)
 
+        # Initial queryset
+        qs = model.objects.select_related().filter(suppressed=False)
+
         # Apply filtersets
         qs = apply_get_filterset(
             fs=METADBFilter,  # Filterset to use
             model=model,  # Model that the filterset is linked to
             view_fields=view_fields,  # Fields that the filterset will build filters for
             filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
-            qs=model.objects.filter(suppressed=False),  # Initial queryset
+            qs=qs,  # Initial queryset
         )
 
         # If a response was returned, something went wrong
@@ -269,7 +272,7 @@ class QueryRecordView(METADBAPIView):
             return validation
 
         # Initial queryset
-        qs = model.objects.filter(suppressed=False)
+        qs = model.objects.select_related().filter(suppressed=False)
 
         # If request data was provided, then it has now been validated
         # So we form the query (a Q object)
