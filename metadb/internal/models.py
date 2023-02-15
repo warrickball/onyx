@@ -54,7 +54,7 @@ class Signal(models.Model):
 
 
 class Project(models.Model):
-    code = LowerCharField(max_length=8, unique=True)
+    code = LowerCharField(max_length=50, unique=True)
     hidden = models.BooleanField(default=False)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     add_group = models.OneToOneField(
@@ -101,20 +101,22 @@ class History(models.Model):
 
     class Meta:
         indexes = [
+            models.Index(fields=["record", "user"]),
             models.Index(fields=["record"]),
             models.Index(fields=["user"]),
-            models.Index(fields=["record", "user"]),
         ]
 
 
 class Choice(models.Model):
-    choice_key = LowerCharField(max_length=100, unique=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     field = models.TextField()
     choice = LowerCharField(max_length=100)
 
     class Meta:
+        unique_together = ["content_type", "field", "choice"]
         indexes = [
-            models.Index(fields=["choice_key"]),
-            models.Index(fields=["content_type", "field"]),
+            models.Index(fields=["content_type", "field", "choice"]),
+            models.Index(fields=["content_type"]),
+            models.Index(fields=["field"]),
+            models.Index(fields=["choice"]),
         ]

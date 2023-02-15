@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
+from model_utils.managers import InheritanceManager  # TODO
 from secrets import token_hex
 from utils.fields import YearMonthField
 from utils.permissions import generate_permissions
@@ -34,11 +35,11 @@ class Record(models.Model):
 
     class Meta:
         indexes = [
+            models.Index(fields=["site", "published_date"]),
             models.Index(fields=["site"]),
             models.Index(fields=["cid"]),
             models.Index(fields=["published_date"]),
         ]
-
         permissions = generate_permissions(
             model_name="record",
             fields=[
@@ -78,7 +79,6 @@ class Pathogen(Record):
             models.Index(fields=["fasta_path"]),
             models.Index(fields=["bam_path"]),
         ]
-
         permissions = generate_permissions(
             model_name="pathogen",
             fields=[
@@ -109,6 +109,15 @@ class Metagenomic(Record):
     fastq_path = models.TextField()
 
     class Meta:
+        unique_together = ["sample_id", "run_name"]
+        indexes = [
+            models.Index(fields=["sample_id"]),
+            models.Index(fields=["run_name"]),
+            models.Index(fields=["sample_id", "run_name"]),
+            models.Index(fields=["collection_month"]),
+            models.Index(fields=["received_month"]),
+            models.Index(fields=["fastq_path"]),
+        ]
         permissions = generate_permissions(
             model_name="metagenomic",
             fields=[
@@ -124,56 +133,47 @@ class Metagenomic(Record):
 class Mpx(Pathogen):
     sample_type = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="sample_type",
     )
     seq_platform = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="seq_platform",
     )
     enrichment_method = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="enrichment_method",
     )
     seq_strategy = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="seq_strategy",
     )
     source_of_library = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="source_of_library",
     )
     country = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="country",
     )
     run_layout = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="run_layout",
     )
     patient_ageband = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="patient_ageband",
         null=True,
     )
     sample_site = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="sample_site",
         null=True,
@@ -189,14 +189,12 @@ class Mpx(Pathogen):
     # PHA fields
     ukhsa_region = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="ukhsa_region",
         null=True,
     )
     travel_status = models.ForeignKey(
         Choice,
-        to_field="choice_key",
         on_delete=models.CASCADE,
         related_name="travel_status",
         null=True,
