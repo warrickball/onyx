@@ -22,9 +22,7 @@ class Command(base.BaseCommand):
                 content_type = ContentType.objects.get(app_label=app_label, model=model)
 
                 for c in choices:
-                    c_key = f"{app_label}.{model}.{field}.{c}"
                     choice, created = Choice.objects.get_or_create(
-                        choice_key=c_key,
                         content_type=content_type,
                         field=field,
                         choice=c,
