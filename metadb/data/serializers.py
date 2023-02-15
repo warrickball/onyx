@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from internal.serializers import DynamicFieldsModelSerializer
 from internal.models import Choice
-from data.models import Record, Pathogen, Mpx
+from data.models import Record, Pathogen, Metagenomic, Mpx
 from utils import fieldserializers
 from utils.validation import (
     enforce_optional_value_groups_create,
@@ -18,8 +18,8 @@ class RecordSerializer(DynamicFieldsModelSerializer):
         fields = [
             "created",
             "last_modified",
-            "suppressed",
-            "user",
+            # "suppressed",
+            # "user",
             "site",
             "cid",
             "published_date",
@@ -104,30 +104,70 @@ class PathogenSerializer(RecordSerializer):
         ]
 
 
+class MetagenomicSerializer(RecordSerializer):
+    collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
+    received_month = fieldserializers.YearMonthField()
+
+    class Meta:
+        model = Metagenomic
+        fields = RecordSerializer.Meta.fields + [
+            "sample_id",
+            "run_name",
+            "collection_month",
+            "received_month",
+            "fastq_path",
+        ]
+
+
 class MpxSerializer(PathogenSerializer):
-    sample_type = fieldserializers.ChoiceField(queryset=Choice.objects.all())
-    seq_platform = fieldserializers.ChoiceField(queryset=Choice.objects.all())
-    enrichment_method = fieldserializers.ChoiceField(queryset=Choice.objects.all())
-    seq_strategy = fieldserializers.ChoiceField(queryset=Choice.objects.all())
-    source_of_library = fieldserializers.ChoiceField(queryset=Choice.objects.all())
-    country = fieldserializers.ChoiceField(queryset=Choice.objects.all())
-    run_layout = fieldserializers.ChoiceField(queryset=Choice.objects.all())
-    patient_ageband = fieldserializers.ChoiceField(
+    sample_type = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+    )
+    seq_platform = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+    )
+    enrichment_method = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+    )
+    seq_strategy = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+    )
+    source_of_library = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+    )
+    country = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+    )
+    run_layout = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+    )
+    patient_ageband = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
         queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    sample_site = fieldserializers.ChoiceField(
+    sample_site = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
         queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    ukhsa_region = fieldserializers.ChoiceField(
+    ukhsa_region = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
         queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    travel_status = fieldserializers.ChoiceField(
+    travel_status = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
         queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
@@ -163,5 +203,6 @@ def get_serializer(model):
     """
     return {
         Pathogen: PathogenSerializer,
+        Metagenomic: MetagenomicSerializer,
         Mpx: MpxSerializer,
     }[model]
