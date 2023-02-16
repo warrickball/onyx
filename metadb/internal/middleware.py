@@ -13,13 +13,14 @@ class SaveRequest:
         response = self.get_response(request)  # Get response from view function.
         _t = int((time.time() - _t) * 1000)
 
-        # If the url does not start with on of the prefixes above, then return response and dont save log.
-        if not list(filter(request.get_full_path().startswith, self.prefixes)):
+        # If the url does not start with one of the prefixes
+        # Return the response and dont log the request
+        if not any(request.path.startswith(prefix) for prefix in self.prefixes):
             return response
 
-        # Create instance of our model and assign values
+        # Create Request instance
         request_log = Request(
-            endpoint=request.get_full_path(),
+            endpoint=request.path,
             method=request.method,
             status=response.status_code,
             address=self.get_client_ip(request),
