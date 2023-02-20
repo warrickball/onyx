@@ -29,13 +29,8 @@ BASE_LOOKUPS = [
     "lte",
     "gt",
     "gte",
-]
-
-# Text field types
-TEXT_FIELDS = [
-    LowerCharField,
-    models.CharField,
-    models.TextField,
+    "in",
+    "range",
 ]
 
 # Additional lookups for text fields
@@ -51,6 +46,33 @@ TEXT_LOOKUPS = [
     "iregex",
 ]
 
+# Additional lookups for yearmonth fields
+YEARMONTH_LOOKUPS = [
+    "year",
+    "year__in",
+    "year__range",
+]
+
+# Additional lookups for other date fields
+DATE_LOOKUPS = [
+    "year",
+    "year__in",
+    "year__range",
+    "iso_year",
+    "iso_year__in",
+    "iso_year__range",
+    "week",
+    "week__in",
+    "week__range",
+]
+
+# Text field types
+TEXT_FIELDS = [
+    LowerCharField,
+    models.CharField,
+    models.TextField,
+]
+
 # Number field types
 NUMBER_FIELDS = [
     models.IntegerField,
@@ -62,23 +84,6 @@ DATE_FIELDS = [
     YearMonthField,
     models.DateField,
     models.DateTimeField,
-]
-
-# Additional lookups for yearmonth fields
-YEARMONTH_LOOKUPS = [
-    "year",
-    "year__in",
-    "year__range",
-]
-
-# Additional lookups for other date fields
-DATE_LOOKUPS = YEARMONTH_LOOKUPS + [
-    "iso_year",
-    "iso_year__in",
-    "iso_year__range",
-    "week",
-    "week__in",
-    "week__range",
 ]
 
 # Accepted strings for True and False when validating BooleanField
@@ -102,6 +107,15 @@ FILTERS = {
     ("bool", "in"): TypedChoiceInFilter,
     ("bool", "range"): TypedChoiceRangeFilter,
 }
+
+
+def isnull(field):
+    return filters.TypedChoiceFilter(
+        field_name=field,
+        choices=BOOLEAN_CHOICES,
+        coerce=strtobool,
+        lookup_expr="isnull",
+    )
 
 
 def get_filter(model, user_field, fields):
@@ -153,7 +167,7 @@ def get_filter(model, user_field, fields):
                 queryset=qs,
                 to_field_name=to_field_name,
             )
-        elif lookup in ["in", "range"] or lookup in BASE_LOOKUPS:
+        elif lookup in BASE_LOOKUPS:
             filter = FILTERS.get(("choice", lookup), filters.ModelChoiceFilter)
             return f"{field}__{lookup}", filter(
                 field_name=field,
@@ -167,54 +181,35 @@ def get_filter(model, user_field, fields):
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", filters.TypedChoiceFilter(
-                field_name=field,
-                choices=BOOLEAN_CHOICES,
-                coerce=strtobool,
-                lookup_expr="isnull",
-            )
+            return f"{field}__isnull", isnull(field)
     # Text
     elif field_type in TEXT_FIELDS:
         if not lookup:
             return f"{field}", filters.CharFilter(
                 field_name=field_path,
             )
-        elif (
-            lookup in ["in", "range"]
-            or lookup in BASE_LOOKUPS
-            or lookup in TEXT_LOOKUPS
-        ):
+        elif lookup in BASE_LOOKUPS or lookup in TEXT_LOOKUPS:
             filter = FILTERS.get(("text", lookup), filters.CharFilter)
             return f"{field}__{lookup}", filter(
                 field_name=field_path,
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", filters.TypedChoiceFilter(
-                field_name=field_path,
-                choices=BOOLEAN_CHOICES,
-                coerce=strtobool,
-                lookup_expr="isnull",
-            )
+            return f"{field}__isnull", isnull(field_path)
     # Number
     elif field_type in NUMBER_FIELDS:
         if not lookup:
             return f"{field}", filters.NumberFilter(
                 field_name=field_path,
             )
-        elif lookup in ["in", "range"] or lookup in BASE_LOOKUPS:
+        elif lookup in BASE_LOOKUPS:
             filter = FILTERS.get(("number", lookup), filters.NumberFilter)
             return f"{field}__{lookup}", filter(
                 field_name=field_path,
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", filters.TypedChoiceFilter(
-                field_name=field_path,
-                choices=BOOLEAN_CHOICES,
-                coerce=strtobool,
-                lookup_expr="isnull",
-            )
+            return f"{field}__isnull", isnull(field_path)
     # Date
     elif field_type in DATE_FIELDS:
         if field_type == YearMonthField:
@@ -238,7 +233,7 @@ def get_filter(model, user_field, fields):
                 field_name=field_path,
                 input_formats=input_formats,
             )
-        elif lookup in ["in", "range"] or lookup in BASE_LOOKUPS:
+        elif lookup in BASE_LOOKUPS:
             filter = FILTERS.get((filter_type, lookup), filter)  # type: ignore
             return f"{field}__{lookup}", filter(
                 field_name=field_path,
@@ -257,12 +252,7 @@ def get_filter(model, user_field, fields):
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", filters.TypedChoiceFilter(
-                field_name=field_path,
-                choices=BOOLEAN_CHOICES,
-                coerce=strtobool,
-                lookup_expr="isnull",
-            )
+            return f"{field}__isnull", isnull(field_path)
     # True/false
     elif field_type == models.BooleanField:
         if not lookup:
@@ -271,7 +261,7 @@ def get_filter(model, user_field, fields):
                 choices=BOOLEAN_CHOICES,
                 coerce=strtobool,
             )
-        elif lookup in ["in", "range"] or lookup in BASE_LOOKUPS:
+        elif lookup in BASE_LOOKUPS:
             filter = FILTERS.get(("bool", lookup), filters.TypedChoiceFilter)
             return f"{field}__{lookup}", filter(
                 field_name=field_path,
@@ -280,12 +270,8 @@ def get_filter(model, user_field, fields):
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", filters.TypedChoiceFilter(
-                field_name=field_path,
-                choices=BOOLEAN_CHOICES,
-                coerce=strtobool,
-                lookup_expr="isnull",
-            )
+            return f"{field}__isnull", isnull(field_path)
+
     return None, None
 
 
