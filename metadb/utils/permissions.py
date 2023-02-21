@@ -1,82 +1,6 @@
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
 from utils.response import METADBAPIResponse
-
-
-# TODO: Make this nicer. Certainly some bits are not needed
-def check_permissions(
-    project,
-    project_code,
-    user,
-    model,
-    default_permissions,
-    action,
-    user_fields,
-    view_fields,
-):
-    """
-    Check that the `user` has correct permissions to perform `action` to `user_fields` of the provided `model`.
-    """
-    # Default permissions
-    request_permissions = [
-        f"{x.content_type.app_label}.{x.codename}" for x in default_permissions
-    ]
-
-    # Add global model action permission to required request permissions
-    model_permission = f"{model._meta.app_label}.{action}_{model._meta.model_name}"
-    request_permissions.append(model_permission)
-
-    # Starting from the grandest parent model
-    # Record which fields belong to which model in the inheritance hierarchy
-    model_fields = {field.name: model for field in model._meta.get_fields()}
-    models = [model] + model._meta.get_parent_list()
-    for m in reversed(models):
-        for field in m._meta.get_fields(include_parents=False):
-            if field.name in model_fields:
-                model_fields[field.name] = m
-
-    # For each field provided by the user, get the corresponding permission
-    unknown = {}
-    for user_field in user_fields:
-        if user_field in model_fields and user_field in view_fields:
-            field_model = model_fields[user_field]
-            field_permission = f"{field_model._meta.app_label}.{action}_{field_model._meta.model_name}__{user_field}"
-            request_permissions.append(field_permission)
-        else:
-            unknown[user_field] = [METADBAPIResponse.UNKNOWN_FIELD]
-
-    request_permissions = sorted(set(request_permissions))
-
-    # Check the user has permissions to perform action to all provided fields
-    has_permission = user.has_perms(request_permissions)
-
-    # If not, determine the permissions they need
-    required = []
-    if not has_permission:
-        user_permissions = user.get_all_permissions()
-
-        for request_permission in request_permissions:
-            if request_permission not in user_permissions:
-                required.append(request_permission)
-
-    # If not authorised
-    if not has_permission:
-        if project.hidden:
-            # If project is secret, return 404
-            return Response(
-                {project_code: [METADBAPIResponse.NOT_FOUND]},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        else:
-            # Otherwise, return 403
-            return Response(
-                {"denied_permissions": required},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-    # If unknown fields were provided, return 400
-    if unknown:
-        return Response(unknown, status=status.HTTP_400_BAD_REQUEST)
 
 
 def generate_permissions(model_name, fields):
@@ -90,10 +14,72 @@ def generate_permissions(model_name, fields):
     ]
 
 
-def get_view_permissions_and_fields(project):
-    view_permissions = project.view_group.permissions.all()
-    return view_permissions, [
-        x.split("__")[1]
-        for x in view_permissions.values_list("codename", flat=True)
-        if len(x.split("__")) > 1
+def get_fields_from_permissions(permissions):
+    return [
+        field
+        for (_, _, field) in (
+            x.partition("__") for x in permissions.values_list("codename", flat=True)
+        )
+        if field
     ]
+
+
+def check_permissions(
+    project,
+    user,
+    model,
+    action,
+    user_fields,
+):
+    """
+    Check that the `user` has correct permissions to perform `action` to `user_fields` of the provided `model`.
+    """
+    # By default, user must be able to view the project and perform intended action on the project
+    permissions = [
+        f"internal.view_project_{project.code}",
+        f"internal.{action}_project_{project.code}",
+    ]
+
+    # Starting from the grandest parent model
+    # Record which fields belong to which model in the inheritance hierarchy
+    model_fields = {field.name: model for field in model._meta.get_fields()}
+    models = [model] + model._meta.get_parent_list()
+    for m in reversed(models):
+        for field in m._meta.get_fields(include_parents=False):
+            if field.name in model_fields:
+                model_fields[field.name] = m
+
+    # For each field provided by the user, get the corresponding permission
+    unknown = {}
+    for user_field in user_fields:
+        if user_field in model_fields:
+            field_model = model_fields[user_field]
+            field_permission = f"{field_model._meta.app_label}.{action}_{field_model._meta.model_name}__{user_field}"
+            permissions.append(field_permission)
+        else:
+            unknown[user_field] = [METADBAPIResponse.UNKNOWN_FIELD]
+
+    # Check the user has all the requested permissions
+    required = []
+    for perm in sorted(set(permissions)):
+        if not user.has_perm(perm):
+            required.append(perm)
+
+    return required, unknown
+
+
+def not_authorised_response(project, user, required):
+    can_view = user.has_perm(f"internal.view_project_{project.code}")
+
+    if project.hidden and not can_view:
+        # If project is secret, return 404
+        return Response(
+            {project.code: [METADBAPIResponse.NOT_FOUND]},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    else:
+        # Otherwise, return 403
+        return Response(
+            {"denied_permissions": required},
+            status=status.HTTP_403_FORBIDDEN,
+        )

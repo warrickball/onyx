@@ -1,5 +1,4 @@
 #add_metagenomic
-data,metagenomic,add_metagenomic
 data,metagenomic,add_metagenomic__sample_id
 data,metagenomic,add_metagenomic__run_name
 data,metagenomic,add_metagenomic__collection_month
@@ -7,7 +6,6 @@ data,metagenomic,add_metagenomic__received_month
 data,metagenomic,add_metagenomic__fastq_path
 
 #view_metagenomic
-data,metagenomic,view_metagenomic
 data,record,view_record__site
 data,record,view_record__cid
 data,record,view_record__published_date
@@ -18,13 +16,11 @@ data,metagenomic,view_metagenomic__received_month
 data,metagenomic,view_metagenomic__fastq_path
 
 #change_metagenomic
-data,metagenomic,change_metagenomic
 data,metagenomic,change_metagenomic__collection_month
 data,metagenomic,change_metagenomic__received_month
 data,metagenomic,change_metagenomic__fastq_path
 
 #suppress_metagenomic
-data,metagenomic,suppress_metagenomic
 data,record,suppress_record__site
 data,record,suppress_record__cid
 data,record,suppress_record__published_date
@@ -35,7 +31,6 @@ data,metagenomic,suppress_metagenomic__received_month
 data,metagenomic,suppress_metagenomic__fastq_path
 
 #delete_metagenomic
-data,metagenomic,delete_metagenomic
 data,record,delete_record__site
 data,record,delete_record__cid
 data,record,delete_record__published_date
@@ -46,7 +41,6 @@ data,metagenomic,delete_metagenomic__received_month
 data,metagenomic,delete_metagenomic__fastq_path
 
 #add_mpx
-data,mpx,add_mpx
 data,pathogen,add_pathogen__sample_id
 data,pathogen,add_pathogen__run_name
 data,pathogen,add_pathogen__collection_month
@@ -68,7 +62,6 @@ data,mpx,add_mpx__bioinfo_pipe_name
 data,mpx,add_mpx__bioinfo_pipe_version
 
 #view_mpx
-data,mpx,view_mpx
 data,record,view_record__site
 data,record,view_record__cid
 data,record,view_record__published_date
@@ -93,7 +86,6 @@ data,mpx,view_mpx__bioinfo_pipe_name
 data,mpx,view_mpx__bioinfo_pipe_version
 
 #change_mpx
-data,mpx,change_mpx
 data,pathogen,change_pathogen__collection_month
 data,pathogen,change_pathogen__received_month
 data,pathogen,change_pathogen__fasta_path
@@ -113,7 +105,6 @@ data,mpx,change_mpx__bioinfo_pipe_name
 data,mpx,change_mpx__bioinfo_pipe_version
 
 #suppress_mpx
-data,mpx,suppress_mpx
 data,record,suppress_record__site
 data,record,suppress_record__cid
 data,record,suppress_record__published_date
@@ -138,7 +129,6 @@ data,mpx,suppress_mpx__bioinfo_pipe_name
 data,mpx,suppress_mpx__bioinfo_pipe_version
 
 #delete_mpx
-data,mpx,delete_mpx
 data,record,delete_record__site
 data,record,delete_record__cid
 data,record,delete_record__published_date
@@ -163,7 +153,6 @@ data,mpx,delete_mpx__bioinfo_pipe_name
 data,mpx,delete_mpx__bioinfo_pipe_version
 
 #add_mpxpha
-data,mpx,add_mpx
 data,pathogen,add_pathogen__sample_id
 data,pathogen,add_pathogen__run_name
 data,pathogen,add_pathogen__collection_month
@@ -189,7 +178,6 @@ data,mpx,add_mpx__outer_postcode
 data,mpx,add_mpx__epi_cluster
 
 #view_mpxpha
-data,mpx,view_mpx
 data,record,view_record__site
 data,record,view_record__cid
 data,record,view_record__published_date
@@ -218,7 +206,6 @@ data,mpx,view_mpx__outer_postcode
 data,mpx,view_mpx__epi_cluster
 
 #change_mpxpha
-data,mpx,change_mpx
 data,pathogen,change_pathogen__collection_month
 data,pathogen,change_pathogen__received_month
 data,pathogen,change_pathogen__fasta_path
@@ -242,7 +229,6 @@ data,mpx,change_mpx__outer_postcode
 data,mpx,change_mpx__epi_cluster
 
 #suppress_mpxpha
-data,mpx,suppress_mpx
 data,record,suppress_record__site
 data,record,suppress_record__cid
 data,record,suppress_record__published_date
@@ -271,7 +257,6 @@ data,mpx,suppress_mpx__outer_postcode
 data,mpx,suppress_mpx__epi_cluster
 
 #delete_mpxpha
-data,mpx,delete_mpx
 data,record,delete_record__site
 data,record,delete_record__cid
 data,record,delete_record__published_date
@@ -300,7 +285,6 @@ data,mpx,delete_mpx__outer_postcode
 data,mpx,delete_mpx__epi_cluster
 
 #add_mpxadmin
-data,mpx,add_mpx
 data,record,add_record__site
 data,pathogen,add_pathogen__sample_id
 data,pathogen,add_pathogen__run_name
@@ -328,7 +312,6 @@ data,mpx,add_mpx__epi_cluster
 data,mpx,add_mpx__csv_template_version
 
 #view_mpxadmin
-data,mpx,view_mpx
 data,record,view_record__created
 data,record,view_record__last_modified
 data,record,view_record__site
@@ -360,7 +343,6 @@ data,mpx,view_mpx__epi_cluster
 data,mpx,view_mpx__csv_template_version
 
 #change_mpxadmin
-data,mpx,change_mpx
 data,pathogen,change_pathogen__collection_month
 data,pathogen,change_pathogen__received_month
 data,pathogen,change_pathogen__fasta_path
@@ -385,7 +367,6 @@ data,mpx,change_mpx__epi_cluster
 data,mpx,change_mpx__csv_template_version
 
 #suppress_mpxadmin
-data,mpx,suppress_mpx
 data,record,suppress_record__site
 data,record,suppress_record__cid
 data,record,suppress_record__published_date
@@ -415,7 +396,6 @@ data,mpx,suppress_mpx__epi_cluster
 data,mpx,suppress_mpx__csv_template_version
 
 #delete_mpxadmin
-data,mpx,delete_mpx
 data,record,delete_record__site
 data,record,delete_record__cid
 data,record,delete_record__published_date

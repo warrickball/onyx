@@ -14,8 +14,9 @@ from utils.project import (
     get_project_and_model,
 )
 from utils.permissions import (
+    get_fields_from_permissions,
     check_permissions,
-    get_view_permissions_and_fields,
+    not_authorised_response,
 )
 from utils.query import (
     make_keyvalues,
@@ -42,32 +43,39 @@ class CreateRecordView(METADBAPIView):
         project, model = get_project_and_model(project_code)
         if not project or not model:
             return Response(
-                {project_code: [METADBAPIResponse.NOT_FOUND]},
+                {project_code.lower(): [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # Fields that will be created
         create_fields = list(request.data)
 
-        # Get required view permissions and their corresponding fieldnames
-        view_permissions, view_fields = get_view_permissions_and_fields(project)
-
         # Check user has permission to create the instance
-        response = check_permissions(
+        required, unknown = check_permissions(
             project=project,
-            project_code=project_code,
             user=request.user,
             model=model,
-            default_permissions=view_permissions,
             action="add",
             user_fields=create_fields,
-            view_fields=view_fields,
         )
 
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(response, Response):
-            return response
+        # Handle required permissions
+        if required:
+            return not_authorised_response(
+                project=project,
+                user=request.user,
+                required=required,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                unknown,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get fields that can be viewed
+        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
 
         # If a site code was not provided, use the user's site code
         if not request.data.get("site"):
@@ -91,9 +99,15 @@ class CreateRecordView(METADBAPIView):
                     action="add",
                 )
 
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED,
+            )
         else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class GetRecordView(METADBAPIView):
@@ -107,7 +121,7 @@ class GetRecordView(METADBAPIView):
         project, model = get_project_and_model(project_code)
         if not project or not model:
             return Response(
-                {project_code: [METADBAPIResponse.NOT_FOUND]},
+                {project_code.lower(): [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -125,25 +139,32 @@ class GetRecordView(METADBAPIView):
         # Fields that will be filtered on
         filter_fields = [x.split("__")[0] for x in request.query_params]
 
-        # Get required view permissions and their corresponding fieldnames
-        view_permissions, view_fields = get_view_permissions_and_fields(project)
-
         # Check user has permission to filter the instances
-        response = check_permissions(
+        required, unknown = check_permissions(
             project=project,
-            project_code=project_code,
             user=request.user,
             model=model,
-            default_permissions=view_permissions,
             action="view",
             user_fields=filter_fields,
-            view_fields=view_fields,
         )
 
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(response, Response):
-            return response
+        # Handle required permissions
+        if required:
+            return not_authorised_response(
+                project=project,
+                user=request.user,
+                required=required,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                unknown,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get fields that can be viewed
+        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
 
         # Turn the request query params into a series of dictionaries, each that will be passed to a filterset
         filterset_datas = get_filterset_datas_from_query_params(request.query_params)
@@ -155,7 +176,7 @@ class GetRecordView(METADBAPIView):
         qs = apply_get_filterset(
             fs=METADBFilter,  # Filterset to use
             model=model,  # Model that the filterset is linked to
-            view_fields=view_fields,  # Fields that the filterset will build filters for
+            view_fields=view_fields,  # Fields that the filterset can build filters for
             filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
             qs=qs,  # Initial queryset
         )
@@ -185,7 +206,10 @@ class GetRecordView(METADBAPIView):
         # Return paginated response
         self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
         self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class QueryRecordView(METADBAPIView):
@@ -199,7 +223,7 @@ class QueryRecordView(METADBAPIView):
         project, model = get_project_and_model(project_code)
         if not project or not model:
             return Response(
-                {project_code: [METADBAPIResponse.NOT_FOUND]},
+                {project_code.lower(): [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -231,25 +255,32 @@ class QueryRecordView(METADBAPIView):
         # Fields that will be filtered on
         filter_fields = [x.key.split("__")[0] for x in keyvalues]
 
-        # Get required view permissions and their corresponding fieldnames
-        view_permissions, view_fields = get_view_permissions_and_fields(project)
-
         # Check user has permission to filter the instances
-        response = check_permissions(
+        required, unknown = check_permissions(
             project=project,
-            project_code=project_code,
             user=request.user,
             model=model,
-            default_permissions=view_permissions,
             action="view",
             user_fields=filter_fields,
-            view_fields=view_fields,
         )
 
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(response, Response):
-            return response
+        # Handle required permissions
+        if required:
+            return not_authorised_response(
+                project=project,
+                user=request.user,
+                required=required,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                unknown,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get fields that can be viewed
+        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
 
         # Construct a list of dictionaries from the keyvalues
         # Each of these dictionaries will be passed to a filterset
@@ -262,7 +293,7 @@ class QueryRecordView(METADBAPIView):
         validation = apply_query_filterset(
             fs=METADBFilter,  # Filterset to use
             model=model,  # Model that the filterset is linked to
-            view_fields=view_fields,  # Fields that the filterset will build filters for
+            view_fields=view_fields,  # Fields that the filterset can build filters for
             filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
         )
 
@@ -321,7 +352,7 @@ class UpdateRecordView(METADBAPIView):
         project, model = get_project_and_model(project_code)
         if not project or not model:
             return Response(
-                {project_code: [METADBAPIResponse.NOT_FOUND]},
+                {project_code.lower(): [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -337,25 +368,32 @@ class UpdateRecordView(METADBAPIView):
         # Fields that will be updated
         update_fields = list(request.data)
 
-        # Get required view permissions and their corresponding fieldnames
-        view_permissions, view_fields = get_view_permissions_and_fields(project)
-
         # Check user has permission to update the instance
-        response = check_permissions(
+        required, unknown = check_permissions(
             project=project,
-            project_code=project_code,
             user=request.user,
             model=model,
-            default_permissions=view_permissions,
             action="change",
             user_fields=update_fields,
-            view_fields=view_fields,
         )
 
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(response, Response):
-            return response
+        # Handle required permissions
+        if required:
+            return not_authorised_response(
+                project=project,
+                user=request.user,
+                required=required,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                unknown,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get fields that can be viewed
+        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
 
         # Get the model serializer, and validate the data
         serializer = get_serializer(model)(
@@ -378,9 +416,15 @@ class UpdateRecordView(METADBAPIView):
                     changes=",".join(update_fields),
                 )
 
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(
+                serializer.data,
+                status=status.HTTP_200_OK,
+            )
         else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class SuppressRecordView(METADBAPIView):
@@ -394,7 +438,7 @@ class SuppressRecordView(METADBAPIView):
         project, model = get_project_and_model(project_code)
         if not project or not model:
             return Response(
-                {project_code: [METADBAPIResponse.NOT_FOUND]},
+                {project_code.lower(): [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -404,7 +448,8 @@ class SuppressRecordView(METADBAPIView):
             instance = model.objects.filter(suppressed=False).get(cid=cid)
         except model.DoesNotExist:
             return Response(
-                {cid: [METADBAPIResponse.NOT_FOUND]}, status=status.HTTP_404_NOT_FOUND
+                {cid: [METADBAPIResponse.NOT_FOUND]},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # Fields that will be suppressed
@@ -415,25 +460,29 @@ class SuppressRecordView(METADBAPIView):
             if x in fields and y is not None
         ]
 
-        # Get required view permissions and their corresponding fieldnames
-        view_permissions, view_fields = get_view_permissions_and_fields(project)
-
         # Check user has permission to suppress the instance
-        response = check_permissions(
+        required, unknown = check_permissions(
             project=project,
-            project_code=project_code,
             user=request.user,
             model=model,
-            default_permissions=view_permissions,
             action="suppress",
             user_fields=suppress_fields,
-            view_fields=view_fields,
         )
 
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(response, Response):
-            return response
+        # Handle required permissions
+        if required:
+            return not_authorised_response(
+                project=project,
+                user=request.user,
+                required=required,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                unknown,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Suppress and save
         if not test:
@@ -464,7 +513,7 @@ class DeleteRecordView(METADBAPIView):
         project, model = get_project_and_model(project_code)
         if not project or not model:
             return Response(
-                {project_code: [METADBAPIResponse.NOT_FOUND]},
+                {project_code.lower(): [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -474,7 +523,8 @@ class DeleteRecordView(METADBAPIView):
             instance = model.objects.get(cid=cid)
         except model.DoesNotExist:
             return Response(
-                {cid: [METADBAPIResponse.NOT_FOUND]}, status=status.HTTP_404_NOT_FOUND
+                {cid: [METADBAPIResponse.NOT_FOUND]},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # Fields that will be deleted
@@ -485,25 +535,29 @@ class DeleteRecordView(METADBAPIView):
             if x in fields and y is not None
         ]
 
-        # Get required view permissions and their corresponding fieldnames
-        view_permissions, view_fields = get_view_permissions_and_fields(project)
-
         # Check user has permission to delete the instance
-        response = check_permissions(
+        required, unknown = check_permissions(
             project=project,
-            project_code=project_code,
             user=request.user,
             model=model,
-            default_permissions=view_permissions,
             action="delete",
             user_fields=delete_fields,
-            view_fields=view_fields,
         )
 
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(response, Response):
-            return response
+        # Handle required permissions
+        if required:
+            return not_authorised_response(
+                project=project,
+                user=request.user,
+                required=required,
+            )
+
+        # If unknown fields were provided, return 400
+        if unknown:
+            return Response(
+                unknown,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Delete the instance
         if not test:
@@ -516,4 +570,7 @@ class DeleteRecordView(METADBAPIView):
             )
 
         # Return response indicating deletion
-        return Response({"cid": cid}, status=status.HTTP_200_OK)
+        return Response(
+            {"cid": cid},
+            status=status.HTTP_200_OK,
+        )
