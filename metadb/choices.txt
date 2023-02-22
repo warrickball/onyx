@@ -1,4 +1,4 @@
-data,mpx,sample_type,swab,serum
+data,genomic,sample_type,swab,serum,other,unknown
 data,mpx,seq_platform,illumina,oxford_nanopore,pacific_biosciences,ion_torrent
 data,mpx,enrichment_method,other,pcr,random,random_pcr,none
 data,mpx,seq_strategy,amplicon,other,targeted_capture,wga,wgs

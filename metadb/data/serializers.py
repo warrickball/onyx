@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from internal.serializers import DynamicFieldsModelSerializer
 from internal.models import Choice
-from data.models import Record, Pathogen, Metagenomic, Mpx
+from data.models import Record, Genomic, Metagenomic, Mpx
 from utils import fieldserializers
 from utils.validation import (
     enforce_optional_value_groups_create,
@@ -18,8 +18,8 @@ class RecordSerializer(DynamicFieldsModelSerializer):
         fields = [
             "created",
             "last_modified",
-            # "suppressed",
-            # "user",
+            "suppressed",
+            "user",
             "site",
             "cid",
             "published_date",
@@ -88,12 +88,12 @@ class RecordSerializer(DynamicFieldsModelSerializer):
         return data
 
 
-class PathogenSerializer(RecordSerializer):
+class GenomicSerializer(RecordSerializer):
     collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
     received_month = fieldserializers.YearMonthField()
 
     class Meta:
-        model = Pathogen
+        model = Genomic
         fields = RecordSerializer.Meta.fields + [
             "sample_id",
             "run_name",
@@ -101,6 +101,7 @@ class PathogenSerializer(RecordSerializer):
             "received_month",
             "fasta_path",
             "bam_path",
+            "sample_type",
         ]
 
 
@@ -119,7 +120,7 @@ class MetagenomicSerializer(RecordSerializer):
         ]
 
 
-class MpxSerializer(PathogenSerializer):
+class MpxSerializer(GenomicSerializer):
     sample_type = fieldserializers.ContextedSlugRelatedField(
         slug_field="choice",
         queryset=Choice.objects.all(),
@@ -175,8 +176,7 @@ class MpxSerializer(PathogenSerializer):
 
     class Meta:
         model = Mpx
-        fields = PathogenSerializer.Meta.fields + [
-            "sample_type",
+        fields = GenomicSerializer.Meta.fields + [
             "seq_platform",
             "instrument_model",
             "enrichment_method",
@@ -202,7 +202,7 @@ def get_serializer(model):
     Function that returns the appropriate serializer for the given model.
     """
     return {
-        Pathogen: PathogenSerializer,
+        Genomic: GenomicSerializer,
         Metagenomic: MetagenomicSerializer,
         Mpx: MpxSerializer,
     }[model]

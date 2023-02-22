@@ -1,11 +1,10 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
-from model_utils.managers import InheritanceManager  # TODO
-from secrets import token_hex
 from utils.fields import YearMonthField
 from utils.permissions import generate_permissions
 from accounts.models import Site, User
 from internal.models import Choice
+from secrets import token_hex
 
 
 def generate_cid():
@@ -40,6 +39,7 @@ class Record(models.Model):
             models.Index(fields=["cid"]),
             models.Index(fields=["published_date"]),
         ]
+        default_permissions = ["add", "change", "view", "delete", "suppress"]
         permissions = generate_permissions(
             model_name="record",
             fields=[
@@ -60,13 +60,18 @@ class Record(models.Model):
         yearmonth_orderings = []
 
 
-class Pathogen(Record):
+class Genomic(Record):
     sample_id = models.CharField(max_length=24, validators=[MinLengthValidator(8)])
     run_name = models.CharField(max_length=96, validators=[MinLengthValidator(18)])
     collection_month = YearMonthField(null=True)
     received_month = YearMonthField()
     fasta_path = models.TextField()
     bam_path = models.TextField()
+    sample_type = models.ForeignKey(
+        Choice,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_sample_type",
+    )
 
     class Meta:
         unique_together = ["sample_id", "run_name"]
@@ -79,8 +84,9 @@ class Pathogen(Record):
             models.Index(fields=["fasta_path"]),
             models.Index(fields=["bam_path"]),
         ]
+        default_permissions = ["add", "change", "view", "delete", "suppress"]
         permissions = generate_permissions(
-            model_name="pathogen",
+            model_name="genomic",
             fields=[
                 "sample_id",
                 "run_name",
@@ -88,6 +94,7 @@ class Pathogen(Record):
                 "received_month",
                 "fasta_path",
                 "bam_path",
+                "sample_type",
             ],
         )
 
@@ -107,6 +114,16 @@ class Metagenomic(Record):
     collection_month = YearMonthField(null=True)
     received_month = YearMonthField()
     fastq_path = models.TextField()
+    sample_type = models.ForeignKey(
+        Choice,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_sample_type",
+    )
+    seq_platform = models.ForeignKey(
+        Choice,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_seq_platform",
+    )
 
     class Meta:
         unique_together = ["sample_id", "run_name"]
@@ -118,6 +135,7 @@ class Metagenomic(Record):
             models.Index(fields=["received_month"]),
             models.Index(fields=["fastq_path"]),
         ]
+        default_permissions = ["add", "change", "view", "delete", "suppress"]
         permissions = generate_permissions(
             model_name="metagenomic",
             fields=[
@@ -130,52 +148,47 @@ class Metagenomic(Record):
         )
 
 
-class Mpx(Pathogen):
-    sample_type = models.ForeignKey(
-        Choice,
-        on_delete=models.CASCADE,
-        related_name="sample_type",
-    )
+class Mpx(Genomic):
     seq_platform = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="seq_platform",
+        related_name="%(app_label)s_%(class)s_seq_platform",
     )
     enrichment_method = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="enrichment_method",
+        related_name="%(app_label)s_%(class)s_enrichment_method",
     )
     seq_strategy = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="seq_strategy",
+        related_name="%(app_label)s_%(class)s_seq_strategy",
     )
     source_of_library = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="source_of_library",
+        related_name="%(app_label)s_%(class)s_source_of_library",
     )
     country = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="country",
+        related_name="%(app_label)s_%(class)s_country",
     )
     run_layout = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="run_layout",
+        related_name="%(app_label)s_%(class)s_run_layout",
     )
     patient_ageband = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="patient_ageband",
+        related_name="%(app_label)s_%(class)s_patient_ageband",
         null=True,
     )
     sample_site = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="sample_site",
+        related_name="%(app_label)s_%(class)s_sample_site",
         null=True,
     )
     instrument_model = models.TextField()
@@ -190,13 +203,13 @@ class Mpx(Pathogen):
     ukhsa_region = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="ukhsa_region",
+        related_name="%(app_label)s_%(class)s_ukhsa_region",
         null=True,
     )
     travel_status = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
-        related_name="travel_status",
+        related_name="%(app_label)s_%(class)s_travel_status",
         null=True,
     )
     outer_postcode = models.CharField(
@@ -213,10 +226,10 @@ class Mpx(Pathogen):
     csv_template_version = models.TextField(null=True)
 
     class Meta:
+        default_permissions = ["add", "change", "view", "delete", "suppress"]
         permissions = generate_permissions(
             model_name="mpx",
             fields=[
-                "sample_type",
                 "sample_site",
                 "patient_ageband",
                 "country",
