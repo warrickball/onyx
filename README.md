@@ -12,16 +12,16 @@ $ metadb register
 ## Upload data
 
 ```
-$ metadb create <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
-$ metadb csv-create <PATHOGEN_CODE> <CSV_FILE>
-$ metadb tsv-create <PATHOGEN_CODE> <TSV_FILE>
+$ metadb create <PROJECT> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb csv-create <PROJECT> <CSV_FILE>
+$ metadb tsv-create <PROJECT> <TSV_FILE>
 ```
 
 ## Get data
 
 ```
-$ metadb get <PATHOGEN_CODE> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
-$ metadb get <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb get <PROJECT> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb get <PROJECT> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
 ```
 
 ### Table of lookups
@@ -65,14 +65,14 @@ $ metadb get mpx --field published_date__iso_week__range 33,37 --field published
 
 ## Update data
 ```
-$ metadb update <PATHOGEN_CODE> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
-$ metadb csv-update <PATHOGEN_CODE> <CSV>
-$ metadb tsv-update <PATHOGEN_CODE> <TSV>
+$ metadb update <PROJECT> <CID> --field <FIELD> <VALUE> --field <FIELD> <VALUE> ...
+$ metadb csv-update <PROJECT> <CSV>
+$ metadb tsv-update <PROJECT> <TSV>
 ```
 
 ## Suppress data
 ```
-$ metadb suppress <PATHOGEN_CODE> <CID>
-$ metadb csv-suppress <PATHOGEN_CODE> <CSV>
-$ metadb tsv-suppress <PATHOGEN_CODE> <TSV>
+$ metadb suppress <PROJECT> <CID>
+$ metadb csv-suppress <PROJECT> <CSV>
+$ metadb tsv-suppress <PROJECT> <TSV>
 ```
