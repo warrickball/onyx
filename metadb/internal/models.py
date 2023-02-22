@@ -58,19 +58,29 @@ class Project(models.Model):
     hidden = models.BooleanField(default=False)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     add_group = models.OneToOneField(
-        Group, on_delete=models.CASCADE, related_name="add_group_project"
+        Group,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_add",
     )
     view_group = models.OneToOneField(
-        Group, on_delete=models.CASCADE, related_name="view_group_project"
+        Group,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_view",
     )
     change_group = models.OneToOneField(
-        Group, on_delete=models.CASCADE, related_name="change_group_project"
+        Group,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_change",
     )
     suppress_group = models.OneToOneField(
-        Group, on_delete=models.CASCADE, related_name="suppress_group_project"
+        Group,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_suppress",
     )
     delete_group = models.OneToOneField(
-        Group, on_delete=models.CASCADE, related_name="delete_group_project"
+        Group,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_delete",
     )
 
 
