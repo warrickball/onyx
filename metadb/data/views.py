@@ -34,9 +34,6 @@ from .serializers import get_serializer
 from internal.models import History
 
 
-# TODO: Determine whether to show suppressed data, based on if that field is in the view_fields
-
-
 class CreateRecordView(METADBAPIView):
     permission_classes = Admin
 
