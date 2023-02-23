@@ -338,6 +338,7 @@ data,mpx,add_mpx__csv_template_version
 #view_mpxadmin
 data,record,view_record__created
 data,record,view_record__last_modified
+data,record,view_record__suppressed
 data,record,view_record__site
 data,record,view_record__cid
 data,record,view_record__published_date
