@@ -35,7 +35,6 @@ class LowerCharField(serializers.CharField):
         return super().to_internal_value(data)
 
 
-# TODO: Currently no support for choice fields from inherited models
 class ContextedSlugRelatedField(serializers.RelatedField):
     """
     A read-write field that represents the target of the relationship
@@ -57,7 +56,9 @@ class ContextedSlugRelatedField(serializers.RelatedField):
         try:
             return queryset.get(  # type: ignore
                 **{
-                    "content_type": self.context["project"].content_type,
+                    "content_type": self.context["field_contexts"][
+                        self.source
+                    ].content_type,
                     "field": self.source,
                     self.slug_field: data,
                 }

@@ -1,6 +1,5 @@
 from django.db import models
 from django.db.models import ForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django_filters import rest_framework as filters
 from utils.fields import YearMonthField, LowerCharField
 from utils.filters import (
@@ -118,13 +117,13 @@ def isnull(field):
     )
 
 
-def get_filter(model, user_field, fields):
+def get_filter(model, user_field, field_contexts, view_fields):
     # Get the field and the lookup
     field, underscore, lookup = user_field.partition("__")
 
     # Check that the field is a known field
     # Also check that there is no trailing underscore
-    if (field not in fields) or (underscore and not lookup):
+    if (field not in view_fields) or (underscore and not lookup):
         return None, None
 
     # Retrieve the provided field from the model
@@ -152,9 +151,8 @@ def get_filter(model, user_field, fields):
             qs = db_model.objects.all()
             to_field_name = related_field
         else:
-            content_type = ContentType.objects.get_for_model(model)
             qs = Choice.objects.filter(
-                content_type=content_type,
+                content_type=field_contexts[field].content_type,
                 field=field,
             )
             to_field_name = "choice"
@@ -276,14 +274,15 @@ def get_filter(model, user_field, fields):
 
 
 class METADBFilter(filters.FilterSet):
-    def __init__(self, model, fields, *args, **kwargs):
+    def __init__(self, model, field_contexts, view_fields, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         for user_field in self.data:
             name, filter = get_filter(
                 model,
                 user_field,
-                fields,
+                field_contexts,
+                view_fields,
             )
             if name:
                 self.filters[name] = filter

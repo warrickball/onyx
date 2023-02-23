@@ -26,6 +26,7 @@ from utils.query import (
     apply_get_filterset,
     apply_query_filterset,
 )
+from utils.fieldcontext import get_field_contexts
 from utils.mutable import mutable
 from .filters import METADBFilter
 from .serializers import get_serializer
@@ -50,13 +51,16 @@ class CreateRecordView(METADBAPIView):
         # Fields that will be created
         create_fields = list(request.data)
 
+        # (Parent) model and contenttype for each field in the model
+        field_contexts = get_field_contexts(model)
+
         # Check user has permission to create the instance
         required, unknown = check_permissions(
             project=project,
             user=request.user,
-            model=model,
             action="add",
             user_fields=create_fields,
+            field_contexts=field_contexts,
         )
 
         # Handle required permissions
@@ -85,7 +89,7 @@ class CreateRecordView(METADBAPIView):
         serializer = get_serializer(model)(
             data=request.data,
             fields=view_fields,
-            context={"project": project, "request": request},
+            context={"field_contexts": field_contexts, "request": request},
         )
 
         # If data is valid, save to the database. Otherwise, return 400
@@ -139,13 +143,16 @@ class GetRecordView(METADBAPIView):
         # Fields that will be filtered on
         filter_fields = [x.split("__")[0] for x in request.query_params]
 
+        # (Parent) model and contenttype for each field in the model
+        field_contexts = get_field_contexts(model)
+
         # Check user has permission to filter the instances
         required, unknown = check_permissions(
             project=project,
             user=request.user,
-            model=model,
             action="view",
             user_fields=filter_fields,
+            field_contexts=field_contexts,
         )
 
         # Handle required permissions
@@ -176,6 +183,7 @@ class GetRecordView(METADBAPIView):
         qs = apply_get_filterset(
             fs=METADBFilter,  # Filterset to use
             model=model,  # Model that the filterset is linked to
+            field_contexts=field_contexts,
             view_fields=view_fields,  # Fields that the filterset can build filters for
             filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
             qs=qs,  # Initial queryset
@@ -200,7 +208,7 @@ class GetRecordView(METADBAPIView):
             result_page,
             many=True,
             fields=view_fields,
-            context={"project": project},
+            context={"field_contexts": field_contexts},
         )
 
         # Return paginated response
@@ -255,13 +263,16 @@ class QueryRecordView(METADBAPIView):
         # Fields that will be filtered on
         filter_fields = [x.key.split("__")[0] for x in keyvalues]
 
+        # (Parent) model and contenttype for each field in the model
+        field_contexts = get_field_contexts(model)
+
         # Check user has permission to filter the instances
         required, unknown = check_permissions(
             project=project,
             user=request.user,
-            model=model,
             action="view",
             user_fields=filter_fields,
+            field_contexts=field_contexts,
         )
 
         # Handle required permissions
@@ -293,6 +304,7 @@ class QueryRecordView(METADBAPIView):
         validation = apply_query_filterset(
             fs=METADBFilter,  # Filterset to use
             model=model,  # Model that the filterset is linked to
+            field_contexts=field_contexts,
             view_fields=view_fields,  # Fields that the filterset can build filters for
             filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
         )
@@ -332,7 +344,7 @@ class QueryRecordView(METADBAPIView):
             result_page,
             many=True,
             fields=view_fields,
-            context={"project": project},
+            context={"field_contexts": field_contexts},
         )
 
         # Return paginated response
@@ -368,13 +380,16 @@ class UpdateRecordView(METADBAPIView):
         # Fields that will be updated
         update_fields = list(request.data)
 
+        # (Parent) model and contenttype for each field in the model
+        field_contexts = get_field_contexts(model)
+
         # Check user has permission to update the instance
         required, unknown = check_permissions(
             project=project,
             user=request.user,
-            model=model,
             action="change",
             user_fields=update_fields,
+            field_contexts=field_contexts,
         )
 
         # Handle required permissions
@@ -401,7 +416,7 @@ class UpdateRecordView(METADBAPIView):
             data=request.data,
             partial=True,
             fields=view_fields,
-            context={"project": project},
+            context={"field_contexts": field_contexts},
         )
 
         # If data is valid, update existing record in the database. Otherwise, return 400
@@ -460,13 +475,16 @@ class SuppressRecordView(METADBAPIView):
             if x in fields and y is not None
         ]
 
+        # (Parent) model and contenttype for each field in the model
+        field_contexts = get_field_contexts(model)
+
         # Check user has permission to suppress the instance
         required, unknown = check_permissions(
             project=project,
             user=request.user,
-            model=model,
             action="suppress",
             user_fields=suppress_fields,
+            field_contexts=field_contexts,
         )
 
         # Handle required permissions
@@ -528,20 +546,22 @@ class DeleteRecordView(METADBAPIView):
             )
 
         # Fields that will be deleted
-        fields = get_serializer(model).Meta.fields
         delete_fields = [
             x
             for x, y in model_to_dict(instance).items()
-            if x in fields and y is not None
+            if x in get_serializer(model).Meta.fields and y is not None
         ]
+
+        # (Parent) model and contenttype for each field in the model
+        field_contexts = get_field_contexts(model)
 
         # Check user has permission to delete the instance
         required, unknown = check_permissions(
             project=project,
             user=request.user,
-            model=model,
             action="delete",
             user_fields=delete_fields,
+            field_contexts=field_contexts,
         )
 
         # Handle required permissions
@@ -562,12 +582,6 @@ class DeleteRecordView(METADBAPIView):
         # Delete the instance
         if not test:
             instance.delete()
-
-            History.objects.create(
-                record=instance,
-                user=request.user,
-                action="delete",
-            )
 
         # Return response indicating deletion
         return Response(

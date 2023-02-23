@@ -119,7 +119,7 @@ def get_filterset_datas_from_keyvalues(keyvalues):
     return filterset_datas
 
 
-def apply_get_filterset(fs, model, view_fields, filterset_datas, qs):
+def apply_get_filterset(fs, model, field_contexts, view_fields, filterset_datas, qs):
     # A filterset can only take a a query with one of each field at a time
     # So given that the get view only AND's fields together, we can represent this
     # as a series of filtersets ANDed together
@@ -127,6 +127,7 @@ def apply_get_filterset(fs, model, view_fields, filterset_datas, qs):
         # Generate filterset of current queryset
         filterset = fs(
             model,
+            field_contexts,
             view_fields,
             data=filterset_data,
             queryset=qs,
@@ -138,6 +139,7 @@ def apply_get_filterset(fs, model, view_fields, filterset_datas, qs):
 
             for field in filterset_data:
                 if field not in filterset.filters:
+                    # TODO: Perhaps modify this to account for known, permissioned fields that are not searchable in this project
                     unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
 
             if unknown:
@@ -156,12 +158,13 @@ def apply_get_filterset(fs, model, view_fields, filterset_datas, qs):
     return qs
 
 
-def apply_query_filterset(fs, model, view_fields, filterset_datas):
+def apply_query_filterset(fs, model, field_contexts, view_fields, filterset_datas):
     # Use a filterset, applied to each dict in filterset_datas, to validate the data
     for i, filterset_data in enumerate(filterset_datas):
         # Slightly cursed, but it works
         filterset = fs(
             model,
+            field_contexts,
             view_fields,
             data={k: v.value for k, v in filterset_data.items()},
             queryset=model.objects.none(),

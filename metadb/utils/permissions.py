@@ -5,9 +5,6 @@ from utils.response import METADBAPIResponse
 
 def generate_permissions(model_name, fields):
     return [
-        (f"{action}_{model_name}", f"Can {action} {model_name}")
-        for action in ["suppress"]
-    ] + [
         (f"{action}_{model_name}__{x}", f"Can {action} {model_name} {x}")
         for action in ["add", "change", "view", "delete", "suppress"]
         for x in fields
@@ -24,13 +21,7 @@ def get_fields_from_permissions(permissions):
     ]
 
 
-def check_permissions(
-    project,
-    user,
-    model,
-    action,
-    user_fields,
-):
+def check_permissions(project, user, action, user_fields, field_contexts):
     """
     Check that the `user` has correct permissions to perform `action` to `user_fields` of the provided `model`.
     """
@@ -40,20 +31,11 @@ def check_permissions(
         f"internal.{action}_project_{project.code}",
     ]
 
-    # Starting from the grandest parent model
-    # Record which fields belong to which model in the inheritance hierarchy
-    model_fields = {field.name: model for field in model._meta.get_fields()}
-    models = [model] + model._meta.get_parent_list()
-    for m in reversed(models):
-        for field in m._meta.get_fields(include_parents=False):
-            if field.name in model_fields:
-                model_fields[field.name] = m
-
     # For each field provided by the user, get the corresponding permission
     unknown = {}
     for user_field in user_fields:
-        if user_field in model_fields:
-            field_model = model_fields[user_field]
+        if user_field in field_contexts:
+            field_model = field_contexts[user_field].model
             field_permission = f"{field_model._meta.app_label}.{action}_{field_model._meta.model_name}__{user_field}"
             permissions.append(field_permission)
         else:
