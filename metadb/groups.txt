@@ -168,7 +168,7 @@ data,mpx,delete_mpx__seq_strategy
 data,mpx,delete_mpx__bioinfo_pipe_name
 data,mpx,delete_mpx__bioinfo_pipe_version
 
-#add_mpxpha
+#add_mpx-pha
 data,genomic,add_genomic__sample_id
 data,genomic,add_genomic__run_name
 data,genomic,add_genomic__collection_month
@@ -193,7 +193,7 @@ data,mpx,add_mpx__travel_status
 data,mpx,add_mpx__outer_postcode
 data,mpx,add_mpx__epi_cluster
 
-#view_mpxpha
+#view_mpx-pha
 data,record,view_record__site
 data,record,view_record__cid
 data,record,view_record__published_date
@@ -221,7 +221,7 @@ data,mpx,view_mpx__travel_status
 data,mpx,view_mpx__outer_postcode
 data,mpx,view_mpx__epi_cluster
 
-#change_mpxpha
+#change_mpx-pha
 data,genomic,change_genomic__collection_month
 data,genomic,change_genomic__received_month
 data,genomic,change_genomic__fasta_path
@@ -244,7 +244,7 @@ data,mpx,change_mpx__travel_status
 data,mpx,change_mpx__outer_postcode
 data,mpx,change_mpx__epi_cluster
 
-#suppress_mpxpha
+#suppress_mpx-pha
 data,record,suppress_record__created
 data,record,suppress_record__last_modified
 data,record,suppress_record__suppressed
@@ -276,7 +276,7 @@ data,mpx,suppress_mpx__travel_status
 data,mpx,suppress_mpx__outer_postcode
 data,mpx,suppress_mpx__epi_cluster
 
-#delete_mpxpha
+#delete_mpx-pha
 data,record,delete_record__created
 data,record,delete_record__last_modified
 data,record,delete_record__suppressed
@@ -308,7 +308,7 @@ data,mpx,delete_mpx__travel_status
 data,mpx,delete_mpx__outer_postcode
 data,mpx,delete_mpx__epi_cluster
 
-#add_mpxadmin
+#add_mpx-admin
 data,record,add_record__site
 data,genomic,add_genomic__sample_id
 data,genomic,add_genomic__run_name
@@ -335,7 +335,7 @@ data,mpx,add_mpx__outer_postcode
 data,mpx,add_mpx__epi_cluster
 data,mpx,add_mpx__csv_template_version
 
-#view_mpxadmin
+#view_mpx-admin
 data,record,view_record__created
 data,record,view_record__last_modified
 data,record,view_record__suppressed
@@ -367,7 +367,7 @@ data,mpx,view_mpx__outer_postcode
 data,mpx,view_mpx__epi_cluster
 data,mpx,view_mpx__csv_template_version
 
-#change_mpxadmin
+#change_mpx-admin
 data,genomic,change_genomic__collection_month
 data,genomic,change_genomic__received_month
 data,genomic,change_genomic__fasta_path
@@ -391,7 +391,7 @@ data,mpx,change_mpx__outer_postcode
 data,mpx,change_mpx__epi_cluster
 data,mpx,change_mpx__csv_template_version
 
-#suppress_mpxadmin
+#suppress_mpx-admin
 data,record,suppress_record__created
 data,record,suppress_record__last_modified
 data,record,suppress_record__suppressed
@@ -424,7 +424,7 @@ data,mpx,suppress_mpx__outer_postcode
 data,mpx,suppress_mpx__epi_cluster
 data,mpx,suppress_mpx__csv_template_version
 
-#delete_mpxadmin
+#delete_mpx-admin
 data,record,delete_record__created
 data,record,delete_record__last_modified
 data,record,delete_record__suppressed
