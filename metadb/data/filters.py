@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import ForeignKey
 from django_filters import rest_framework as filters
-from utils.fields import YearMonthField, LowerCharField
+from utils.fields import YearMonthField, LowerCharField, UpperCharField
 from utils.filters import (
     ModelChoiceInFilter,
     ModelChoiceRangeFilter,
@@ -68,6 +68,7 @@ DATE_LOOKUPS = [
 # Text field types
 TEXT_FIELDS = [
     LowerCharField,
+    UpperCharField,
     models.CharField,
     models.TextField,
 ]
