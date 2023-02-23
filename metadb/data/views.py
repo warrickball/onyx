@@ -12,6 +12,7 @@ from utils.views import METADBAPIView
 from utils.response import METADBAPIResponse
 from utils.project import (
     get_project_and_model,
+    init_queryset,
 )
 from utils.permissions import (
     get_fields_from_permissions,
@@ -31,6 +32,9 @@ from utils.mutable import mutable
 from .filters import METADBFilter
 from .serializers import get_serializer
 from internal.models import History
+
+
+# TODO: Determine whether to show suppressed data, based on if that field is in the view_fields
 
 
 class CreateRecordView(METADBAPIView):
@@ -99,8 +103,10 @@ class CreateRecordView(METADBAPIView):
 
                 History.objects.create(
                     record=instance,
+                    cid=instance.cid,
                     user=request.user,
                     action="add",
+                    changes=str(request.data),
                 )
 
             return Response(
@@ -177,7 +183,7 @@ class GetRecordView(METADBAPIView):
         filterset_datas = get_filterset_datas_from_query_params(request.query_params)
 
         # Initial queryset
-        qs = model.objects.select_related().filter(suppressed=False)
+        qs = init_queryset(model, view_fields)
 
         # Apply filtersets
         qs = apply_get_filterset(
@@ -315,7 +321,7 @@ class QueryRecordView(METADBAPIView):
             return validation
 
         # Initial queryset
-        qs = model.objects.select_related().filter(suppressed=False)
+        qs = init_queryset(model, view_fields)
 
         # If request data was provided, then it has now been validated
         # So we form the query (a Q object)
@@ -368,10 +374,13 @@ class UpdateRecordView(METADBAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Get fields that can be viewed
+        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
+
         # Get the instance to be updated
         # If the instance does not exist, return 404
         try:
-            instance = model.objects.filter(suppressed=False).get(cid=cid)
+            instance = init_queryset(model, view_fields).get(cid=cid)
         except model.DoesNotExist:
             return Response(
                 {cid: [METADBAPIResponse.NOT_FOUND]}, status=status.HTTP_404_NOT_FOUND
@@ -407,9 +416,6 @@ class UpdateRecordView(METADBAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get fields that can be viewed
-        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
-
         # Get the model serializer, and validate the data
         serializer = get_serializer(model)(
             instance=instance,
@@ -426,9 +432,10 @@ class UpdateRecordView(METADBAPIView):
 
                 History.objects.create(
                     record=instance,
+                    cid=cid,
                     user=request.user,
                     action="change",
-                    changes=",".join(update_fields),
+                    changes=str(request.data),
                 )
 
             return Response(
@@ -457,10 +464,13 @@ class SuppressRecordView(METADBAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Get fields that can be viewed
+        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
+
         # Get the instance to be suppressed
         # If the instance does not exist, return 404
         try:
-            instance = model.objects.filter(suppressed=False).get(cid=cid)
+            instance = init_queryset(model, view_fields).get(cid=cid)
         except model.DoesNotExist:
             return Response(
                 {cid: [METADBAPIResponse.NOT_FOUND]},
@@ -509,6 +519,7 @@ class SuppressRecordView(METADBAPIView):
 
             History.objects.create(
                 record=instance,
+                cid=cid,
                 user=request.user,
                 action="suppress",
             )
@@ -535,10 +546,13 @@ class DeleteRecordView(METADBAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Get fields that can be viewed
+        view_fields = get_fields_from_permissions(project.view_group.permissions.all())
+
         # Get the instance to be deleted
         # If it does not exist, return 404
         try:
-            instance = model.objects.get(cid=cid)
+            instance = init_queryset(model, view_fields).get(cid=cid)
         except model.DoesNotExist:
             return Response(
                 {cid: [METADBAPIResponse.NOT_FOUND]},
@@ -582,6 +596,13 @@ class DeleteRecordView(METADBAPIView):
         # Delete the instance
         if not test:
             instance.delete()
+
+            History.objects.create(
+                record=None,
+                cid=cid,
+                user=request.user,
+                action="delete",
+            )
 
         # Return response indicating deletion
         return Response(

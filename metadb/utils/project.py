@@ -14,6 +14,15 @@ def init_project_queryset(model, user):
     return qs
 
 
+def init_queryset(model, view_fields):
+    qs = model.objects.select_related()
+
+    if "suppressed" not in view_fields:
+        qs = qs.filter(suppressed=False)
+
+    return qs
+
+
 def get_project_and_model(project_code):
     try:
         project = Project.objects.get(code=project_code)

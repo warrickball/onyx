@@ -88,14 +88,15 @@ class Request(models.Model):
     endpoint = models.CharField(max_length=100, null=True)
     method = models.CharField(max_length=10, null=True)
     status = models.PositiveSmallIntegerField()
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    user = models.ForeignKey(User, on_delete=models.PROTECT, null=True)
     address = models.CharField(max_length=20, null=True)
     exec_time = models.IntegerField(null=True)
     date = models.DateTimeField(auto_now=True)
 
 
 class History(models.Model):
-    record = models.ForeignKey("data.Record", on_delete=models.PROTECT)
+    record = models.ForeignKey("data.Record", on_delete=models.SET_NULL, null=True)
+    cid = models.CharField(max_length=12)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     action = LowerCharField(
         max_length=10,
