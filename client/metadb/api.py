@@ -3,9 +3,13 @@ import sys
 import csv
 import json
 import requests
-from metadbclient import utils, settings
-from metadbclient.field import Field
-from metadbclient.config import Config
+import concurrent.futures
+from metadb import utils, settings
+from metadb.field import Field
+from metadb.config import Config
+
+
+# TODO: Learn OAuth
 
 
 class Client:
@@ -28,25 +32,30 @@ class Client:
             "admin_waiting": f"{self.url}/accounts/admin/waiting/",
             "admin_users": f"{self.url}/accounts/admin/users/",
             # data
-            "pathogens": f"{self.url}/data/pathogens/",
-            "query": lambda x: f"{self.url}/data/{x}/query/",
-            "create": lambda x: f"{self.url}/data/{x}/",
-            "get": lambda x: f"{self.url}/data/{x}/",
-            "update": lambda x, y: f"{self.url}/data/{x}/{y}/",
-            "suppress": lambda x, y: f"{self.url}/data/{x}/{y}",
+            "create": lambda x: f"{self.url}/data/create/{x}/",
+            "get": lambda x: f"{self.url}/data/get/{x}/",
+            "query": lambda x: f"{self.url}/data/query/{x}/",
+            "update": lambda x, y: f"{self.url}/data/update/{x}/{y}/",
+            "suppress": lambda x, y: f"{self.url}/data/suppress/{x}/{y}/",
+            "delete": lambda x, y: f"{self.url}/data/delete/{x}/{y}/",
         }
 
     def request(self, method, **kwargs):
+        """
+        Carry out a request while handling token authorisation.
+        """
         kwargs.setdefault("headers", {}).update(
             {"Authorization": f"Token {self.token}"}
         )
         method_response = method(**kwargs)
+
         if method_response.status_code == 401:
             password = self.get_password()
             login_response = requests.post(
                 self.endpoints["login"],
                 auth=(self.username, password),
             )
+
             if login_response.ok:
                 self.token = login_response.json().get("token")
                 self.expiry = login_response.json().get("expiry")
@@ -118,7 +127,8 @@ class Client:
 
     def get_password(self):
         if self.env_password:
-            # If the password is meant to be an env var, grab it. If its not there, this is unintended so raise an error
+            # If the password is meant to be an env var, grab it.
+            # If its not there, this is unintended so an error is raised
             password_env_var = (
                 settings.PASSWORD_ENV_VAR_PREFIX
                 + self.username.upper()
@@ -158,7 +168,7 @@ class Client:
     @utils.session_required
     def logout(self):
         """
-        Log out the user.
+        Log out the user in this client.
         """
         response = self.request(
             method=requests.post,
@@ -174,7 +184,7 @@ class Client:
     @utils.session_required
     def logoutall(self):
         """
-        Log out the user everywhere.
+        Log out the user in all clients.
         """
         response = self.request(
             method=requests.post,
@@ -254,32 +264,21 @@ class Client:
         return response
 
     @utils.session_required
-    def list_pathogen_codes(self):
+    def create(self, project, fields):
         """
-        List the current pathogens within the database.
-        """
-        response = self.request(
-            method=requests.get,
-            url=self.endpoints["pathogens"],
-        )
-        return response
-
-    @utils.session_required
-    def create(self, pathogen_code, fields):
-        """
-        Post a pathogen record to the database.
+        Post a record to the database.
         """
         response = self.request(
             method=requests.post,
-            url=self.endpoints["create"](pathogen_code),
+            url=self.endpoints["create"](project),
             json=fields,
         )
         return response
 
     @utils.session_required
-    def csv_create(self, pathogen_code, csv_path, delimiter=None):
+    def csv_create(self, project, csv_path, delimiter=None, multithreaded=False):
         """
-        Post a .csv or .tsv containing pathogen records to the database.
+        Post a .csv or .tsv containing records to the database.
         """
         if csv_path == "-":
             csv_file = sys.stdin
@@ -291,19 +290,46 @@ class Client:
             else:
                 reader = csv.DictReader(csv_file, delimiter=delimiter)
 
-            for record in reader:
+            record = next(reader, None)
+
+            if record:
                 response = self.request(
                     method=requests.post,
-                    url=self.endpoints["create"](pathogen_code),
+                    url=self.endpoints["create"](project),
                     json=record,
                 )
                 yield response
+
+                if multithreaded:
+                    # TODO: Prevent multithreaded option if password not set in environment
+                    # Because a multithreaded password entry spells disaster
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        futures = [
+                            executor.submit(
+                                self.request,
+                                requests.post,
+                                url=self.endpoints["create"](project),
+                                json=record,
+                            )
+                            for record in reader
+                        ]
+                        for future in concurrent.futures.as_completed(futures):
+                            yield future.result()
+
+                else:
+                    for record in reader:
+                        response = self.request(
+                            method=requests.post,
+                            url=self.endpoints["create"](project),
+                            json=record,
+                        )
+                        yield response
         finally:
             if csv_file is not sys.stdin:
                 csv_file.close()
 
     @utils.session_required
-    def get(self, pathogen_code, cid=None, fields=None, **kwargs):
+    def get(self, project, cid=None, fields=None, **kwargs):
         """
         Get records from the database.
         """
@@ -326,68 +352,61 @@ class Client:
 
                 fields.setdefault(field, []).append(values)
 
-        response = self.request(
-            method=requests.get,
-            url=self.endpoints["get"](pathogen_code),
-            params=fields,
-        )
-        yield response
-
-        if response.ok:
-            _next = response.json()["next"]
-        else:
-            _next = None
-
+        _next = self.endpoints["get"](project)
+        params = fields
         while _next is not None:
             response = self.request(
                 method=requests.get,
                 url=_next,
+                params=params,
             )
-            yield response
+            utils.raise_for_status(response)
+            _next = response.json().get("next")
+            params = None
 
-            if response.ok:
-                _next = response.json()["next"]
-            else:
-                _next = None
+            for result in response.json()["results"]:
+                yield result
 
     @utils.session_required
-    def query(self, pathogen_code, query, group=None):
+    def query(self, project, query=None):
         """
         Get records from the database.
         """
-        if not isinstance(query, Field):
-            raise Exception("Query must be of type Field")
+        if query:
+            if not isinstance(query, Field):
+                raise Exception("Query must be of type Field")
+            else:
+                query = query.query
 
-        params = {}
+        _next = self.endpoints["query"](project)
+        while _next is not None:
+            response = self.request(
+                method=requests.post,
+                url=_next,
+                json=query,
+            )
+            utils.raise_for_status(response)
+            _next = response.json().get("next")
 
-        if group is not None:
-            params["group"] = group
-
-        response = self.request(
-            method=requests.post,
-            url=self.endpoints["query"](pathogen_code),
-            json=query.query,
-            params=params,
-        )
-
-        return response
+            for result in response.json()["results"]:
+                yield result
 
     @utils.session_required
-    def update(self, pathogen_code, cid, fields):
+    def update(self, project, cid, fields):
         """
-        Update a pathogen record in the database.
+        Update a record in the database.
         """
         response = self.request(
             method=requests.patch,
-            url=self.endpoints["update"](pathogen_code, cid),
+            url=self.endpoints["update"](project, cid),
             json=fields,
         )
         return response
 
     @utils.session_required
-    def csv_update(self, pathogen_code, csv_path, delimiter=None):
+    def csv_update(self, project, csv_path, delimiter=None):
         """
-        Use a .csv or .tsv to update pathogen records in the database.
+        Use a .csv or .tsv to update records in the database.
         """
         if csv_path == "-":
             csv_file = sys.stdin
@@ -406,7 +425,7 @@ class Client:
 
                 response = self.request(
                     method=requests.patch,
-                    url=self.endpoints["update"](pathogen_code, cid),
+                    url=self.endpoints["update"](project, cid),
                     json=record,
                 )
                 yield response
@@ -415,20 +434,20 @@ class Client:
                 csv_file.close()
 
     @utils.session_required
-    def suppress(self, pathogen_code, cid):
+    def suppress(self, project, cid):
         """
-        Suppress a pathogen record in the database.
+        Suppress a record in the database.
         """
         response = self.request(
             method=requests.delete,
-            url=self.endpoints["suppress"](pathogen_code, cid),
+            url=self.endpoints["suppress"](project, cid),
         )
         return response
 
     @utils.session_required
-    def csv_suppress(self, pathogen_code, csv_path, delimiter=None):
+    def csv_suppress(self, project, csv_path, delimiter=None):
         """
-        Use a .csv or .tsv to suppress pathogen records in the database.
+        Use a .csv or .tsv to suppress records in the database.
         """
         if csv_path == "-":
             csv_file = sys.stdin
@@ -447,7 +466,47 @@ class Client:
 
                 response = self.request(
                     method=requests.delete,
-                    url=self.endpoints["suppress"](pathogen_code, cid),
+                    url=self.endpoints["suppress"](project, cid),
+                )
+                yield response
+        finally:
+            if csv_file is not sys.stdin:
+                csv_file.close()
+
+    @utils.session_required
+    def delete(self, project, cid):
+        """
+        Delete a record in the database.
+        """
+        response = self.request(
+            method=requests.delete,
+            url=self.endpoints["delete"](project, cid),
+        )
+        return response
+
+    @utils.session_required
+    def csv_delete(self, project, csv_path, delimiter=None):
+        """
+        Use a .csv or .tsv to delete records in the database.
+        """
+        if csv_path == "-":
+            csv_file = sys.stdin
+        else:
+            csv_file = open(csv_path)
+        try:
+            if delimiter is None:
+                reader = csv.DictReader(csv_file)
+            else:
+                reader = csv.DictReader(csv_file, delimiter=delimiter)
+
+            for record in reader:
+                cid = record.get("cid")
+                if cid is None:
+                    raise KeyError("cid column must be provided")
+
+                response = self.request(
+                    method=requests.delete,
+                    url=self.endpoints["delete"](project, cid),
                 )
                 yield response
         finally:

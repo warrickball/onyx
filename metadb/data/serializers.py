@@ -1,8 +1,9 @@
 from rest_framework import serializers
-from accounts.models import Site
-from data.models import PathogenCode, Pathogen, Mpx
+from internal.serializers import DynamicFieldsModelSerializer
+from internal.models import Choice
+from data.models import Record, Genomic, Metagenomic, Mpx
 from utils import fieldserializers
-from utils.functions import (
+from utils.validation import (
     enforce_optional_value_groups_create,
     enforce_optional_value_groups_update,
     enforce_yearmonth_order_create,
@@ -11,81 +12,75 @@ from utils.functions import (
 )
 
 
-class PathogenSerializer(serializers.ModelSerializer):
-    pathogen_code = serializers.SlugRelatedField(
-        queryset=PathogenCode.objects.all(), slug_field="code"
-    )
-    site = serializers.SlugRelatedField(queryset=Site.objects.all(), slug_field="code")
-    collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
-    received_month = fieldserializers.YearMonthField()
-
+class RecordSerializer(DynamicFieldsModelSerializer):
     class Meta:
-        model = Pathogen
+        model = Record
         fields = [
-            "pathogen_code",
+            "created",
+            "last_modified",
+            "suppressed",
+            "user",
             "site",
             "cid",
-            "sample_id",
-            "run_name",
-            "collection_month",
-            "received_month",
             "published_date",
-            "fasta_path",
-            "bam_path",
         ]
+
+    def create(self, validated_data):
+        # Add the user who created the object to the record
+        validated_data["user"] = self.context["request"].user
+        return super().create(validated_data)
 
     def validate(self, data):
         """
         Additional validation carried out on either object creation or update
-
-        Update is indicated by the existence of a `self.instance`
-
-        Creation is indicated by `self.instance = None`
         """
         model = self.Meta.model
         errors = {}
 
+        # Object update validation
         if self.instance:
             enforce_optional_value_groups_update(
                 errors=errors,
                 instance=self.instance,
                 data=data,
-                groups=model.OPTIONAL_VALUE_GROUPS,
+                groups=model.CustomMeta.optional_value_groups,
             )
-            enforce_yearmonth_order_update(
-                errors=errors,
-                instance=self.instance,
-                lower_yearmonth="collection_month",
-                higher_yearmonth="received_month",
-                data=data,
-            )
-
+            for (
+                lower_yearmonth,
+                higher_yearmonth,
+            ) in model.CustomMeta.yearmonth_orderings:
+                enforce_yearmonth_order_update(
+                    errors=errors,
+                    instance=self.instance,
+                    lower_yearmonth=lower_yearmonth,
+                    higher_yearmonth=higher_yearmonth,
+                    data=data,
+                )
+        # Object create validation
         else:
             enforce_optional_value_groups_create(
                 errors=errors,
                 data=data,
-                groups=model.OPTIONAL_VALUE_GROUPS,
+                groups=model.CustomMeta.optional_value_groups,
             )
-            enforce_yearmonth_order_create(
-                errors=errors,
-                lower_yearmonth="collection_month",
-                higher_yearmonth="received_month",
-                data=data,
-            )
-
-        if data.get("collection_month"):
-            enforce_yearmonth_non_future(
-                errors=errors,
-                name="collection_month",
-                value=data["collection_month"],
-            )
-
-        if data.get("received_month"):
-            enforce_yearmonth_non_future(
-                errors=errors,
-                name="received_month",
-                value=data["received_month"],
-            )
+            for (
+                lower_yearmonth,
+                higher_yearmonth,
+            ) in model.CustomMeta.yearmonth_orderings:
+                enforce_yearmonth_order_create(
+                    errors=errors,
+                    lower_yearmonth=lower_yearmonth,
+                    higher_yearmonth=higher_yearmonth,
+                    data=data,
+                )
+        # Object create and update validation
+        for yearmonth in model.CustomMeta.yearmonths:
+            if data.get(yearmonth):
+                enforce_yearmonth_non_future(
+                    errors=errors,
+                    name=yearmonth,
+                    value=data[yearmonth],
+                )
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -93,54 +88,95 @@ class PathogenSerializer(serializers.ModelSerializer):
         return data
 
 
-class AdminPathogenSerializer(PathogenSerializer):
+class GenomicSerializer(RecordSerializer):
+    collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
+    received_month = fieldserializers.YearMonthField()
+
     class Meta:
-        model = Pathogen
-        fields = PathogenSerializer.Meta.fields + [
-            "id",
-            "created",
-            "last_modified",
-            "suppressed",
+        model = Genomic
+        fields = RecordSerializer.Meta.fields + [
+            "sample_id",
+            "run_name",
+            "collection_month",
+            "received_month",
+            "fasta_path",
+            "bam_path",
+            "sample_type",
         ]
 
 
-class MpxSerializer(PathogenSerializer):
-    sample_type = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("sample_type").choices
+class MetagenomicSerializer(RecordSerializer):
+    collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
+    received_month = fieldserializers.YearMonthField()
+
+    class Meta:
+        model = Metagenomic
+        fields = RecordSerializer.Meta.fields + [
+            "sample_id",
+            "run_name",
+            "collection_month",
+            "received_month",
+            "fastq_path",
+        ]
+
+
+class MpxSerializer(GenomicSerializer):
+    sample_type = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
     )
-    seq_platform = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("seq_platform").choices
+    seq_platform = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
     )
-    enrichment_method = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("enrichment_method").choices
+    enrichment_method = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
     )
-    seq_strategy = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("seq_strategy").choices
+    seq_strategy = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
     )
-    source_of_library = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("source_of_library").choices,
+    source_of_library = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
     )
-    country = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("country").choices,
+    country = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
     )
-    run_layout = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("run_layout").choices
+    run_layout = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
     )
-    patient_ageband = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("patient_ageband").choices,
+    patient_ageband = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    sample_site = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("sample_site").choices,
+    sample_site = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    ukhsa_region = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    travel_status = fieldserializers.ContextedSlugRelatedField(
+        slug_field="choice",
+        queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
 
     class Meta:
         model = Mpx
-        fields = PathogenSerializer.Meta.fields + [
-            "sample_type",
+        fields = GenomicSerializer.Meta.fields + [
             "seq_platform",
             "instrument_model",
             "enrichment_method",
@@ -153,72 +189,20 @@ class MpxSerializer(PathogenSerializer):
             "patient_ageband",
             "patient_id",
             "sample_site",
-        ]
-
-
-class PhaMpxSerializer(MpxSerializer):
-    ukhsa_region = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("ukhsa_region").choices,
-    )
-    travel_status = fieldserializers.LowerChoiceField(
-        choices=Mpx._meta.get_field("travel_status").choices,
-        required=False,
-        allow_null=True,
-    )
-
-    class Meta:
-        model = Mpx
-        fields = MpxSerializer.Meta.fields + [
             "ukhsa_region",
             "travel_status",
             "outer_postcode",
             "epi_cluster",
-        ]
-
-
-class AdminMpxSerializer(PhaMpxSerializer):
-    class Meta:
-        model = Mpx
-        fields = PhaMpxSerializer.Meta.fields + [
-            "id",
-            "created",
-            "last_modified",
-            "suppressed",
             "csv_template_version",
         ]
 
 
-serializer_map = {
-    Pathogen: {
-        "any": PathogenSerializer,
-        "admin": AdminPathogenSerializer,
-    },
-    Mpx: {
-        "any": MpxSerializer,
-        "pha": PhaMpxSerializer,
-        "admin": AdminMpxSerializer,
-    },
-}
-
-
-def get_serializer(model, user, group=None):
+def get_serializer(model):
     """
-    Function that returns the appropriate serializer for the given model, depending on the user's permissions.
+    Function that returns the appropriate serializer for the given model.
     """
-    if group == "admin":
-        if user.is_staff:
-            return serializer_map[model].get("admin", serializer_map[model]["any"])
-        else:
-            return "You do not have permission to view this."
-
-    elif group == "pha":
-        if user.is_staff or user.site.is_pha:
-            return serializer_map[model].get("pha", serializer_map[model]["any"])
-        else:
-            return "You do not have permission to view this."
-
-    elif group == "any" or group is None:
-        return serializer_map[model]["any"]
-
-    else:
-        return "Not found."
+    return {
+        Genomic: GenomicSerializer,
+        Metagenomic: MetagenomicSerializer,
+        Mpx: MpxSerializer,
+    }[model]

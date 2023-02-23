@@ -1,14 +1,14 @@
 from rest_framework import status
 from data.models import Covid
 from accounts.models import Site
-from data.filters import BASE_LOOKUPS, CHAR_LOOKUPS
-from utils.responses import METADBAPIResponse
+from data.filters import BASE_LOOKUPS, TEXT_LOOKUPS
+from utils.response import METADBAPIResponse
 from django.conf import settings
 from datetime import date
 from data.tests.utils import METADBTestCase, get_covid_data
 
 
-class TestGetPathogen(METADBTestCase):
+class TestGetGenomic(METADBTestCase):
     def setUp(self):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
@@ -62,7 +62,7 @@ class TestGetPathogen(METADBTestCase):
         response = self.client.get("/data/hello/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(
-            response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND}
+            response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]}
         )
 
     def test_get(self):
@@ -122,7 +122,7 @@ class TestGetPathogen(METADBTestCase):
         )
 
 
-class TestGetPathogenChoiceField(TestGetPathogen):
+class TestGetGenomicChoiceField(TestGetGenomic):
     def test_choice_field_exact(self):
         for value in ["SWAB", "SERUM"]:
             results = self.client_get_paginated(
@@ -192,7 +192,7 @@ class TestGetPathogenChoiceField(TestGetPathogen):
             self.assertEqualCids(results, internal)
 
     def test_choice_field_char_lookups(self):
-        for lookup in CHAR_LOOKUPS:
+        for lookup in TEXT_LOOKUPS:
             results = self.client_get_paginated(
                 "/data/covid/", data={f"sample_type__{lookup}": ["SWAB"]}
             )
@@ -218,7 +218,7 @@ class TestGetPathogenChoiceField(TestGetPathogen):
 
     def test_choice_field_non_choice_but_char_lookup_so_its_all_cool(self):
         for value in ["HELLO THERE", "SWA", "SER"]:
-            for lookup in CHAR_LOOKUPS:
+            for lookup in TEXT_LOOKUPS:
                 results = self.client_get_paginated(
                     "/data/covid/", data={f"sample_type__{lookup}": [value]}
                 )
@@ -226,7 +226,7 @@ class TestGetPathogenChoiceField(TestGetPathogen):
                 self.assertEqualCids(results, internal)
 
 
-class TestGetPathogenCharField(TestGetPathogen):
+class TestGetGenomicCharField(TestGetGenomic):
     def test_char_field_exact(self):
         for value in ["MN908947.3", "NC_045512", "hello", "goodbye"]:
             results = self.client_get_paginated(
@@ -296,7 +296,7 @@ class TestGetPathogenCharField(TestGetPathogen):
             self.assertEqualCids(results, internal)
 
     def test_char_field_char_lookups(self):
-        for lookup in CHAR_LOOKUPS:
+        for lookup in TEXT_LOOKUPS:
             results = self.client_get_paginated(
                 "/data/covid/", data={f"fasta_header__{lookup}": ["hello"]}
             )
@@ -304,7 +304,7 @@ class TestGetPathogenCharField(TestGetPathogen):
             self.assertEqualCids(results, internal)
 
 
-class TestGetPathogenYearMonthField(TestGetPathogen):
+class TestGetGenomicYearMonthField(TestGetGenomic):
     def test_yearmonth_field_exact(self):
         for value in ["2021-03", "2022-01", "2022-04", "2022-12"]:
             results = self.client_get_paginated(
@@ -424,7 +424,7 @@ class TestGetPathogenYearMonthField(TestGetPathogen):
                 )
 
 
-class TestGetPathogenDateField(TestGetPathogen):
+class TestGetGenomicDateField(TestGetGenomic):
     def setUp(self):
         super().setUp()
 
@@ -587,7 +587,7 @@ class TestGetPathogenDateField(TestGetPathogen):
                 )
 
 
-class TestGetPathogenBooleanField(TestGetPathogen):
+class TestGetGenomicBooleanField(TestGetGenomic):
     def test_boolean_field(self):
         for value in ["true", "True"]:
             results = self.client_get_paginated(

@@ -1,19 +1,19 @@
 from rest_framework import status
-from data.models import Covid, PathogenCode
+from data.models import Covid, Project
 from accounts.models import Site
 from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
-from utils.responses import METADBAPIResponse
+from utils.response import METADBAPIResponse
 import secrets
 import random
 
 
-class TestCreatePathogen(METADBTestCase):
+class TestCreateGenomic(METADBTestCase):
     def setUp(self):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
         )
-        self.covid = PathogenCode.objects.create(code="COVID")
+        self.covid = Project.objects.create(code="COVID")
         self.user = self.setup_admin_user("testuser", self.site.code)
 
         settings.CURSOR_PAGINATION_PAGE_SIZE = 20
@@ -64,7 +64,7 @@ class TestCreatePathogen(METADBTestCase):
             response = self.client.post("/data/hello/", data=x)
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
             self.assertEqual(
-                response.json()["errors"], {"hello": METADBAPIResponse.NOT_FOUND}
+                response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]}
             )
 
     def test_create(self):
@@ -187,9 +187,9 @@ class TestCreatePathogen(METADBTestCase):
             response = self.client.post("/data/covid/", data=x_)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_mismatch_pathogen_code(self):
+    def test_mismatch_project(self):
         for x in self.covid_data:
-            x["pathogen_code"] = "PATHOGEN"
+            x["project"] = "PATHOGEN"
             response = self.client.post("/data/covid/", data=x)
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             self.assertTrue(len(Covid.objects.all()) == 0)

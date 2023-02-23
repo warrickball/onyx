@@ -119,7 +119,7 @@ def get_covid_data(site):
     pathogen_dict = {
         "sample_id": sample_id,
         "run_name": run_name,
-        "pathogen_code": "COVID",
+        "project": "COVID",
         "site": site,
         "fasta_path": f"{sample_id}.{run_name}.fasta",
         "bam_path": f"{sample_id}.{run_name}.bam",

@@ -5,6 +5,7 @@ dependencies:
   - pip
   - pip:
     - gunicorn
+    - psycopg2-binary
     - django
     - djangorestframework
     - django-rest-knox
@@ -13,4 +14,3 @@ dependencies:
     - django-cursor-pagination
     - celery
     - requests
-    - pandas

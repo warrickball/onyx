@@ -1,6 +1,7 @@
 import sys
 import json
 import inspect
+import requests
 from getpass import getpass
 
 
@@ -60,6 +61,14 @@ def print_response(response, pretty_print=True, status_only=False):
         print(formatted_response)
     else:
         print(formatted_response, file=sys.stderr)
+
+
+def raise_for_status(response):
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        print_response(response)
+        raise e
 
 
 def get_input(field, password=False, type=None, required=True):

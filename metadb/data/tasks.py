@@ -1,32 +1,15 @@
 from django.utils import timezone
-from data.models import Mpx, Signal
+from data.models import Mpx
+from internal.models import Signal
+from utils.project import (
+    get_project_and_model,
+)
+from utils.permissions import get_fields_from_permissions
 from celery import shared_task
-from .serializers import MpxSerializer, PhaMpxSerializer
+from .serializers import MpxSerializer
 from cursor_pagination import CursorPaginator
 import csv
 import os
-
-
-# from utils.stats import calculate_fasta_stats
-# from data.models import FastaStatistics, Pathogen
-
-
-# @shared_task
-# def generate_fasta_statistics(cid, fasta_path):
-#     fasta_data = calculate_fasta_stats(fasta_path)
-#     metadata = Pathogen.objects.get(cid=cid)
-#     fasta = FastaStatistics.objects.create(metadata=metadata, **fasta_data)
-#     metadata.fasta_statistics = True
-#     metadata.save(update_fields=["fasta_statistics", "last_modified"])
-
-
-# @shared_task
-# def generate_bam_statistics(cid, bam_path):
-#     bam_data = calculate_fasta_stats(bam_path)
-#     metadata = Pathogen.objects.get(cid=cid)
-#     bam = BamStatistics.objects.create(metadata=metadata, **bam_data)
-#     metadata.bam_statistics = True
-#     metadata.save(update_fields=["bam_statistics", "last_modified"])
 
 
 def paginator(qs, cursor=None, page_size=5000):
@@ -58,19 +41,29 @@ def create_mpx_tables():
     temp_pha_mpx_file = f"{os.environ['METADB_PHA_MPX_TSV']}.temp"
     final_pha_mpx_file = os.environ["METADB_PHA_MPX_TSV"]
 
+    mpx_project, _ = get_project_and_model("mpx")
+    mpx_view_fields = get_fields_from_permissions(
+        mpx_project.view_group.permissions.all()  # type: ignore
+    )
+
+    mpxpha_project, _ = get_project_and_model("mpxpha")
+    mpxpha_view_fields = get_fields_from_permissions(
+        mpxpha_project.view_group.permissions.all()  # type: ignore
+    )
+
     with open(temp_mpx_file, "w") as temp_mpx, open(
         temp_pha_mpx_file, "w"
     ) as temp_pha_mpx:
         mpx_writer = csv.DictWriter(
             temp_mpx,
-            fieldnames=MpxSerializer.Meta.fields,
+            fieldnames=mpx_view_fields,
             delimiter="\t",
         )
         mpx_writer.writeheader()
 
         pha_mpx_writer = csv.DictWriter(
             temp_pha_mpx,
-            fieldnames=PhaMpxSerializer.Meta.fields,
+            fieldnames=mpxpha_view_fields,
             delimiter="\t",
         )
         pha_mpx_writer.writeheader()
@@ -80,10 +73,18 @@ def create_mpx_tables():
         while has_next:
             data = paginator(Mpx.objects.filter(suppressed=False), cursor=cursor)
 
-            mpx_serialized = MpxSerializer(data["objects"], many=True).data
+            mpx_serialized = MpxSerializer(
+                data["objects"],
+                many=True,
+                fields=mpx_view_fields,
+            ).data
             mpx_writer.writerows(mpx_serialized)
 
-            pha_mpx_serialized = PhaMpxSerializer(data["objects"], many=True).data
+            pha_mpx_serialized = MpxSerializer(
+                data["objects"],
+                many=True,
+                fields=mpxpha_view_fields,
+            ).data
             pha_mpx_writer.writerows(pha_mpx_serialized)
 
             cursor = data["cursor"]

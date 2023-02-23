@@ -5,7 +5,7 @@ from django.conf import settings
 from data.tests.utils import METADBTestCase, get_covid_data
 
 
-class TestGetPathogenCode(METADBTestCase):
+class TestGetProject(METADBTestCase):
     def setUp(self):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"

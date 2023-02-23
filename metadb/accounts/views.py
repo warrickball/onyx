@@ -9,7 +9,7 @@ from .serializers import (
     SiteWaitingUserSerializer,
     AdminWaitingUserSerializer,
 )
-from utils.responses import METADBAPIResponse
+from utils.response import METADBAPIResponse
 from utils.views import METADBAPIView, METADBCreateAPIView, METADBListAPIView
 from .permissions import (
     Any,
@@ -95,14 +95,14 @@ class SiteApproveView(METADBAPIView):
             user = User.objects.get(username=username)
         except User.DoesNotExist:
             return Response(
-                {username: METADBAPIResponse.NOT_FOUND},
+                {username: [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # Approve user
         user.is_site_approved = True
-        user.date_site_approved = datetime.now()
-        user.save(update_fields=["is_site_approved", "date_site_approved"])
+        user.when_site_approved = datetime.now()
+        user.save(update_fields=["is_site_approved", "when_site_approved"])
 
         return Response(
             {
@@ -126,14 +126,14 @@ class AdminApproveView(METADBAPIView):
             user = User.objects.get(username=username)
         except User.DoesNotExist:
             return Response(
-                {username: METADBAPIResponse.NOT_FOUND},
+                {username: [METADBAPIResponse.NOT_FOUND]},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # Approve target user
         user.is_admin_approved = True
-        user.date_admin_approved = datetime.now()
-        user.save(update_fields=["is_admin_approved", "date_admin_approved"])
+        user.when_admin_approved = datetime.now()
+        user.save(update_fields=["is_admin_approved", "when_admin_approved"])
 
         return Response(
             {
@@ -181,7 +181,7 @@ class AdminWaitingView(METADBListAPIView):
             User.objects.filter(is_active=True)
             .filter(is_site_approved=True)
             .filter(is_admin_approved=False)
-            .order_by("-date_site_approved")
+            .order_by("-when_site_approved")
         )
 
 

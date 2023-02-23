@@ -32,6 +32,7 @@ DEBUG = False
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
+# ADMINS = [(os.environ["METADB_ADMIN_NAME"], os.environ["METADB_ADMIN_EMAIL"])]
 
 # Application definition
 
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "knox",
     "django_filters",
+    "internal",
     "data",
     "accounts",
 ]
@@ -61,6 +63,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "internal.middleware.SaveRequest",
 ]
 
 ROOT_URLCONF = "metadb.urls"
@@ -162,8 +165,18 @@ REST_KNOX = {
     "TOKEN_LIMIT_PER_USER": None,
 }
 
-# Custom settings used in the project
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+}
+
 CURSOR_PAGINATION_PAGE_SIZE = 5000
-INTERNAL_SERVER_ERROR_LOG_FILE = os.environ["METADB_INTERNAL_SERVER_ERROR_LOG_FILE"]
-INTERNAL_SERVER_ERROR_LOG_FILE_MAX_BYTES = 10000000
-INTERNAL_SERVER_ERROR_LOG_FILE_NUM_BACKUPS = 5

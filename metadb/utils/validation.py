@@ -1,18 +1,5 @@
-from .responses import METADBAPIResponse
 from datetime import datetime
-
-
-def init_pathogen_queryset(pathogen_model, user):
-    """
-    Return an initial queryset of the provided `pathogen_model`.
-
-    If `user.is_staff = True`, returns all objects, otherwise only returns objects with `suppressed = False`.
-    """
-    if user.is_staff:
-        qs = pathogen_model.objects.all()
-    else:
-        qs = pathogen_model.objects.filter(suppressed=False)
-    return qs
+from utils.response import METADBAPIResponse
 
 
 def enforce_field_set(data, user_fields, accepted_fields, rejected_fields):
@@ -115,5 +102,5 @@ def enforce_yearmonth_non_future(errors, name, value):
     """
     Ensure yearmonth is not from the future.
     """
-    if value.year > datetime.now().year or value.month > datetime.now().month:
+    if value.year >= datetime.now().year and value.month > datetime.now().month:
         errors.setdefault(name, []).append("Yearmonth cannot be from the future.")

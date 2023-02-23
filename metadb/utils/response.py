@@ -7,18 +7,21 @@ class METADBAPIResponse:
     )
 
     def __init__(self):
-        self.errors = {}
-        self.warnings = {}
-        self.results = []
         self.next = None
         self.previous = None
+        self.errors = {}
+        self.results = []
 
     @property
     def data(self):
-        return {
-            "next": self.next,
-            "previous": self.previous,
+        d = {
             "errors": self.errors,
-            "warnings": self.warnings,
             "results": self.results,
         }
+        if self.next:
+            d["next"] = self.next
+
+        if self.previous:
+            d["previous"] = self.previous
+
+        return d

@@ -1,7 +1,8 @@
 from rest_framework import permissions, exceptions
-from data.models import Pathogen
+from data.models import Record
 from accounts.models import User
-from utils.functions import init_pathogen_queryset
+from utils.project import init_project_queryset
+from utils.response import METADBAPIResponse
 
 
 class AllowAny(permissions.BasePermission):
@@ -84,20 +85,6 @@ class IsActiveSite(permissions.BasePermission):
         )
 
 
-class IsPHAMember(permissions.BasePermission):
-    """
-    Allows access only to users who are a member of a Public Health Agency.
-    """
-
-    message = "Your site would need to be a Public Health Agency."
-
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and getattr(getattr(request.user, "site", False), "is_pha", False)
-        )
-
-
 class IsAdminUser(permissions.BasePermission):
     """
     Allows access only to admin users.
@@ -118,9 +105,9 @@ class IsSameSiteAsCID(permissions.BasePermission):
         cid = view.kwargs["cid"]
 
         try:
-            obj = init_pathogen_queryset(Pathogen, request.user).get(cid=cid)
-        except Pathogen.DoesNotExist:
-            raise exceptions.NotFound({cid: "Not found."})
+            obj = init_project_queryset(Record, request.user).get(cid=cid)
+        except Record.DoesNotExist:
+            raise exceptions.NotFound({cid: [METADBAPIResponse.NOT_FOUND]})
 
         self.message = f"You need to be from site {obj.site.code}"
 
@@ -139,7 +126,7 @@ class IsSameSiteAsUser(permissions.BasePermission):
         try:
             obj = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise exceptions.NotFound({username: "Not found."})
+            raise exceptions.NotFound({username: [METADBAPIResponse.NOT_FOUND]})
 
         self.message = f"You need to be from site {obj.site.code}"
 

@@ -2,9 +2,48 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("pathogens/", views.PathogenCodeView.as_view()),
-    path("<pathogen_code>/query/", views.QueryPathogenView.as_view()),
-    path("<pathogen_code>/", views.CreateGetPathogenView.as_view()),
-    path("<pathogen_code>/<cid>/delete/", views.DeletePathogenView.as_view()),
-    path("<pathogen_code>/<cid>/", views.UpdateSuppressPathogenView.as_view()),
+    path(
+        "create/<project_code>/",
+        views.CreateRecordView.as_view(),
+    ),
+    path(
+        "testcreate/<project_code>/",
+        views.CreateRecordView.as_view(),
+        kwargs={"test": True},
+    ),
+    path(
+        "get/<project_code>/",
+        views.GetRecordView.as_view(),
+    ),
+    path(
+        "query/<project_code>/",
+        views.QueryRecordView.as_view(),
+    ),
+    path(
+        "update/<project_code>/<cid>/",
+        views.UpdateRecordView.as_view(),
+    ),
+    path(
+        "testupdate/<project_code>/<cid>/",
+        views.UpdateRecordView.as_view(),
+        kwargs={"test": True},
+    ),
+    path(
+        "suppress/<project_code>/<cid>/",
+        views.SuppressRecordView.as_view(),
+    ),
+    path(
+        "testsuppress/<project_code>/<cid>/",
+        views.SuppressRecordView.as_view(),
+        kwargs={"test": True},
+    ),
+    path(
+        "delete/<project_code>/<cid>/",
+        views.DeleteRecordView.as_view(),
+    ),
+    path(
+        "testdelete/<project_code>/<cid>/",
+        views.DeleteRecordView.as_view(),
+        kwargs={"test": True},
+    ),
 ]

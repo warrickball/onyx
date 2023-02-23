@@ -1,11 +1,13 @@
 import os
+import sys
+import csv
 import stat
 import json
+import requests
 import argparse
-import pandas as pd
-from metadbclient import version, utils, settings
-from metadbclient.config import Config
-from metadbclient.api import Client
+from metadb import version, utils, settings
+from metadb.config import Config
+from metadb.api import Client
 
 
 def register():
@@ -92,18 +94,6 @@ def logoutall(username, env_password):
 
     response = client.logoutall()
     utils.print_response(response, status_only=True)
-
-
-def list_pathogen_codes(username, env_password):
-    """
-    Get the current pathogens within the database.
-    """
-    config = Config()
-    client = Client(config)
-    client.continue_session(username=username, env_password=env_password)
-
-    pathogen_codes = client.list_pathogen_codes()
-    utils.print_response(pathogen_codes)
 
 
 class ConfigCommands:
@@ -247,15 +237,17 @@ class ConfigCommands:
             print(user)
 
 
-class SiteCommands:
-    """
-    Site specific commands.
-    """
-
+class SessionRequired:
     def __init__(self, username, env_password):
         config = Config()
         self.client = Client(config)
         self.client.continue_session(username=username, env_password=env_password)
+
+
+class SiteCommands(SessionRequired):
+    """
+    Site specific commands.
+    """
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -303,15 +295,10 @@ class SiteCommands:
         utils.print_response(users)
 
 
-class AdminCommands:
+class AdminCommands(SessionRequired):
     """
     Admin specific commands.
     """
-
-    def __init__(self, username, env_password):
-        config = Config()
-        self.client = Client(config)
-        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
@@ -359,22 +346,17 @@ class AdminCommands:
         utils.print_response(users)
 
 
-class CreateCommands:
+class CreateCommands(SessionRequired):
     """
     Commands for creating.
     """
 
-    def __init__(self, username, env_password):
-        config = Config()
-        self.client = Client(config)
-        self.client.continue_session(username=username, env_password=env_password)
-
     @classmethod
     def add_commands(cls, command, user_parser):
         create_parser = command.add_parser(
-            "create", parents=[user_parser], help="Upload pathogen metadata to metadb."
+            "create", parents=[user_parser], help="Upload metadata to metadb."
         )
-        create_parser.add_argument("pathogen_code")
+        create_parser.add_argument("project")
         create_parser.add_argument(
             "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
         )
@@ -382,104 +364,93 @@ class CreateCommands:
         csv_create_parser = command.add_parser(
             "csv-create",
             parents=[user_parser],
-            help="Upload pathogen metadata to metadb via a .csv file.",
+            help="Upload metadata to metadb via a .csv file.",
         )
-        csv_create_parser.add_argument("pathogen_code")
+        csv_create_parser.add_argument("project")
         csv_create_parser.add_argument("csv")
 
         tsv_create_parser = command.add_parser(
             "tsv-create",
             parents=[user_parser],
-            help="Upload pathogen metadata to metadb via a .tsv file.",
+            help="Upload metadata to metadb via a .tsv file.",
         )
-        tsv_create_parser.add_argument("pathogen_code")
+        tsv_create_parser.add_argument("project")
         tsv_create_parser.add_argument("tsv")
 
-    def create(self, pathogen_code, fields):
+    def create(self, project, fields):
         """
-        Post a new pathogen record to the database.
+        Post a new record to the database.
         """
         fields = utils.construct_unique_fields_dict(fields)
-        creation = self.client.create(pathogen_code, fields)
+        creation = self.client.create(project, fields)
         utils.print_response(creation)
 
-    def csv_create(self, pathogen_code, csv_path):
+    def csv_create(self, project, csv_path):
         """
-        Post new pathogen records to the database, using a csv.
+        Post new records to the database, using a csv.
         """
-        creations = self.client.csv_create(pathogen_code, csv_path)
+        creations = self.client.csv_create(project, csv_path)
         utils.execute_uploads(creations)
 
-    def tsv_create(self, pathogen_code, tsv_path):
+    def tsv_create(self, project, tsv_path):
         """
-        Post new pathogen records to the database, using a tsv.
+        Post new records to the database, using a tsv.
         """
-        creations = self.client.csv_create(pathogen_code, tsv_path, delimiter="\t")
+        creations = self.client.csv_create(project, tsv_path, delimiter="\t")
         utils.execute_uploads(creations)
 
 
-class GetCommands:
+class GetCommands(SessionRequired):
     """
     Commands for getting.
     """
 
-    def __init__(self, username, env_password):
-        config = Config()
-        self.client = Client(config)
-        self.client.continue_session(username=username, env_password=env_password)
-
     @classmethod
     def add_commands(cls, command, user_parser):
         get_parser = command.add_parser(
-            "get", parents=[user_parser], help="Get pathogen metadata from metadb."
+            "get", parents=[user_parser], help="Get metadata from metadb."
         )
-        get_parser.add_argument("pathogen_code")
+        get_parser.add_argument("project")
         get_parser.add_argument("cid", nargs="?", help="optional")
         get_parser.add_argument(
             "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
         )
 
-    def get(self, pathogen_code, cid, fields):
+    def get(self, project, cid, fields):
         """
-        Get pathogen records from the database.
+        Get records from the database.
         """
         fields = utils.construct_fields_dict(fields)
+        results = self.client.get(project, cid, fields)
 
-        results = self.client.get(pathogen_code, cid, fields)
+        try:
+            result = next(results, None)
+            if result:
+                writer = csv.DictWriter(
+                    sys.stdout, delimiter="\t", fieldnames=result.keys()
+                )
+                writer.writeheader()
+                writer.writerow(result)
 
-        result = next(results)
-        if result.ok:
-            table = pd.json_normalize(result.json()["results"])
-            print(table.to_csv(index=False, sep="\t"), end="")
-        else:
-            utils.print_response(result)
-
-        for result in results:
-            if result.ok:
-                table = pd.json_normalize(result.json()["results"])
-                print(table.to_csv(index=False, sep="\t", header=False), end="")
-            else:
-                utils.print_response(result)
+                for result in results:
+                    writer.writerow(result)
+        except requests.HTTPError:
+            pass
 
 
-class UpdateCommands:
+class UpdateCommands(SessionRequired):
     """
     Commands for updating.
     """
-
-    def __init__(self, username, env_password):
-        config = Config()
-        self.client = Client(config)
-        self.client.continue_session(username=username, env_password=env_password)
 
     @classmethod
     def add_commands(cls, command, user_parser):
         update_parser = command.add_parser(
             "update",
             parents=[user_parser],
-            help="Update pathogen metadata within metadb.",
+            help="Update metadata within metadb.",
         )
-        update_parser.add_argument("pathogen_code")
+        update_parser.add_argument("project")
         update_parser.add_argument("cid")
         update_parser.add_argument(
             "-f", "--field", nargs=2, action="append", metavar=("FIELD", "VALUE")
@@ -488,99 +459,146 @@ class UpdateCommands:
         csv_update_parser = command.add_parser(
             "csv-update",
             parents=[user_parser],
-            help="Update pathogen metadata within metadb via a .csv file.",
+            help="Update metadata within metadb via a .csv file.",
         )
-        csv_update_parser.add_argument("pathogen_code")
+        csv_update_parser.add_argument("project")
         csv_update_parser.add_argument("csv")
 
         tsv_update_parser = command.add_parser(
             "tsv-update",
             parents=[user_parser],
-            help="Update pathogen metadata within metadb via a .tsv file.",
+            help="Update metadata within metadb via a .tsv file.",
         )
-        tsv_update_parser.add_argument("pathogen_code")
+        tsv_update_parser.add_argument("project")
         tsv_update_parser.add_argument("tsv")
 
-    def update(self, pathogen_code, cid, fields):
+    def update(self, project, cid, fields):
         """
-        Update a pathogen record in the database.
+        Update a record in the database.
         """
         fields = utils.construct_unique_fields_dict(fields)
-        update = self.client.update(pathogen_code, cid, fields)
+        update = self.client.update(project, cid, fields)
         utils.print_response(update)
 
-    def csv_update(self, pathogen_code, csv_path):
+    def csv_update(self, project, csv_path):
         """
-        Update pathogen records in the database, using a csv.
+        Update records in the database, using a csv.
         """
-        updates = self.client.csv_update(pathogen_code, csv_path)
+        updates = self.client.csv_update(project, csv_path)
         utils.execute_uploads(updates)
 
-    def tsv_update(self, pathogen_code, tsv_path):
+    def tsv_update(self, project, tsv_path):
         """
-        Update pathogen records in the database, using a tsv.
+        Update records in the database, using a tsv.
         """
-        updates = self.client.csv_update(pathogen_code, tsv_path, delimiter="\t")
+        updates = self.client.csv_update(project, tsv_path, delimiter="\t")
         utils.execute_uploads(updates)
 
 
-class SuppressCommands:
+class SuppressCommands(SessionRequired):
     """
     Commands for suppressing (soft deleting).
     """
 
-    def __init__(self, username, env_password):
-        config = Config()
-        self.client = Client(config)
-        self.client.continue_session(username=username, env_password=env_password)
-
     @classmethod
     def add_commands(cls, command, user_parser):
-
         suppress_parser = command.add_parser(
             "suppress",
             parents=[user_parser],
-            help="Suppress pathogen metadata within metadb.",
+            help="Suppress metadata within metadb.",
         )
-        suppress_parser.add_argument("pathogen_code")
+        suppress_parser.add_argument("project")
         suppress_parser.add_argument("cid")
 
         csv_suppress_parser = command.add_parser(
             "csv-suppress",
             parents=[user_parser],
-            help="Suppress pathogen metadata within metadb via a .csv file.",
+            help="Suppress metadata within metadb via a .csv file.",
         )
-        csv_suppress_parser.add_argument("pathogen_code")
+        csv_suppress_parser.add_argument("project")
         csv_suppress_parser.add_argument("csv")
 
         tsv_suppress_parser = command.add_parser(
             "tsv-suppress",
             parents=[user_parser],
-            help="Suppress pathogen metadata within metadb via a .tsv file.",
+            help="Suppress metadata within metadb via a .tsv file.",
         )
-        tsv_suppress_parser.add_argument("pathogen_code")
+        tsv_suppress_parser.add_argument("project")
         tsv_suppress_parser.add_argument("tsv")
 
-    def suppress(self, pathogen_code, cid):
+    def suppress(self, project, cid):
         """
-        Suppress a pathogen record in the database.
+        Suppress a record in the database.
         """
-        suppression = self.client.suppress(pathogen_code, cid)
+        suppression = self.client.suppress(project, cid)
         utils.print_response(suppression)
 
-    def csv_suppress(self, pathogen_code, csv_path):
+    def csv_suppress(self, project, csv_path):
         """
-        Suppress pathogen records in the database, using a csv.
+        Suppress records in the database, using a csv.
         """
-        suppressions = self.client.csv_suppress(pathogen_code, csv_path)
+        suppressions = self.client.csv_suppress(project, csv_path)
         utils.execute_uploads(suppressions)
 
-    def tsv_suppress(self, pathogen_code, tsv_path):
+    def tsv_suppress(self, project, tsv_path):
         """
-        Suppress pathogen records in the database, using a tsv.
+        Suppress records in the database, using a tsv.
         """
-        suppressions = self.client.csv_suppress(pathogen_code, tsv_path, delimiter="\t")
+        suppressions = self.client.csv_suppress(project, tsv_path, delimiter="\t")
         utils.execute_uploads(suppressions)
+
+
+class DeleteCommands(SessionRequired):
+    """
+    Commands for deleting.
+    """
+
+    @classmethod
+    def add_commands(cls, command, user_parser):
+        delete_parser = command.add_parser(
+            "delete",
+            parents=[user_parser],
+            help="Delete metadata within metadb.",
+        )
+        delete_parser.add_argument("project")
+        delete_parser.add_argument("cid")
+
+        csv_delete_parser = command.add_parser(
+            "csv-delete",
+            parents=[user_parser],
+            help="Delete metadata within metadb via a .csv file.",
+        )
+        csv_delete_parser.add_argument("project")
+        csv_delete_parser.add_argument("csv")
+
+        tsv_delete_parser = command.add_parser(
+            "tsv-delete",
+            parents=[user_parser],
+            help="Delete metadata within metadb via a .tsv file.",
+        )
+        tsv_delete_parser.add_argument("project")
+        tsv_delete_parser.add_argument("tsv")
+
+    def delete(self, project, cid):
+        """
+        Delete a record in the database.
+        """
+        deletion = self.client.delete(project, cid)
+        utils.print_response(deletion)
+
+    def csv_delete(self, project, csv_path):
+        """
+        Delete records in the database, using a csv.
+        """
+        deletions = self.client.csv_delete(project, csv_path)
+        utils.execute_uploads(deletions)
+
+    def tsv_delete(self, project, tsv_path):
+        """
+        Delete records in the database, using a tsv.
+        """
+        deletions = self.client.csv_delete(project, tsv_path, delimiter="\t")
+        utils.execute_uploads(deletions)
 
 
 def run(args):
@@ -647,49 +665,58 @@ def run(args):
     elif args.command == "logoutall":
         logoutall(args.user, args.env_password)
 
-    elif args.command == "list-pathogens":
-        list_pathogen_codes(args.user, args.env_password)
-
     elif args.command in ["create", "csv-create", "tsv-create"]:
         create_commands = CreateCommands(args.user, args.env_password)
 
         if args.command == "create":
-            create_commands.create(args.pathogen_code, args.field)
+            create_commands.create(args.project, args.field)
 
         elif args.command == "csv-create":
-            create_commands.csv_create(args.pathogen_code, args.csv)
+            create_commands.csv_create(args.project, args.csv)
 
         elif args.command == "tsv-create":
-            create_commands.tsv_create(args.pathogen_code, args.tsv)
+            create_commands.tsv_create(args.project, args.tsv)
 
     elif args.command == "get":
         get_commands = GetCommands(args.user, args.env_password)
 
-        get_commands.get(args.pathogen_code, args.cid, args.field)
+        get_commands.get(args.project, args.cid, args.field)
 
     elif args.command in ["update", "csv-update", "tsv-update"]:
         update_commands = UpdateCommands(args.user, args.env_password)
 
         if args.command == "update":
-            update_commands.update(args.pathogen_code, args.cid, args.field)
+            update_commands.update(args.project, args.cid, args.field)
 
         elif args.command == "csv-update":
-            update_commands.csv_update(args.pathogen_code, args.csv)
+            update_commands.csv_update(args.project, args.csv)
 
         elif args.command == "tsv-update":
-            update_commands.tsv_update(args.pathogen_code, args.tsv)
+            update_commands.tsv_update(args.project, args.tsv)
 
     elif args.command in ["suppress", "csv-suppress", "tsv-suppress"]:
         suppress_commands = SuppressCommands(args.user, args.env_password)
 
         if args.command == "suppress":
-            suppress_commands.suppress(args.pathogen_code, args.cid)
+            suppress_commands.suppress(args.project, args.cid)
 
         elif args.command == "csv-suppress":
-            suppress_commands.csv_suppress(args.pathogen_code, args.csv)
+            suppress_commands.csv_suppress(args.project, args.csv)
 
         elif args.command == "tsv-suppress":
-            suppress_commands.tsv_suppress(args.pathogen_code, args.tsv)
+            suppress_commands.tsv_suppress(args.project, args.tsv)
+
+    elif args.command in ["delete", "csv-delete", "tsv-delete"]:
+        suppress_commands = DeleteCommands(args.user, args.env_password)
+
+        if args.command == "delete":
+            suppress_commands.delete(args.project, args.cid)
+
+        elif args.command == "csv-delete":
+            suppress_commands.csv_delete(args.project, args.csv)
+
+        elif args.command == "tsv-delete":
+            suppress_commands.tsv_delete(args.project, args.tsv)
 
 
 def get_args():
@@ -743,12 +770,6 @@ def get_args():
         help="Log out of metadb everywhere.",
     )
 
-    pathogen_codes_parser = command.add_parser(
-        "list-pathogens",
-        parents=[user_parser],
-        help="List all pathogens in metadb.",
-    )
-
     CreateCommands.add_commands(command, user_parser=user_parser)
 
     GetCommands.add_commands(command, user_parser=user_parser)
@@ -756,6 +777,8 @@ def get_args():
     UpdateCommands.add_commands(command, user_parser=user_parser)
 
     SuppressCommands.add_commands(command, user_parser=user_parser)
+
+    DeleteCommands.add_commands(command, user_parser=user_parser)
 
     args = parser.parse_args()
 
