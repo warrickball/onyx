@@ -3,12 +3,8 @@ from .models import User
 from django.core.exceptions import ValidationError
 import django.contrib.auth.password_validation as validators
 
-# from utils import fieldserializers
-
 
 class UserSerializer(serializers.ModelSerializer):
-    # username = fieldserializers.LowerCharField() # TODO: understand why having validators here wiped validators on model
-    # email = fieldserializers.LowerCharField()
     password = serializers.CharField(write_only=True)
 
     def create(self, validated_data):

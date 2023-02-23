@@ -2,7 +2,6 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import validate_email, MinLengthValidator
-from model_utils.fields import MonitorField  # TODO
 from utils.fields import LowerCharField
 
 
