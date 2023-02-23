@@ -6,5 +6,5 @@ class DataConfig(AppConfig):
     name = "data"
 
     def ready(self):
-        import data.signals  # TODO understand
+        import data.signals
         import metadb.celery

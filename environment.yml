@@ -10,7 +10,6 @@ dependencies:
     - djangorestframework
     - django-rest-knox
     - django-filter
-    - django-model-utils
     - django-cursor-pagination
     - celery
     - requests
