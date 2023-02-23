@@ -8,7 +8,7 @@ import secrets
 import os
 
 
-class TestUpdatePathogen(METADBTestCase):
+class TestUpdateGenomic(METADBTestCase):
     def setUp(self):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"

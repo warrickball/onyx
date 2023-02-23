@@ -1,5 +1,5 @@
 from rest_framework.test import APITestCase
-from data.models import Pathogen, Covid, Mpx
+from data.models import Genomic, Covid, Mpx
 from data.views import (
     get_pathogen_model,
     enforce_optional_value_groups,
@@ -8,9 +8,9 @@ from data.views import (
 from utils.response import METADBAPIResponse
 
 
-class TestGetPathogenModel(APITestCase):
+class TestGetGenomicModel(APITestCase):
     def test_get_pathogen_model(self):
-        self.assertEqual(get_pathogen_model("pathogen", accept_base=True), Pathogen)
+        self.assertEqual(get_pathogen_model("pathogen", accept_base=True), Genomic)
         self.assertEqual(get_pathogen_model("pathogen"), None)
         self.assertEqual(get_pathogen_model("covid"), Covid)
         self.assertEqual(get_pathogen_model("Covid"), Covid)
@@ -21,7 +21,7 @@ class TestGetPathogenModel(APITestCase):
 
 class TestEnforceOptionalValueGroups(APITestCase):
     def setUp(self):
-        self.groups = list(Pathogen.OPTIONAL_VALUE_GROUPS)
+        self.groups = list(Genomic.OPTIONAL_VALUE_GROUPS)
 
     def test_enforce_optional_value_groups_ok(self):
         data = {"collection_month": "2022-01", "received_month": "2022-03"}

@@ -7,7 +7,7 @@ from utils.response import METADBAPIResponse
 import os
 
 
-class TestDeletePathogen(METADBTestCase):
+class TestDeleteGenomic(METADBTestCase):
     def setUp(self):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"

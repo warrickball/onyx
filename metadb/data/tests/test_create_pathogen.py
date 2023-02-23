@@ -8,7 +8,7 @@ import secrets
 import random
 
 
-class TestCreatePathogen(METADBTestCase):
+class TestCreateGenomic(METADBTestCase):
     def setUp(self):
         self.site = Site.objects.create(
             code="DEPTSTUFF", name="Department of Important Stuff"
