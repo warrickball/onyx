@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
-from utils.fields import YearMonthField
+from utils.fields import YearMonthField, UpperCharField
 from utils.permissions import generate_permissions
 from accounts.models import Site, User
 from internal.models import Choice
@@ -29,7 +29,7 @@ class Record(models.Model):
     suppressed = models.BooleanField(default=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
-    cid = models.CharField(default=generate_cid, max_length=12, unique=True)
+    cid = UpperCharField(default=generate_cid, max_length=12, unique=True)
     published_date = models.DateField(auto_now_add=True)
 
     class Meta:

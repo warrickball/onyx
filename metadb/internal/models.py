@@ -4,7 +4,7 @@ from django.db.models.fields.related_lookups import RelatedLookupMixin
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from accounts.models import User
-from utils.fields import LowerCharField
+from utils.fields import LowerCharField, UpperCharField
 
 
 class NotEqual(models.Lookup):
@@ -96,7 +96,7 @@ class Request(models.Model):
 
 class History(models.Model):
     record = models.ForeignKey("data.Record", on_delete=models.SET_NULL, null=True)
-    cid = models.CharField(max_length=12)
+    cid = UpperCharField(max_length=12)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     action = LowerCharField(
         max_length=10,

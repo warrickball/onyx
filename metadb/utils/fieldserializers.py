@@ -29,12 +29,6 @@ class YearMonthField(serializers.Field):
         return year + "-" + month
 
 
-class LowerCharField(serializers.CharField):
-    def to_internal_value(self, data):
-        data = str(data).lower()
-        return super().to_internal_value(data)
-
-
 class ContextedSlugRelatedField(serializers.RelatedField):
     """
     A read-write field that represents the target of the relationship

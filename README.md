@@ -1,4 +1,27 @@
 # `metadb`
+```
+$ metadb -h
+usage: metadb [-h] [-v] {command} ...
+
+positional arguments:
+  {command}
+    config       Config-specific commands.
+    site         Site-specific commands.
+    admin        Admin-specific commands.
+    register     Register a new user in metadb.
+    login        Log in to metadb.
+    logout       Log out of metadb.
+    logoutall    Log out of metadb everywhere.
+    create       Upload metadata to metadb.
+    get          Get metadata from metadb.
+    update       Update metadata within metadb.
+    suppress     Suppress metadata within metadb.
+    delete       Delete metadata within metadb.
+
+options:
+  -h, --help     show this help message and exit
+  -v, --version  Client version number.
+```
 
 ## Create a config
 ```
@@ -12,8 +35,8 @@ $ metadb register
 ## Upload data
 ```
 $ metadb create <project> --field <name> <value> --field <name> <value> ...
-$ metadb csv-create <project> <csv>
-$ metadb tsv-create <project> <tsv>
+$ metadb create <project> --csv <csv>
+$ metadb create <project> --tsv <tsv>
 ```
 
 ## Retrieve data
@@ -22,7 +45,7 @@ $ metadb get <project> <cid>
 $ metadb get <project> --field <name> <value> --field <name> <value> ...
 ```
 
-#### Table of lookups
+#### Supported lookups
 
 | Lookup            | Numeric | Text | Date (YYYY-MM-DD) | Date (YYYY-MM) | True/False |
 | ----------------- | :-----: | :--: | :---------------: | :------------: | :--------: |
@@ -66,13 +89,20 @@ $ metadb get mpx --field published_date__iso_week__range 33,37 --field published
 ## Update data
 ```
 $ metadb update <project> <cid> --field <name> <value> --field <name> <value> ...
-$ metadb csv-update <project> <CSV>
-$ metadb tsv-update <project> <TSV>
+$ metadb update <project> --csv <csv>
+$ metadb update <project> --tsv <tsv>
 ```
 
 ## Suppress data
 ```
 $ metadb suppress <project> <cid>
-$ metadb csv-suppress <project> <CSV>
-$ metadb tsv-suppress <project> <TSV>
+$ metadb suppress <project> --csv <csv>
+$ metadb suppress <project> --tsv <tsv>
+```
+
+## Delete data
+```
+$ metadb delete <project> <cid>
+$ metadb delete <project> --csv <csv>
+$ metadb delete <project> --tsv <tsv>
 ```
