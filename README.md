@@ -33,20 +33,115 @@ $ metadb register
 ```
 
 ## Upload data
+#### Create a single record from name/value pairs
 ```
 $ metadb create <project> --field <name> <value> --field <name> <value> ...
+```
+```python
+from metadb import Session
+
+with Session() as client:
+    # Create a single record
+    response = client.create(
+        "project",
+        fields={
+            "name1": "value1",
+            "name2": "value2",
+            # ...
+        },
+    )
+
+    # Print the response
+    print(response)
+```
+#### Create multiple records from a csv/tsv
+```
 $ metadb create <project> --csv <csv>
 $ metadb create <project> --tsv <tsv>
 ```
+```python
+from metadb import Session
+
+with Session() as client:
+    # Create from a csv of records
+    responses = client.csv_create(
+        "project",
+        csv_path="/path/to/file.csv",
+        # delimiter="\t", # For uploading from a tsv
+    )
+
+    # Iterating through the responses triggers the uploads
+    for response in responses:
+        print(response)
+```
 
 ## Retrieve data
+#### The `get` endpoint
 ```
 $ metadb get <project> <cid>
 $ metadb get <project> --field <name> <value> --field <name> <value> ...
 ```
+More CLI examples:
+```
+$ metadb get <project> C-123456
+$ metadb get <project> --field sample_type__in swab,serum
+$ metadb get <project> --field collection_month__range 2022-03,2022-07
+$ metadb get <project> --field received_month__isnull true
+$ metadb get <project> --field published_date__iso_week__range 33,37 --field published_date__iso_year 2022
+```
+```python
+from metadb import Session
+  # Retrieve all results matching ALL of the field requirements
+  with Session() as client:
+      results = client.get(
+          "project",
+          fields={
+              "name1" : "value1",
+              "name2" : "value2",
+              "name3__startswith" : "value3",
+              # ...
+          }
+      )
+  
+  # Display the results
+  # These are dictionaries representing records, not response objects
+  for result in results:
+      print(result)
+```
 
-#### Supported lookups
+#### The `query` endpoint
+```python
+from metadb import Session, Field
 
+with Session() as client:
+    # The python bitwise operators can be used in a query.
+    # These are:
+    # AND: &
+    # OR:  |
+    # XOR: ^
+    # NOT: ~
+
+    # Example query:
+    # This query is asking for all records that:
+    # Do NOT have a sample_type of 'swab', AND:
+    # - Have a collection_month between Feb-Mar 2022
+    # - OR have a collection_month between Jun-Sept 2022
+    results = client.query(
+        "project",
+        query=(~Field(sample_type="swab"))
+        & (
+            Field(collection_month__range=["2022-02", "2022-03"])
+            | Field(collection_month__range=["2022-06", "2022-09"])
+        ),
+    )
+
+    # Display the results
+    # These are dictionaries representing records, not response objects
+    for result in results:
+        print(result)
+```
+
+#### Supported lookups for `get` and `query`
 | Lookup            | Numeric | Text | Date (YYYY-MM-DD) | Date (YYYY-MM) | True/False |
 | ----------------- | :-----: | :--: | :---------------: | :------------: | :--------: |
 | `exact`           | ✓       | ✓    | ✓                 | ✓              | ✓          |
@@ -77,32 +172,54 @@ $ metadb get <project> --field <name> <value> --field <name> <value> ...
 | `iso_week__in`    |         |      | ✓                 |                |            |
 | `iso_week__range` |         |      | ✓                 |                |            |
 
-#### Examples
-```
-$ metadb get mpx C-123456
-$ metadb get mpx --field sample_type__in swab,serum
-$ metadb get mpx --field collection_month__range 2022-03,2022-07
-$ metadb get mpx --field received_month__isnull true
-$ metadb get mpx --field published_date__iso_week__range 33,37 --field published_date__iso_year 2022
-```
+Most of these lookups (excluding `ne`, which is a custom lookup meaning `not equal`) correspond directly to Django's built-in 'field lookups'. More information on what each lookup means can be found at: https://docs.djangoproject.com/en/4.1/ref/models/querysets/#field-lookups
 
 ## Update data
+#### Update a single record from name/value pairs
 ```
 $ metadb update <project> <cid> --field <name> <value> --field <name> <value> ...
+```
+```python
+from metadb import Session
+
+with Session() as client:
+    response = client.update(
+        "project",
+        "cid",
+        fields={
+            "name1" : "value1",
+            "name2" : "value2",
+            # ...
+        }
+    )
+
+    # Print the response
+    print(response)
+```
+#### Update multiple records from a csv/tsv
+```
 $ metadb update <project> --csv <csv>
 $ metadb update <project> --tsv <tsv>
 ```
 
 ## Suppress data
+#### Suppress a single record
 ```
 $ metadb suppress <project> <cid>
+```
+#### Suppress multiple records from a csv/tsv
+```
 $ metadb suppress <project> --csv <csv>
 $ metadb suppress <project> --tsv <tsv>
 ```
 
 ## Delete data
+#### Delete a single record
 ```
 $ metadb delete <project> <cid>
+```
+#### Delete multiple records from a csv/tsv
+```
 $ metadb delete <project> --csv <csv>
 $ metadb delete <project> --tsv <tsv>
 ```
