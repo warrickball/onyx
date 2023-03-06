@@ -119,7 +119,7 @@ with Session() as client:
         print(result)
 ```
 
-#### The `query` endpoint
+#### The `query` endpoint 
 ```python
 from metadb import Session, Field
 
