@@ -34,6 +34,7 @@ from .serializers import get_serializer
 from internal.models import History
 
 
+# TODO: Not using view fields on create means out of scope (e.g. mpxpha) fields get stamped away (e.g. on mpx)
 class CreateRecordView(METADBAPIView):
     permission_classes = Admin
 
