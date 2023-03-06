@@ -27,6 +27,7 @@ options:
 ```
 $ metadb config create
 ```
+
 ## Register a user
 ```
 $ metadb register
@@ -54,6 +55,7 @@ with Session() as client:
     # Print the response
     print(response)
 ```
+
 #### Create multiple records from a csv/tsv
 ```
 $ metadb create <project> --csv <csv>
@@ -79,34 +81,39 @@ with Session() as client:
 #### The `get` endpoint
 ```
 $ metadb get <project> <cid>
-$ metadb get <project> --field <name> <value> --field <name> <value> ...
 ```
-More CLI examples:
+```python
+with Session() as client:
+    result = client.get("project", "cid")
+
+    # Display the result
+    # This is a dictionary representing a record, not a response object
+    print(result)
 ```
-$ metadb get <project> C-123456
-$ metadb get <project> --field sample_type__in swab,serum
-$ metadb get <project> --field collection_month__range 2022-03,2022-07
-$ metadb get <project> --field received_month__isnull true
-$ metadb get <project> --field published_date__iso_week__range 33,37 --field published_date__iso_year 2022
+
+#### The `filter` endpoint
+```
+$ metadb filter <project> --field <name> <value> --field <name> <value> ...
 ```
 ```python
 from metadb import Session
-  # Retrieve all results matching ALL of the field requirements
-  with Session() as client:
-      results = client.get(
-          "project",
-          fields={
-              "name1" : "value1",
-              "name2" : "value2",
-              "name3__startswith" : "value3",
-              # ...
-          }
-      )
-  
-  # Display the results
-  # These are dictionaries representing records, not response objects
-  for result in results:
-      print(result)
+# Retrieve all results matching ALL of the field requirements
+with Session() as client:
+    results = client.filter(
+        "project",
+        fields={
+            "name1" : "value1",
+            "name2" : "value2",
+            "name3__startswith" : "value3",
+            "name4__range" : ["value4", "value5"],
+            # ...
+        }
+    )
+
+    # Display the results
+    # These are dictionaries representing records, not response objects
+    for result in results:
+        print(result)
 ```
 
 #### The `query` endpoint
@@ -141,7 +148,7 @@ with Session() as client:
         print(result)
 ```
 
-#### Supported lookups for `get` and `query`
+#### Supported lookups for `filter` and `query`
 | Lookup            | Numeric | Text | Date (YYYY-MM-DD) | Date (YYYY-MM) | True/False |
 | ----------------- | :-----: | :--: | :---------------: | :------------: | :--------: |
 | `exact`           | ✓       | ✓    | ✓                 | ✓              | ✓          |
@@ -196,6 +203,7 @@ with Session() as client:
     # Print the response
     print(response)
 ```
+
 #### Update multiple records from a csv/tsv
 ```
 $ metadb update <project> --csv <csv>
@@ -207,6 +215,7 @@ $ metadb update <project> --tsv <tsv>
 ```
 $ metadb suppress <project> <cid>
 ```
+
 #### Suppress multiple records from a csv/tsv
 ```
 $ metadb suppress <project> --csv <csv>
@@ -218,6 +227,7 @@ $ metadb suppress <project> --tsv <tsv>
 ```
 $ metadb delete <project> <cid>
 ```
+
 #### Delete multiple records from a csv/tsv
 ```
 $ metadb delete <project> --csv <csv>
