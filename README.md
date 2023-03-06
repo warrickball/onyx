@@ -83,6 +83,8 @@ with Session() as client:
 $ metadb get <project> <cid>
 ```
 ```python
+from metadb import Session 
+
 with Session() as client:
     result = client.get("project", "cid")
 
@@ -97,6 +99,7 @@ $ metadb filter <project> --field <name> <value> --field <name> <value> ...
 ```
 ```python
 from metadb import Session
+
 # Retrieve all results matching ALL of the field requirements
 with Session() as client:
     results = client.filter(
