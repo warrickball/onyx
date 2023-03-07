@@ -202,7 +202,5 @@ def get_serializer(model):
     Function that returns the appropriate serializer for the given model.
     """
     return {
-        Genomic: GenomicSerializer,
-        Metagenomic: MetagenomicSerializer,
         Mpx: MpxSerializer,
     }[model]
