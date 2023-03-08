@@ -7,6 +7,4 @@ from django.utils import timezone
 
 @receiver(post_save, sender=Mpx)
 def post_save_mpx(sender, instance, **kwargs):
-    signal, created = Signal.objects.get_or_create(code="mpx")
-    signal.modified = timezone.now()
-    signal.save(update_fields=["modified"])
+    Signal.objects.update_or_create(code="mpx", defaults={"modified": timezone.now()})
