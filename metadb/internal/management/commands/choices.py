@@ -31,4 +31,6 @@ class Command(base.BaseCommand):
                     if created:
                         print(f"Created choice: {app_label}.{model}, {field}, {c}")
                     else:
-                        print(f"Updated choice: {app_label}.{model}, {field}, {c}")
+                        print(
+                            f"Choice already exists: {app_label}.{model}, {field}, {c}"
+                        )
