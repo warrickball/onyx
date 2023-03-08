@@ -25,11 +25,6 @@ class RecordSerializer(DynamicFieldsModelSerializer):
             "published_date",
         ]
 
-    def create(self, validated_data):
-        # Add the user who created the object to the record
-        validated_data["user"] = self.context["request"].user
-        return super().create(validated_data)
-
     def validate(self, data):
         """
         Additional validation carried out on either object creation or update
