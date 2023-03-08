@@ -1,0 +1,11 @@
+#view_mpx-pha
+data,mpx,view_mpx__ukhsa_region
+data,mpx,view_mpx__travel_status
+data,mpx,view_mpx__outer_postcode
+data,mpx,view_mpx__epi_cluster
+
+#change_mpx-pha
+data,mpx,change_mpx__ukhsa_region
+data,mpx,change_mpx__travel_status
+data,mpx,change_mpx__outer_postcode
+data,mpx,change_mpx__epi_cluster
