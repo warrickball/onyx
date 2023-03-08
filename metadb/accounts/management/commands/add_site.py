@@ -13,13 +13,13 @@ class Command(base.BaseCommand):
     def handle(self, *args, **options):
         name = options["name"]
         code = options["code"]
-        
+
         exists = False
         try:
             site = Site.objects.create(name=name, code=code)
         except IntegrityError:
             exists = True
-        
+
         if exists:
             site = Site.objects.get(code=code.lower())
             print("Site already existed.")

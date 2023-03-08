@@ -35,9 +35,7 @@ class TestUpdateGenomic(METADBTestCase):
 
     def test_authenticated_update(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authenticated_user(
-                "authenticateduser", site=self.site.code
-            )
+            user=self.setup_authenticated_user("authenticateduser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.patch(
@@ -47,9 +45,7 @@ class TestUpdateGenomic(METADBTestCase):
 
     def test_approved_update(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_approved_user(
-                "approveduser", site=self.site.code
-            )
+            user=self.setup_approved_user("approveduser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.patch(
@@ -59,9 +55,7 @@ class TestUpdateGenomic(METADBTestCase):
 
     def test_authority_update(self):
         self.client.force_authenticate(  # type: ignore
-            user=self.setup_authority_user(
-                "authorityuser", site=self.site.code
-            )
+            user=self.setup_authority_user("authorityuser", site=self.site.code)
         )
         for cid in self.cids:
             response = self.client.patch(
@@ -86,14 +80,18 @@ class TestUpdateGenomic(METADBTestCase):
                 os.path.join("/data/hello/", cid + "/"), data={"is_external": False}
             )
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-            self.assertEqual(response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]})
+            self.assertEqual(
+                response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]}
+            )
 
     def test_cid_not_found(self):
         response = self.client.patch(
             os.path.join("/data/covid/", "hello" + "/"), data={"is_external": False}
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]})
+        self.assertEqual(
+            response.json()["errors"], {"hello": [METADBAPIResponse.NOT_FOUND]}
+        )
 
     def test_no_updates(self):
         cid = self.cids[0]
@@ -136,7 +134,8 @@ class TestUpdateGenomic(METADBTestCase):
                     Covid.objects.get(cid=cid).fasta_path != "/updated/fasta/path.fasta"
                 )
                 self.assertTrue(
-                    response.json()["errors"], {field: METADBAPIResponse.NON_ACCEPTED_FIELD}
+                    response.json()["errors"],
+                    {field: METADBAPIResponse.NON_ACCEPTED_FIELD},
                 )
 
     def test_update_unknown_and_rejected_fields(self):
@@ -163,10 +162,12 @@ class TestUpdateGenomic(METADBTestCase):
                     Covid.objects.get(cid=cid).fasta_path != "/updated/fasta/path.fasta"
                 )
                 self.assertTrue(
-                    response.json()["errors"], {field: METADBAPIResponse.NON_ACCEPTED_FIELD}
+                    response.json()["errors"],
+                    {field: METADBAPIResponse.NON_ACCEPTED_FIELD},
                 )
                 self.assertTrue(
-                    response.json()["warnings"], {"hello": METADBAPIResponse.UNKNOWN_FIELD}
+                    response.json()["warnings"],
+                    {"hello": METADBAPIResponse.UNKNOWN_FIELD},
                 )
 
     def test_update_empty_values(self):
@@ -190,20 +191,25 @@ class TestUpdateGenomic(METADBTestCase):
         for cid in self.cids:
             instance = Covid.objects.get(cid=cid)
             if instance.collection_month and instance.received_month:
-                response = self.client.patch(os.path.join("/data/covid/", cid + "/"), data={"collection_month": ""}
+                response = self.client.patch(
+                    os.path.join("/data/covid/", cid + "/"),
+                    data={"collection_month": ""},
                 )
                 self.assertEqual(response.status_code, status.HTTP_200_OK)
-                response = self.client.patch(os.path.join("/data/covid/", cid + "/"), data={"received_month" : ""}
+                response = self.client.patch(
+                    os.path.join("/data/covid/", cid + "/"), data={"received_month": ""}
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             elif instance.collection_month:
-                response = self.client.patch(os.path.join("/data/covid/", cid + "/"), data={"collection_month": ""}
+                response = self.client.patch(
+                    os.path.join("/data/covid/", cid + "/"),
+                    data={"collection_month": ""},
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             elif instance.received_month:
-                response = self.client.patch(os.path.join("/data/covid/", cid + "/"), data={"received_month": ""}
+                response = self.client.patch(
+                    os.path.join("/data/covid/", cid + "/"), data={"received_month": ""}
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             else:
                 self.assertEqual(True, False)
-            

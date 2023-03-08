@@ -16,7 +16,6 @@ class KeyValue:
         self.value = value
 
 
-
 def make_keyvalues(data):
     """
     Traverses the provided `data` and replaces request values with `KeyValue` objects.
@@ -191,4 +190,3 @@ def apply_query_filterset(fs, model, field_contexts, view_fields, filterset_data
         # Add the cleaned values to the KeyValue objects
         for k, keyvalue in filterset_data.items():
             keyvalue.value = filterset.form.cleaned_data[k]
-    

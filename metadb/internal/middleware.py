@@ -1,6 +1,7 @@
 import time
 from .models import Request
 
+
 # Credit to Felix Eklöf for this middleware
 # https://stackoverflow.com/a/63176786/16088113
 class SaveRequest:

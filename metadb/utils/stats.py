@@ -3,35 +3,38 @@
 
 # This function was written by Heng Li
 # https://github.com/lh3/readfq
-def readfq(fp): # this is a generator function
-    last = None # this is a buffer keeping the last unprocessed line
-    while True: # mimic closure; is it a bad idea?
-        if not last: # the first record or a record following a fastq
-            for l in fp: # search for the start of the next record
-                if l[0] in '>@': # fasta/q header line
-                    last = l[:-1] # save this line
+def readfq(fp):  # this is a generator function
+    last = None  # this is a buffer keeping the last unprocessed line
+    while True:  # mimic closure; is it a bad idea?
+        if not last:  # the first record or a record following a fastq
+            for l in fp:  # search for the start of the next record
+                if l[0] in ">@":  # fasta/q header line
+                    last = l[:-1]  # save this line
                     break
-        if not last: break
+        if not last:
+            break
         name, seqs, last = last[1:].partition(" ")[0], [], None
-        for l in fp: # read the sequence
-            if l[0] in '@+>':
+        for l in fp:  # read the sequence
+            if l[0] in "@+>":
                 last = l[:-1]
                 break
             seqs.append(l[:-1])
-        if not last or last[0] != '+': # this is a fasta record
-            yield name, ''.join(seqs), None # yield a fasta record
-            if not last: break
-        else: # this is a fastq record
-            seq, leng, seqs = ''.join(seqs), 0, []
-            for l in fp: # read the quality
+        if not last or last[0] != "+":  # this is a fasta record
+            yield name, "".join(seqs), None  # yield a fasta record
+            if not last:
+                break
+        else:  # this is a fastq record
+            seq, leng, seqs = "".join(seqs), 0, []
+            for l in fp:  # read the quality
                 seqs.append(l[:-1])
                 leng += len(l) - 1
-                if leng >= len(seq): # have read enough quality
+                if leng >= len(seq):  # have read enough quality
                     last = None
-                    yield name, seq, ''.join(seqs); # yield a fastq record
+                    yield name, seq, "".join(seqs)
+                    # yield a fastq record
                     break
-            if last: # reach EOF before reading enough quality
-                yield name, seq, None # yield a fasta record instead
+            if last:  # reach EOF before reading enough quality
+                yield name, seq, None  # yield a fasta record instead
                 break
 
 
@@ -40,10 +43,10 @@ def readfq(fp): # this is a generator function
 def calculate_fasta_stats(fasta_path, decimal_places=None):
     if decimal_places is None:
         decimal_places = 5
-    
+
     with open(fasta_path) as fasta:
         fastas = readfq(fasta)
-        
+
         num_seqs = 0
         num_bases = 0
         num_acgt = 0
@@ -72,12 +75,12 @@ def calculate_fasta_stats(fasta_path, decimal_places=None):
             for base in seq:
                 num_bases += 1
 
-                if base.upper() in 'ACGT':
+                if base.upper() in "ACGT":
                     num_acgt += 1
-                    
-                    if base.upper() in 'GC':
+
+                    if base.upper() in "GC":
                         num_gc += 1
-                    
+
                     current_acgt += 1
                     if current_acgt > longest_acgt:
                         longest_acgt = current_acgt
@@ -85,16 +88,16 @@ def calculate_fasta_stats(fasta_path, decimal_places=None):
                     current_ungap += 1
                     if current_gap > longest_gap:
                         longest_gap = current_gap
-                    
+
                     current_masked = 0
                     current_invalid = 0
                     current_ambig = 0
                     current_gap = 0
 
-                elif base.upper() in 'WSMKRYBDHV':
+                elif base.upper() in "WSMKRYBDHV":
                     num_ambig += 1
 
-                    if base.upper() in 'WSMKRY':
+                    if base.upper() in "WSMKRY":
                         num_ambig_2 += 1
                     else:
                         num_ambig_3 += 1
@@ -106,15 +109,15 @@ def calculate_fasta_stats(fasta_path, decimal_places=None):
                     current_ungap += 1
                     if current_gap > longest_gap:
                         longest_gap = current_gap
-                    
+
                     current_acgt = 0
                     current_masked = 0
                     current_invalid = 0
                     current_gap = 0
-                
-                elif base.upper() in 'NX':
+
+                elif base.upper() in "NX":
                     num_masked += 1
-                    
+
                     current_masked += 1
                     if current_masked > longest_masked:
                         longest_masked = current_masked
@@ -122,12 +125,12 @@ def calculate_fasta_stats(fasta_path, decimal_places=None):
                     current_gap += 1
                     if current_ungap > longest_ungap:
                         longest_ungap = current_ungap
-                    
+
                     current_acgt = 0
                     current_invalid = 0
                     current_ambig = 0
                     current_ungap = 0
-                
+
                 else:
                     num_invalid += 1
 
@@ -164,28 +167,28 @@ def calculate_fasta_stats(fasta_path, decimal_places=None):
             pc_invalid = round(100.0, decimal_places)
 
     return {
-        "num_seqs" : num_seqs, 
-        "num_bases" : num_bases, 
-        "pc_acgt" : pc_acgt,
-        "gc_content" : gc_content,
-        "pc_masked" : pc_masked, 
-        "pc_invalid" : pc_invalid, 
-        "pc_ambig" : pc_ambig,
-        "pc_ambig_2" : pc_ambig_2, 
-        "pc_ambig_3" : pc_ambig_3,  
-        "longest_acgt" : longest_acgt,
-        "longest_masked" : longest_masked,
-        "longest_invalid" : longest_invalid, 
-        "longest_ambig" : longest_ambig,
-        "longest_gap" : longest_gap, 
-        "longest_ungap" : longest_ungap
+        "num_seqs": num_seqs,
+        "num_bases": num_bases,
+        "pc_acgt": pc_acgt,
+        "gc_content": gc_content,
+        "pc_masked": pc_masked,
+        "pc_invalid": pc_invalid,
+        "pc_ambig": pc_ambig,
+        "pc_ambig_2": pc_ambig_2,
+        "pc_ambig_3": pc_ambig_3,
+        "longest_acgt": longest_acgt,
+        "longest_masked": longest_masked,
+        "longest_invalid": longest_invalid,
+        "longest_ambig": longest_ambig,
+        "longest_gap": longest_gap,
+        "longest_ungap": longest_ungap,
     }
 
 
 # def calculate_bam_stats(bam_path, decimal_places=None):
 #     if decimal_places is None:
 #         decimal_places = 5
-    
+
 #     bc = basecount.BaseCount(bam_path, min_base_quality=0, min_mapping_quality=0)
 
 #     pc_coverage = 100 * (len([record["coverage"] for record in bc.records() if record["coverage"] != 0]) / sum(bc.reference_lengths.values()))
