@@ -67,11 +67,9 @@ class Genomic(Record):
     received_month = YearMonthField()
     fasta_path = models.TextField()
     bam_path = models.TextField()
-    sample_type = models.ForeignKey(
-        Choice,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_sample_type",
-    )
+
+    int_field = models.IntegerField()
+    float_field = models.FloatField()
 
     class Meta:
         unique_together = ["sample_id", "run_name"]
@@ -94,7 +92,8 @@ class Genomic(Record):
                 "received_month",
                 "fasta_path",
                 "bam_path",
-                "sample_type",
+                "int_field",
+                "float_field",
             ],
         )
 
@@ -149,6 +148,11 @@ class Metagenomic(Record):
 
 
 class Mpx(Genomic):
+    sample_type = models.ForeignKey(
+        Choice,
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_sample_type",
+    )
     seq_platform = models.ForeignKey(
         Choice,
         on_delete=models.CASCADE,
@@ -230,6 +234,7 @@ class Mpx(Genomic):
         permissions = generate_permissions(
             model_name="mpx",
             fields=[
+                "sample_type",
                 "sample_site",
                 "patient_ageband",
                 "country",

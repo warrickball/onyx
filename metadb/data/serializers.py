@@ -96,7 +96,6 @@ class GenomicSerializer(RecordSerializer):
             "received_month",
             "fasta_path",
             "bam_path",
-            "sample_type",
         ]
 
 
@@ -172,6 +171,7 @@ class MpxSerializer(GenomicSerializer):
     class Meta:
         model = Mpx
         fields = GenomicSerializer.Meta.fields + [
+            "sample_type",
             "seq_platform",
             "instrument_model",
             "enrichment_method",

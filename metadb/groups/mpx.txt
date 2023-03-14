@@ -6,7 +6,7 @@ data,genomic,add_genomic__collection_month
 data,genomic,add_genomic__received_month
 data,genomic,add_genomic__fasta_path
 data,genomic,add_genomic__bam_path
-data,genomic,add_genomic__sample_type
+data,mpx,add_mpx__sample_type
 data,mpx,add_mpx__sample_site
 data,mpx,add_mpx__patient_ageband
 data,mpx,add_mpx__country
@@ -35,7 +35,7 @@ data,genomic,view_genomic__collection_month
 data,genomic,view_genomic__received_month
 data,genomic,view_genomic__fasta_path
 data,genomic,view_genomic__bam_path
-data,genomic,view_genomic__sample_type
+data,mpx,view_mpx__sample_type
 data,mpx,view_mpx__sample_site
 data,mpx,view_mpx__patient_ageband
 data,mpx,view_mpx__country
@@ -54,7 +54,7 @@ data,genomic,change_genomic__collection_month
 data,genomic,change_genomic__received_month
 data,genomic,change_genomic__fasta_path
 data,genomic,change_genomic__bam_path
-data,genomic,change_genomic__sample_type
+data,mpx,change_mpx__sample_type
 data,mpx,change_mpx__sample_site
 data,mpx,change_mpx__patient_ageband
 data,mpx,change_mpx__country
