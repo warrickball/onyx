@@ -118,13 +118,12 @@ def isnull(field):
     )
 
 
-def get_filter(model, user_field, field_contexts, view_fields):
+def get_filter(model, user_field, field_contexts):
     # Get the field and the lookup
     field, underscore, lookup = user_field.partition("__")
 
-    # Check that the field is a known field
-    # Also check that there is no trailing underscore
-    if (field not in view_fields) or (underscore and not lookup):
+    # Check that there is no trailing underscore
+    if underscore and not lookup:
         return None, None
 
     # Retrieve the provided field from the model
@@ -275,7 +274,7 @@ def get_filter(model, user_field, field_contexts, view_fields):
 
 
 class METADBFilter(filters.FilterSet):
-    def __init__(self, model, field_contexts, view_fields, *args, **kwargs):
+    def __init__(self, model, field_contexts, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         for user_field in self.data:
@@ -283,7 +282,6 @@ class METADBFilter(filters.FilterSet):
                 model,
                 user_field,
                 field_contexts,
-                view_fields,
             )
             if name:
                 self.filters[name] = filter

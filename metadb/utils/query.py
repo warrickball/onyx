@@ -37,7 +37,13 @@ def make_keyvalues(data):
 
     else:
         # Initialise KeyValue object
-        keyvalue = KeyValue(key, value)
+        # NOTE: The value is turned into a str for the filterset form.
+        # Within the GET/FILTER endpoint, the filterset receives query params.
+        # These contain key/value pairs where the value is always a str initially.
+        # This is what the filterset is built to handle; it attempts to decode these strs and returns errors if it fails.
+        # If we don't turn these values into strs, filterset can actually crash when it treats e.g. a list as a str
+        # And tries to split a list by a comma for example.
+        keyvalue = KeyValue(key, str(value))
 
         # Replace the request.data value with the KeyValue object
         data[key] = keyvalue
@@ -118,7 +124,7 @@ def get_filterset_datas_from_keyvalues(keyvalues):
     return filterset_datas
 
 
-def apply_get_filterset(fs, model, field_contexts, view_fields, filterset_datas, qs):
+def apply_get_filterset(fs, model, field_contexts, filterset_datas, qs):
     # A filterset can only take a a query with one of each field at a time
     # So given that the get view only AND's fields together, we can represent this
     # as a series of filtersets ANDed together
@@ -127,7 +133,6 @@ def apply_get_filterset(fs, model, field_contexts, view_fields, filterset_datas,
         filterset = fs(
             model,
             field_contexts,
-            view_fields,
             data=filterset_data,
             queryset=qs,
         )
@@ -157,14 +162,13 @@ def apply_get_filterset(fs, model, field_contexts, view_fields, filterset_datas,
     return qs
 
 
-def apply_query_filterset(fs, model, field_contexts, view_fields, filterset_datas):
+def apply_query_filterset(fs, model, field_contexts, filterset_datas):
     # Use a filterset, applied to each dict in filterset_datas, to validate the data
     for i, filterset_data in enumerate(filterset_datas):
         # Slightly cursed, but it works
         filterset = fs(
             model,
             field_contexts,
-            view_fields,
             data={k: v.value for k, v in filterset_data.items()},
             queryset=model.objects.none(),
         )

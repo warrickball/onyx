@@ -3,46 +3,50 @@ from . import views
 
 urlpatterns = [
     path(
-        "create/<project_code>/",
+        "create/<code>/",
         views.CreateRecordView.as_view(),
     ),
     path(
-        "testcreate/<project_code>/",
+        "testcreate/<code>/",
         views.CreateRecordView.as_view(),
         kwargs={"test": True},
     ),
     path(
-        "get/<project_code>/",
+        "get/<code>/<cid>/",
         views.GetRecordView.as_view(),
     ),
     path(
-        "query/<project_code>/",
+        "filter/<code>/",
+        views.FilterRecordView.as_view(),
+    ),
+    path(
+        "query/<code>/",
         views.QueryRecordView.as_view(),
     ),
     path(
-        "update/<project_code>/<cid>/",
+        "update/<code>/<cid>/",
         views.UpdateRecordView.as_view(),
     ),
     path(
-        "testupdate/<project_code>/<cid>/",
+        "testupdate/<code>/<cid>/",
         views.UpdateRecordView.as_view(),
         kwargs={"test": True},
     ),
     path(
-        "suppress/<project_code>/<cid>/",
+        "suppress/<code>/<cid>/",
         views.SuppressRecordView.as_view(),
     ),
     path(
-        "testsuppress/<project_code>/<cid>/",
+        "testsuppress/<code>/<cid>/",
         views.SuppressRecordView.as_view(),
         kwargs={"test": True},
     ),
     path(
-        "delete/<project_code>/<cid>/",
+        "delete/<code>/<cid>/",
         views.DeleteRecordView.as_view(),
     ),
     path(
-        "testdelete/<project_code>/<cid>/",
+        "testdelete/<code>/<cid>/",
         views.DeleteRecordView.as_view(),
         kwargs={"test": True},
     ),

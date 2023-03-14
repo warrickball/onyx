@@ -5,6 +5,7 @@ from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from accounts.models import User
 from utils.fields import LowerCharField, UpperCharField
+from utils.choices import format_choices
 
 
 class NotEqual(models.Lookup):
@@ -55,7 +56,6 @@ class Signal(models.Model):
 
 class Project(models.Model):
     code = LowerCharField(max_length=50, unique=True)
-    hidden = models.BooleanField(default=False)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     add_group = models.OneToOneField(
         Group,
@@ -84,6 +84,19 @@ class Project(models.Model):
     )
 
 
+class Scope(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    code = LowerCharField(max_length=50)
+    action = LowerCharField(
+        max_length=10,
+        choices=format_choices(["add", "view", "change", "suppress", "delete"]),
+    )
+    group = models.OneToOneField(Group, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ["project", "code", "action"]
+
+
 class Request(models.Model):
     endpoint = models.CharField(max_length=100, null=True)
     method = models.CharField(max_length=10, null=True)
@@ -99,13 +112,7 @@ class History(models.Model):
     cid = UpperCharField(max_length=12)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     action = LowerCharField(
-        max_length=10,
-        choices=[
-            ("add", "add"),
-            ("change", "change"),
-            ("suppress", "suppress"),
-            ("delete", "delete"),
-        ],
+        max_length=10, choices=format_choices(["add", "change", "suppress", "delete"])
     )
     taken = models.DateTimeField(auto_now_add=True)
     changes = models.TextField(null=True)
