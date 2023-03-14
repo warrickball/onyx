@@ -68,9 +68,6 @@ class Genomic(Record):
     fasta_path = models.TextField()
     bam_path = models.TextField()
 
-    int_field = models.IntegerField()
-    float_field = models.FloatField()
-
     class Meta:
         unique_together = ["sample_id", "run_name"]
         indexes = [
@@ -92,8 +89,6 @@ class Genomic(Record):
                 "received_month",
                 "fasta_path",
                 "bam_path",
-                "int_field",
-                "float_field",
             ],
         )
 
