@@ -108,7 +108,7 @@ with Session() as client:
             "name1" : "value1",
             "name2" : "value2",
             "name3__startswith" : "value3",
-            "name4__range" : ["value4", "value5"],
+            "name4__range" : "value4, value5",
             # ...
         }
     )
