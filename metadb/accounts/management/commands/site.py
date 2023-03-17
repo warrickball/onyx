@@ -4,7 +4,7 @@ from ...models import Site
 
 
 class Command(base.BaseCommand):
-    help = "Create a new site in the database."
+    help = "Create a site in the database."
 
     def add_arguments(self, parser):
         parser.add_argument("-n", "--name", required=True)

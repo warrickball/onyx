@@ -1,5 +1,4 @@
 from django.core.management import base
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from ...models import Project
 from utils.groups import read_groups, create_or_update_group
@@ -12,9 +11,6 @@ class Command(base.BaseCommand):
         parser.add_argument("code")
         parser.add_argument("--content-type")
         parser.add_argument("--groups")
-        visibility = parser.add_mutually_exclusive_group(required=True)
-        visibility.add_argument("--public", action="store_false", dest="hidden")
-        visibility.add_argument("--private", action="store_true", dest="hidden")
 
     def handle(self, *args, **options):
         code = options["code"].lower()
@@ -24,15 +20,7 @@ class Command(base.BaseCommand):
 
         for gdef in read_groups(options["groups"]):
             group, created = create_or_update_group(gdef)
-
             action, _, _ = gdef.name.partition("_")
-            action_perm, _ = Permission.objects.get_or_create(
-                codename=f"{action}_{code}",
-                name=f"Can {action} {code}",
-                content_type=content_type,
-            )
-            group.permissions.add(action_perm)
-
             groups[action] = group
 
             if created:
@@ -47,7 +35,6 @@ class Command(base.BaseCommand):
         project, created = Project.objects.update_or_create(
             code=code,
             defaults={
-                "hidden": options["hidden"],
                 "content_type": content_type,
                 "add_group": groups["add"],
                 "view_group": groups["view"],
@@ -64,4 +51,3 @@ class Command(base.BaseCommand):
 
         print("Code:", project.code)
         print("Model:", project.content_type.model_class())
-        print("Hidden:", project.hidden)

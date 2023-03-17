@@ -44,10 +44,18 @@ def create_or_update_group(gdef):
 
     for perm in gdef.permissions:
         app_label, model, permission = perm
+
+        action, _, thing = permission.partition("_")
+        project, _, field = thing.partition("__")
+
         content_type = ContentType.objects.get(app_label=app_label, model=model)
-        permission = Permission.objects.get(
-            content_type=content_type, codename=permission
+        permission, created = Permission.objects.get_or_create(
+            content_type=content_type,
+            codename=permission,
+            name=f"Can {action} {project}{' ' + field if field else ''}",
         )
+        if created:
+            print("NOTE: CREATED PERMISSION:", permission)
         permissions.append(permission)
 
     group.permissions.set(permissions)

@@ -1,11 +1,11 @@
 #add_mpx
-data,record,add_record__site
 data,genomic,add_genomic__sample_id
 data,genomic,add_genomic__run_name
 data,genomic,add_genomic__collection_month
 data,genomic,add_genomic__received_month
 data,genomic,add_genomic__fasta_path
 data,genomic,add_genomic__bam_path
+data,mpx,add_mpx
 data,mpx,add_mpx__sample_type
 data,mpx,add_mpx__sample_site
 data,mpx,add_mpx__patient_ageband
@@ -19,11 +19,6 @@ data,mpx,add_mpx__source_of_library
 data,mpx,add_mpx__seq_strategy
 data,mpx,add_mpx__bioinfo_pipe_name
 data,mpx,add_mpx__bioinfo_pipe_version
-data,mpx,add_mpx__ukhsa_region
-data,mpx,add_mpx__travel_status
-data,mpx,add_mpx__outer_postcode
-data,mpx,add_mpx__epi_cluster
-data,mpx,add_mpx__csv_template_version
 
 #view_mpx
 data,record,view_record__site
@@ -35,6 +30,7 @@ data,genomic,view_genomic__collection_month
 data,genomic,view_genomic__received_month
 data,genomic,view_genomic__fasta_path
 data,genomic,view_genomic__bam_path
+data,mpx,view_mpx
 data,mpx,view_mpx__sample_type
 data,mpx,view_mpx__sample_site
 data,mpx,view_mpx__patient_ageband
@@ -54,6 +50,7 @@ data,genomic,change_genomic__collection_month
 data,genomic,change_genomic__received_month
 data,genomic,change_genomic__fasta_path
 data,genomic,change_genomic__bam_path
+data,mpx,change_mpx
 data,mpx,change_mpx__sample_type
 data,mpx,change_mpx__sample_site
 data,mpx,change_mpx__patient_ageband
@@ -69,5 +66,7 @@ data,mpx,change_mpx__bioinfo_pipe_name
 data,mpx,change_mpx__bioinfo_pipe_version
 
 #suppress_mpx
+data,mpx,suppress_mpx
 
 #delete_mpx
+data,mpx,delete_mpx

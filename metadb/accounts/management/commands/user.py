@@ -5,7 +5,7 @@ import os
 
 
 class Command(base.BaseCommand):
-    help = "Create a new user in the database."
+    help = "Create a user in the database."
 
     def add_arguments(self, parser):
         parser.add_argument("--username", required=True)
