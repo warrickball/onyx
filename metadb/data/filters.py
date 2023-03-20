@@ -89,7 +89,9 @@ DATE_FIELDS = [
 # Accepted strings for True and False when validating BooleanField
 BOOLEAN_CHOICES = (
     ("true", "true"),
+    ("True", "True"),
     ("false", "false"),
+    ("False", "False"),
 )
 
 # Mappings from field type + lookup to filter
