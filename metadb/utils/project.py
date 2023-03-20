@@ -99,7 +99,9 @@ class ProjectAPI:
                 f"{app_label}.view_{self.project.code}-{s.code}" for s in self.scopes
             ]
             unknown = [
-                perm for perm in view_scope_permissions if not self.user.has_perm(perm)
+                s.code
+                for (s, perm) in zip(self.scopes, view_scope_permissions)
+                if not self.user.has_perm(perm)
             ]
 
             if unknown:

@@ -36,7 +36,9 @@ class ContextedSlugRelatedField(serializers.RelatedField):
     """
 
     default_error_messages = {
-        "does_not_exist": _("Object with {slug_name}={value} does not exist."),
+        "does_not_exist": _(
+            "Select a valid choice. That choice is not one of the available choices."
+        ),
         "invalid": _("Invalid value."),
     }
 

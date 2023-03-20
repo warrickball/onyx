@@ -29,6 +29,7 @@ from utils.errors import (
     ScopesDoNotExist,
     FieldsDoNotExist,
 )
+from utils.action import format_action
 from .filters import METADBFilter
 from .serializers import get_serializer
 
@@ -84,10 +85,7 @@ class CreateRecordView(METADBAPIView):
                 cid = None
 
             return Response(
-                {
-                    "cid": cid,
-                    "action": f"{'test' if test else ''}create",
-                },
+                {"action": format_action("add", test=test), "cid": cid},
                 status=status.HTTP_201_CREATED,
             )
         else:
@@ -152,7 +150,7 @@ class GetRecordView(METADBAPIView):
 
         # Return response with data
         return Response(
-            serializer.data,
+            {"action": "view", "record": serializer.data},
             status=status.HTTP_200_OK,
         )
 
@@ -237,11 +235,13 @@ class FilterRecordView(METADBAPIView):
         )
 
         # Return paginated response
-        self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
-        self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
         return Response(
-            serializer.data,
-            status=status.HTTP_200_OK,
+            {
+                "action": "view",
+                "next": paginator.get_next_link(),
+                "previous": paginator.get_previous_link(),
+                "records": serializer.data,
+            }
         )
 
 
@@ -355,11 +355,13 @@ class QueryRecordView(METADBAPIView):
         )
 
         # Return paginated response
-        self.API_RESPONSE.next = paginator.get_next_link()  # type: ignore
-        self.API_RESPONSE.previous = paginator.get_previous_link()  # type: ignore
         return Response(
-            serializer.data,
-            status=status.HTTP_200_OK,
+            {
+                "action": "view",
+                "next": paginator.get_next_link(),
+                "previous": paginator.get_previous_link(),
+                "records": serializer.data,
+            }
         )
 
 
@@ -419,10 +421,7 @@ class UpdateRecordView(METADBAPIView):
                 )
 
             return Response(
-                {
-                    "cid": cid,
-                    "action": f"{'test' if test else ''}update",
-                },
+                {"action": format_action("change", test=test), "cid": cid},
                 status=status.HTTP_200_OK,
             )
         else:
@@ -480,10 +479,7 @@ class SuppressRecordView(METADBAPIView):
 
         # Return response indicating suppression
         return Response(
-            {
-                "cid": cid,
-                "action": f"{'test' if test else ''}suppress",
-            },
+            {"action": format_action("suppress", test=test), "cid": cid},
             status=status.HTTP_200_OK,
         )
 
@@ -531,9 +527,6 @@ class DeleteRecordView(METADBAPIView):
 
         # Return response indicating deletion
         return Response(
-            {
-                "cid": cid,
-                "action": f"{'test' if test else ''}delete",
-            },
+            {"action": format_action("delete", test=test), "cid": cid},
             status=status.HTTP_200_OK,
         )
