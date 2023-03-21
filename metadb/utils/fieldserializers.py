@@ -9,14 +9,13 @@ from datetime import date
 class YearMonthField(serializers.Field):
     def to_internal_value(self, data):
         try:
+            # value = date.fromisoformat(f"{data}-01")
             year, month = str(data).split("-")
-        except ValueError:
-            raise ValidationError("Must be in YYYY-MM format.")
-
-        try:
+            if not (len(year) == 4 and 1 <= len(month) <= 2):
+                raise ValueError
             value = date(int(year), int(month), 1)
-        except ValueError as e:
-            raise ValidationError(e)
+        except ValueError:
+            raise ValidationError("Enter a valid date in YYYY-MM format.")
 
         return value
 
