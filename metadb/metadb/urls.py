@@ -22,3 +22,8 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     path("data/", include("data.urls")),
 ]
+
+handler404 = "internal.views.custom_page_not_found_view"
+handler500 = "internal.views.custom_error_view"
+handler403 = "internal.views.custom_permission_denied_view"
+handler400 = "internal.views.custom_bad_request_view"
