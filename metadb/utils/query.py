@@ -143,7 +143,6 @@ def apply_get_filterset(fs, model, field_contexts, filterset_datas, qs):
 
             for field in filterset_data:
                 if field not in filterset.filters:
-                    # TODO: Perhaps modify this to account for known, permissioned fields that are not searchable in this project
                     unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
 
             if unknown:
