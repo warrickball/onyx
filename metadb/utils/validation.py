@@ -1,29 +1,4 @@
 from datetime import datetime
-from utils.response import METADBAPIResponse
-
-
-def enforce_field_set(data, user_fields, accepted_fields, rejected_fields):
-    """
-    Check `data` for unknown fields, or known fields which cannot be accepted.
-    """
-    rejected = {}
-    unknown = {}
-
-    for field in data:
-        # Fields that are always rejected in the given scenario
-        if field in rejected_fields:
-            rejected[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
-
-        # Neither accepted or rejected, must be unknown
-        elif field not in accepted_fields:
-            unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
-
-        # By this stage, the field must be acceptable for the given scenario
-        # But it may not be acceptable for this particular user
-        elif field not in user_fields:
-            rejected[field] = [METADBAPIResponse.NON_ACCEPTED_FIELD]
-
-    return rejected, unknown
 
 
 def enforce_optional_value_groups_create(errors, data, groups):

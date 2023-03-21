@@ -1,6 +1,5 @@
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView
-from .response import METADBAPIResponse
 
 
 class METADBAPIMixin:
@@ -63,12 +62,8 @@ class METADBAPIMixin:
         return has_permission, message
 
 
+# https://stackoverflow.com/a/40253614 # to ease your mind
 class METADBAPIView(METADBAPIMixin, APIView):
-    # def setup(self, request, *args, **kwargs):
-    #     # https://stackoverflow.com/a/40253614 # to ease your mind
-    #     # self.API_RESPONSE = METADBAPIResponse()
-    #     super().setup(request, *args, **kwargs)
-
     def get_permission_classes(self):
         return self.permission_classes
 
@@ -87,18 +82,9 @@ class METADBAPIView(METADBAPIMixin, APIView):
                 request,
                 message=message,
             )
-
-    # def get_renderer_context(self):
-    #     context = super().get_renderer_context()
-    #     # context["api_response"] = self.API_RESPONSE
-    #     return context
 
 
 class METADBCreateAPIView(METADBAPIMixin, CreateAPIView):
-    def setup(self, request, *args, **kwargs):
-        self.API_RESPONSE = METADBAPIResponse()
-        super().setup(request, *args, **kwargs)
-
     def get_permission_classes(self):
         return self.permission_classes
 
@@ -117,18 +103,9 @@ class METADBCreateAPIView(METADBAPIMixin, CreateAPIView):
                 request,
                 message=message,
             )
-
-    def get_renderer_context(self):
-        context = super().get_renderer_context()
-        context["api_response"] = self.API_RESPONSE
-        return context
 
 
 class METADBListAPIView(METADBAPIMixin, ListAPIView):
-    def setup(self, request, *args, **kwargs):
-        self.API_RESPONSE = METADBAPIResponse()
-        super().setup(request, *args, **kwargs)
-
     def get_permission_classes(self):
         return self.permission_classes
 
@@ -147,8 +124,3 @@ class METADBListAPIView(METADBAPIMixin, ListAPIView):
                 request,
                 message=message,
             )
-
-    def get_renderer_context(self):
-        context = super().get_renderer_context()
-        context["api_response"] = self.API_RESPONSE
-        return context

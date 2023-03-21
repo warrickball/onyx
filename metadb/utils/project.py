@@ -12,6 +12,7 @@ from utils.errors import (
 )
 
 
+# TODO: keep or not keep
 def init_project_queryset(model, user):
     """
     Return an initial queryset of the provided `model`.

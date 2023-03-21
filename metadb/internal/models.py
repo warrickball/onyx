@@ -54,6 +54,7 @@ class Signal(models.Model):
     modified = models.DateTimeField(auto_now=True)
 
 
+# TODO: Don't actually need half the stuff being recorded in Project and Scope models
 class Project(models.Model):
     code = LowerCharField(max_length=50, unique=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
