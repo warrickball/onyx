@@ -1,26 +1,30 @@
 # `metadb`
 ```
 $ metadb -h
-usage: metadb [-h] [-v] {command} ...
+usage: metadb [-h] [-u USER] [-p] [-v] {command} ...
 
 positional arguments:
   {command}
-    config       Config-specific commands.
-    site         Site-specific commands.
-    admin        Admin-specific commands.
-    register     Register a new user in metadb.
-    login        Log in to metadb.
-    logout       Log out of metadb.
-    logoutall    Log out of metadb everywhere.
-    create       Upload metadata to metadb.
-    get          Get metadata from metadb.
-    update       Update metadata within metadb.
-    suppress     Suppress metadata within metadb.
-    delete       Delete metadata within metadb.
+    config              Config-specific commands.
+    site                Site-specific commands.
+    admin               Admin-specific commands.
+    register            Register a new user.
+    login               Log in to metadb.
+    logout              Log out of metadb.
+    logoutall           Log out of metadb on all devices.
+    create              Upload metadata records.
+    testcreate          Test uploading metadata records.
+    get                 Get a metadata record.
+    filter              Filter metadata records.
+    update              Update metadata records.
+    suppress            Suppress metadata records.
+    delete              Delete metadata records.
 
 options:
-  -h, --help     show this help message and exit
-  -v, --version  Client version number.
+  -h, --help            show this help message and exit
+  -u USER, --user USER  Which user to execute the command as.
+  -p, --env-password    When a password is required, the client will use the env variable with format 'METADB_<USER>_PASSWORD'.
+  -v, --version         Client version number.
 ```
 
 ## Create a config
@@ -87,10 +91,7 @@ from metadb import Session
 
 with Session() as client:
     result = client.get("project", "cid")
-
-    # Display the result
-    # This is a dictionary representing a record, not a response object
-    print(result)
+    print(result) # This is a dictionary representing a record, not a response object
 ```
 
 #### The `filter` endpoint
@@ -121,7 +122,7 @@ with Session() as client:
 
 #### The `query` endpoint 
 ```python
-from metadb import Session, Field
+from metadb import Session, F
 
 with Session() as client:
     # The python bitwise operators can be used in a query.
@@ -138,10 +139,10 @@ with Session() as client:
     # - OR have a collection_month between Jun-Sept 2022
     results = client.query(
         "project",
-        query=(~Field(sample_type="swab"))
+        query=(~F(sample_type="swab"))
         & (
-            Field(collection_month__range=["2022-02", "2022-03"])
-            | Field(collection_month__range=["2022-06", "2022-09"])
+            F(collection_month__range=["2022-02", "2022-03"])
+            | F(collection_month__range=["2022-06", "2022-09"])
         ),
     )
 
@@ -212,11 +213,33 @@ with Session() as client:
 $ metadb update <project> --csv <csv>
 $ metadb update <project> --tsv <tsv>
 ```
+```python
+from metadb import Session
+
+with Session() as client:
+    # Update from a csv of records
+    responses = client.csv_update(
+        "project",
+        csv_path="/path/to/file.csv",
+        # delimiter="\t", # For uploading from a tsv
+    )
+
+    # Iterating through the responses triggers the updates
+    for response in responses:
+        print(response)
+```
 
 ## Suppress data
 #### Suppress a single record
 ```
 $ metadb suppress <project> <cid>
+```
+```python
+from metadb import Session 
+
+with Session() as client:
+    result = client.suppress("project", "cid")
+    print(result)
 ```
 
 #### Suppress multiple records from a csv/tsv
@@ -224,15 +247,52 @@ $ metadb suppress <project> <cid>
 $ metadb suppress <project> --csv <csv>
 $ metadb suppress <project> --tsv <tsv>
 ```
+```python
+from metadb import Session
+
+with Session() as client:
+    # Suppress from a csv of records
+    responses = client.csv_suppress(
+        "project",
+        csv_path="/path/to/file.csv",
+        # delimiter="\t", # For uploading from a tsv
+    )
+
+    # Iterating through the responses triggers the suppressions
+    for response in responses:
+        print(response)
+```
 
 ## Delete data
 #### Delete a single record
 ```
 $ metadb delete <project> <cid>
 ```
+```python
+from metadb import Session 
+
+with Session() as client:
+    result = client.delete("project", "cid")
+    print(result)
+```
 
 #### Delete multiple records from a csv/tsv
 ```
 $ metadb delete <project> --csv <csv>
 $ metadb delete <project> --tsv <tsv>
+```
+```python
+from metadb import Session
+
+with Session() as client:
+    # Delete from a csv of records
+    responses = client.csv_delete(
+        "project",
+        csv_path="/path/to/file.csv",
+        # delimiter="\t", # For uploading from a tsv
+    )
+
+    # Iterating through the responses triggers the deletions
+    for response in responses:
+        print(response)
 ```
