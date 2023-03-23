@@ -1,9 +1,7 @@
 from django.db.models import Q
-from rest_framework import status
-from rest_framework.response import Response
+from django.core.exceptions import FieldDoesNotExist, ValidationError
 import operator
 import functools
-from utils.response import METADBAPIResponse
 
 
 class KeyValue:
@@ -137,26 +135,23 @@ def apply_get_filterset(fs, model, field_contexts, filterset_datas, qs):
             queryset=qs,
         )
 
-        # If unknown field lookups were provided, return 400
+        # If unknown field lookups were provided, raise an exception
         if i == 0:
-            unknown = {}
+            unknown = []
 
             for field in filterset_data:
                 if field not in filterset.filters:
-                    unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
+                    unknown.append(field)
 
             if unknown:
-                return Response(
-                    unknown,
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                raise FieldDoesNotExist(unknown)
 
         # Retrieve the resulting filtered queryset
         qs = filterset.qs
 
         # If not valid, return errors
         if not filterset.is_valid():
-            return Response(filterset.errors, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError(filterset.errors)
 
     return qs
 
@@ -172,23 +167,20 @@ def apply_query_filterset(fs, model, field_contexts, filterset_datas):
             queryset=model.objects.none(),
         )
 
-        # If unknown field lookups were provided, return 400
+        # If unknown field lookups were provided, raise an exception
         if i == 0:
-            unknown = {}
+            unknown = []
 
             for field in filterset_data:
                 if field not in filterset.filters:
-                    unknown[field] = [METADBAPIResponse.UNKNOWN_FIELD]
+                    unknown.append(field)
 
             if unknown:
-                return Response(
-                    unknown,
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                raise FieldDoesNotExist(unknown)
 
         # If not valid, return errors
         if not filterset.is_valid():
-            return Response(filterset.errors, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError(filterset.errors)
 
         # Add the cleaned values to the KeyValue objects
         for k, keyvalue in filterset_data.items():

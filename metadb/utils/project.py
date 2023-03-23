@@ -1,3 +1,4 @@
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from rest_framework import status
 from rest_framework.response import Response
 from internal.models import Project, Scope
@@ -6,9 +7,7 @@ from utils.response import METADBAPIResponse
 from utils.permissions import get_fields_from_permissions
 from utils.errors import (
     ProjectDoesNotExist,
-    ProjectPermissionError,
     ScopesDoNotExist,
-    FieldsDoNotExist,
 )
 
 
@@ -124,7 +123,7 @@ class ProjectAPI:
         ]
 
         if required:
-            raise ProjectPermissionError(required)
+            raise PermissionDenied(required)
 
     def check_field_permissions(self, fields):
         # Get and check each permission required by the user
@@ -147,10 +146,10 @@ class ProjectAPI:
                         required.append(field_permission)
 
         if unknown:
-            raise FieldsDoNotExist(unknown)
+            raise FieldDoesNotExist(unknown)
 
         if required:
-            raise ProjectPermissionError(required)
+            raise PermissionDenied(required)
 
     @classmethod
     def not_found_response(cls, code):
@@ -177,6 +176,13 @@ class ProjectAPI:
     def unknown_fields_response(cls, unknown):
         return Response(
             {field: [METADBAPIResponse.UNKNOWN_FIELD] for field in unknown},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    @classmethod
+    def validation_error_response(cls, errors):
+        return Response(
+            errors,
             status=status.HTTP_400_BAD_REQUEST,
         )
 

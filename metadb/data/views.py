@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import FieldDoesNotExist, ValidationError, PermissionDenied
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
@@ -23,12 +24,7 @@ from utils.query import (
     apply_query_filterset,
 )
 from utils.mutable import mutable
-from utils.errors import (
-    ProjectDoesNotExist,
-    ProjectPermissionError,
-    ScopesDoNotExist,
-    FieldsDoNotExist,
-)
+from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.action import format_action
 from .filters import METADBFilter
 from .serializers import get_serializer
@@ -50,9 +46,9 @@ class CreateRecordView(METADBAPIView):
             )
         except ProjectDoesNotExist as e:
             return ProjectAPI.not_found_response(e.args[0])
-        except ProjectPermissionError as e:
+        except PermissionDenied as e:
             return ProjectAPI.unauthorised_response(e.args[0])
-        except FieldsDoNotExist as e:
+        except FieldDoesNotExist as e:
             return ProjectAPI.unknown_fields_response(e.args[0])
 
         # Add the user id to the metadata
@@ -119,9 +115,9 @@ class GetRecordView(METADBAPIView):
             return ProjectAPI.not_found_response(e.args[0])
         except ScopesDoNotExist as e:
             return ProjectAPI.unknown_scopes_response(e.args[0])
-        except ProjectPermissionError as e:
+        except PermissionDenied as e:
             return ProjectAPI.unauthorised_response(e.args[0])
-        except FieldsDoNotExist as e:
+        except FieldDoesNotExist as e:
             return ProjectAPI.unknown_fields_response(e.args[0])
 
         # Get the instance
@@ -189,9 +185,9 @@ class FilterRecordView(METADBAPIView):
             return ProjectAPI.not_found_response(e.args[0])
         except ScopesDoNotExist as e:
             return ProjectAPI.unknown_scopes_response(e.args[0])
-        except ProjectPermissionError as e:
+        except PermissionDenied as e:
             return ProjectAPI.unauthorised_response(e.args[0])
-        except FieldsDoNotExist as e:
+        except FieldDoesNotExist as e:
             return ProjectAPI.unknown_fields_response(e.args[0])
 
         # Turn the request query params into a series of dictionaries, each that will be passed to a filterset
@@ -204,18 +200,18 @@ class FilterRecordView(METADBAPIView):
         qs = init_queryset(project.model, view_fields)
 
         # Apply filtersets
-        qs = apply_get_filterset(
-            fs=METADBFilter,  # Filterset to use
-            model=project.model,  # Model that the filterset is linked to
-            field_contexts=project.field_contexts,
-            filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
-            qs=qs,  # Initial queryset
-        )
-
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(qs, Response):
-            return qs
+        try:
+            qs = apply_get_filterset(
+                fs=METADBFilter,  # Filterset to use
+                model=project.model,  # Model that the filterset is linked to
+                field_contexts=project.field_contexts,
+                filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
+                qs=qs,  # Initial queryset
+            )
+        except FieldDoesNotExist as e:
+            return project.unknown_fields_response(e.args[0])
+        except ValidationError as e:
+            return project.validation_error_response(e.args[0])
 
         # Add the pagination cursor param back into the request
         if cursor is not None:
@@ -293,9 +289,9 @@ class QueryRecordView(METADBAPIView):
             return ProjectAPI.not_found_response(e.args[0])
         except ScopesDoNotExist as e:
             return ProjectAPI.unknown_scopes_response(e.args[0])
-        except ProjectPermissionError as e:
+        except PermissionDenied as e:
             return ProjectAPI.unauthorised_response(e.args[0])
-        except FieldsDoNotExist as e:
+        except FieldDoesNotExist as e:
             return ProjectAPI.unknown_fields_response(e.args[0])
 
         # Construct a list of dictionaries from the keyvalues
@@ -306,17 +302,17 @@ class QueryRecordView(METADBAPIView):
         filterset_datas = get_filterset_datas_from_keyvalues(keyvalues)
 
         # Apply filtersets (to validate the data only)
-        validation = apply_query_filterset(
-            fs=METADBFilter,  # Filterset to use
-            model=project.model,  # Model that the filterset is linked to
-            field_contexts=project.field_contexts,
-            filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
-        )
-
-        # If a response was returned, something went wrong
-        # So this is returned to the user
-        if isinstance(validation, Response):
-            return validation
+        try:
+            apply_query_filterset(
+                fs=METADBFilter,  # Filterset to use
+                model=project.model,  # Model that the filterset is linked to
+                field_contexts=project.field_contexts,
+                filterset_datas=filterset_datas,  # User data that determines how to apply the filterset
+            )
+        except FieldDoesNotExist as e:
+            return project.unknown_fields_response(e.args[0])
+        except ValidationError as e:
+            return project.validation_error_response(e.args[0])
 
         # View fields
         view_fields = project.get_view_fields()
@@ -381,9 +377,9 @@ class UpdateRecordView(METADBAPIView):
             )
         except ProjectDoesNotExist as e:
             return ProjectAPI.not_found_response(e.args[0])
-        except ProjectPermissionError as e:
+        except PermissionDenied as e:
             return ProjectAPI.unauthorised_response(e.args[0])
-        except FieldsDoNotExist as e:
+        except FieldDoesNotExist as e:
             return ProjectAPI.unknown_fields_response(e.args[0])
 
         # Get the instance to be updated
@@ -446,9 +442,9 @@ class SuppressRecordView(METADBAPIView):
             )
         except ProjectDoesNotExist as e:
             return ProjectAPI.not_found_response(e.args[0])
-        except ProjectPermissionError as e:
+        except PermissionDenied as e:
             return ProjectAPI.unauthorised_response(e.args[0])
-        except FieldsDoNotExist as e:
+        except FieldDoesNotExist as e:
             return ProjectAPI.unknown_fields_response(e.args[0])
 
         # Get the instance to be suppressed
@@ -499,9 +495,9 @@ class DeleteRecordView(METADBAPIView):
             )
         except ProjectDoesNotExist as e:
             return ProjectAPI.not_found_response(e.args[0])
-        except ProjectPermissionError as e:
+        except PermissionDenied as e:
             return ProjectAPI.unauthorised_response(e.args[0])
-        except FieldsDoNotExist as e:
+        except FieldDoesNotExist as e:
             return ProjectAPI.unknown_fields_response(e.args[0])
 
         # Get the instance to be deleted
