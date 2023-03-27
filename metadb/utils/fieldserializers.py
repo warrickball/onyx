@@ -8,8 +8,13 @@ from datetime import date
 
 class YearMonthField(serializers.Field):
     def to_internal_value(self, data):
+        if not data:
+            if self.allow_null:
+                return None
+            else:
+                self.fail("null")
+
         try:
-            # value = date.fromisoformat(f"{data}-01")
             year, month = str(data).split("-")
             if not (len(year) == 4 and 1 <= len(month) <= 2):
                 raise ValueError
