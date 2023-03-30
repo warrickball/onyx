@@ -11,7 +11,7 @@ from accounts.permissions import (
 from internal.models import History
 from utils.views import METADBAPIView
 from utils.response import METADBResponse
-from utils.project import ProjectAPI
+from utils.project import METADBProject
 from utils.query import (
     make_keyvalues,
     get_query,
@@ -34,7 +34,7 @@ class CreateRecordView(METADBAPIView):
         Create an instance for the given project.
         """
         try:
-            project = ProjectAPI(
+            project = METADBProject(
                 code,
                 user=request.user,
                 action="add",
@@ -97,7 +97,7 @@ class GetRecordView(METADBAPIView):
                 query_params.pop("scope")
 
         try:
-            project = ProjectAPI(
+            project = METADBProject(
                 code,
                 user=request.user,
                 action="view",
@@ -123,13 +123,10 @@ class GetRecordView(METADBAPIView):
         except project.model.DoesNotExist:
             return METADBResponse.not_found("cid")
 
-        # View fields
-        view_fields = project.get_view_fields()
-
         # Serialize the result
         serializer = get_serializer(project.model)(
             instance,
-            fields=view_fields,
+            fields=project.fields(),
             context={"field_contexts": project.field_contexts},
         )
 
@@ -166,7 +163,7 @@ class FilterRecordView(METADBAPIView):
                 query_params.pop("scope")
 
         try:
-            project = ProjectAPI(
+            project = METADBProject(
                 code,
                 user=request.user,
                 action="view",
@@ -186,12 +183,12 @@ class FilterRecordView(METADBAPIView):
         filterset_datas = get_filterset_datas_from_query_params(request.query_params)
 
         # View fields
-        view_fields = project.get_view_fields()
+        fields = project.fields()
 
         # Initial queryset
         qs = project.model.objects.select_related()
 
-        if "suppressed" not in view_fields:
+        if "suppressed" not in fields:
             qs = qs.filter(suppressed=False)
 
         for metric in project.model.CustomMeta.metrics:  # type: ignore
@@ -224,7 +221,7 @@ class FilterRecordView(METADBAPIView):
         serializer = get_serializer(project.model)(
             result_page,
             many=True,
-            fields=view_fields,
+            fields=fields,
             context={"field_contexts": project.field_contexts},
         )
 
@@ -274,7 +271,7 @@ class QueryRecordView(METADBAPIView):
             keyvalues = []
 
         try:
-            project = ProjectAPI(
+            project = METADBProject(
                 code,
                 user=request.user,
                 action="view",
@@ -311,12 +308,12 @@ class QueryRecordView(METADBAPIView):
             return METADBResponse.validation_error(e.args[0])
 
         # View fields
-        view_fields = project.get_view_fields()
+        fields = project.fields()
 
         # Initial queryset
         qs = project.model.objects.select_related()
 
-        if "suppressed" not in view_fields:
+        if "suppressed" not in fields:
             qs = qs.filter(suppressed=False)
 
         # If request data was provided, then it has now been validated
@@ -343,7 +340,7 @@ class QueryRecordView(METADBAPIView):
         serializer = get_serializer(project.model)(
             result_page,
             many=True,
-            fields=view_fields,
+            fields=fields,
             context={"field_contexts": project.field_contexts},
         )
 
@@ -366,13 +363,13 @@ class UpdateRecordView(METADBAPIView):
         Update an instance for the given project.
         """
         try:
-            project = ProjectAPI(
+            project = METADBProject(
                 code,
                 user=request.user,
                 action="change",
                 fields=list(request.data),
             )
-        except ProjectDoesNotExist as e:
+        except ProjectDoesNotExist:
             return METADBResponse.not_found("project")
         except PermissionDenied as e:
             return METADBResponse.forbidden(e.args[0])
@@ -424,7 +421,7 @@ class SuppressRecordView(METADBAPIView):
         Suppress an instance of the given project.
         """
         try:
-            project = ProjectAPI(
+            project = METADBProject(
                 code,
                 user=request.user,
                 action="suppress",
@@ -471,7 +468,7 @@ class DeleteRecordView(METADBAPIView):
         Permanently delete an instance of the given project.
         """
         try:
-            project = ProjectAPI(
+            project = METADBProject(
                 code,
                 user=request.user,
                 action="delete",

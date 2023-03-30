@@ -8,7 +8,7 @@ from utils.errors import (
 )
 
 
-class ProjectAPI:
+class METADBProject:
     def __init__(self, code, user, action, fields=None, scopes=None):
         # Save the user + action
         self.user = user
@@ -19,7 +19,7 @@ class ProjectAPI:
         try:
             self.project = Project.objects.get(code=code)
         except Project.DoesNotExist:
-            raise ProjectDoesNotExist(code)
+            raise ProjectDoesNotExist
 
         # Get scope instance
         if scopes:
@@ -66,7 +66,7 @@ class ProjectAPI:
         # If the user cannot view the project + scope, then it doesn't exist
         view_project_permission = f"{app_label}.view_{self.project.code}"
         if not self.user.has_perm(view_project_permission):
-            raise ProjectDoesNotExist(self.project.code)
+            raise ProjectDoesNotExist
 
         if self.scopes:
             view_scope_permissions = [
@@ -125,7 +125,7 @@ class ProjectAPI:
         if required:
             raise PermissionDenied(required)
 
-    def get_view_fields(self):
+    def fields(self):
         view_fields = get_fields_from_permissions(
             self.project.view_group.permissions.all()
         )
