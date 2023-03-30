@@ -1,8 +1,7 @@
 from rest_framework import permissions, exceptions
 from data.models import Record
 from accounts.models import User
-from utils.project import init_project_queryset
-from utils.response import METADBAPIResponse
+from utils.response import METADBResponse
 
 
 class AllowAny(permissions.BasePermission):
@@ -104,10 +103,15 @@ class IsSameSiteAsCID(permissions.BasePermission):
     def has_permission(self, request, view):
         cid = view.kwargs["cid"]
 
+        if request.user.is_staff:
+            qs = Record.objects.all()
+        else:
+            qs = Record.objects.filter(suppressed=False)
+
         try:
-            obj = init_project_queryset(Record, request.user).get(cid=cid)
+            obj = qs.get(cid=cid)
         except Record.DoesNotExist:
-            raise exceptions.NotFound({cid: [METADBAPIResponse.NOT_FOUND]})
+            raise exceptions.NotFound(METADBResponse._not_found("cid"))
 
         self.message = f"You need to be from site {obj.site.code}"
 
@@ -126,7 +130,7 @@ class IsSameSiteAsUser(permissions.BasePermission):
         try:
             obj = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise exceptions.NotFound({username: [METADBAPIResponse.NOT_FOUND]})
+            raise exceptions.NotFound(METADBResponse._not_found("user"))
 
         self.message = f"You need to be from site {obj.site.code}"
 

@@ -9,7 +9,7 @@ from .serializers import (
     SiteWaitingUserSerializer,
     AdminWaitingUserSerializer,
 )
-from utils.response import METADBAPIResponse
+from utils.response import METADBResponse
 from utils.views import METADBAPIView, METADBCreateAPIView, METADBListAPIView
 from .permissions import (
     Any,
@@ -61,7 +61,7 @@ class CreateUserView(METADBCreateAPIView):
             ]
 
         if errors:
-            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+            return METADBResponse.validation_error(errors)
 
         # Enable mutability if required
         mutable = getattr(request.data, "_mutable", None)
@@ -94,10 +94,7 @@ class SiteApproveView(METADBAPIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return Response(
-                {username: [METADBAPIResponse.NOT_FOUND]},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return METADBResponse.not_found("user")
 
         # Approve user
         user.is_site_approved = True
@@ -125,10 +122,7 @@ class AdminApproveView(METADBAPIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return Response(
-                {username: [METADBAPIResponse.NOT_FOUND]},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return METADBResponse.not_found("user")
 
         # Approve target user
         user.is_admin_approved = True

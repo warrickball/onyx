@@ -1,37 +1,11 @@
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied
-from rest_framework import status
-from rest_framework.response import Response
 from internal.models import Project, Scope
 from utils.fieldcontext import get_field_contexts
-from utils.response import METADBAPIResponse
 from utils.permissions import get_fields_from_permissions
 from utils.errors import (
     ProjectDoesNotExist,
     ScopesDoNotExist,
 )
-
-
-# TODO: keep or not keep
-def init_project_queryset(model, user):
-    """
-    Return an initial queryset of the provided `model`.
-
-    If `user.is_staff = True`, returns all objects, otherwise only returns objects with `suppressed = False`.
-    """
-    if user.is_staff:
-        qs = model.objects.all()
-    else:
-        qs = model.objects.filter(suppressed=False)
-    return qs
-
-
-def init_queryset(model, view_fields):
-    qs = model.objects.select_related()
-
-    if "suppressed" not in view_fields:
-        qs = qs.filter(suppressed=False)
-
-    return qs
 
 
 class ProjectAPI:
@@ -150,41 +124,6 @@ class ProjectAPI:
 
         if required:
             raise PermissionDenied(required)
-
-    @classmethod
-    def not_found_response(cls, code):
-        return Response(
-            {code.lower(): [METADBAPIResponse.NOT_FOUND]},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    @classmethod
-    def unauthorised_response(cls, required):
-        return Response(
-            {"denied_permissions": sorted(set(required))},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
-    @classmethod
-    def unknown_scopes_response(cls, unknown):
-        return Response(
-            {scope: [METADBAPIResponse.UNKNOWN_SCOPE] for scope in unknown},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    @classmethod
-    def unknown_fields_response(cls, unknown):
-        return Response(
-            {field: [METADBAPIResponse.UNKNOWN_FIELD] for field in unknown},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    @classmethod
-    def validation_error_response(cls, errors):
-        return Response(
-            errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
 
     def get_view_fields(self):
         view_fields = get_fields_from_permissions(
