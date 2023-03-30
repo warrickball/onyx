@@ -137,6 +137,19 @@ def get_filter(model, user_field, field_contexts):
         related_field = model_field.foreign_related_fields[0].name  # type: ignore
         field_type = type(model_field.related_model._meta.get_field(related_field))
         field_path = field + "__" + related_field
+    elif field in model.CustomMeta.metrics:
+        related_field, underscore, lookup = lookup.partition("__")
+        related_model = model_field.related_model
+
+        if related_field not in related_model.CustomMeta.fields:
+            return None, None
+
+        if underscore and not lookup:
+            return None, None
+
+        field_type = type(model_field.related_model._meta.get_field(related_field))
+        field_path = field + "__" + related_field
+        field = field_path
     else:
         related_field = field
         field_type = type(model_field)

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from internal.serializers import DynamicFieldsModelSerializer
 from internal.models import Choice
-from data.models import Record, Genomic, Metagenomic, Mpx
+from data.models import Record, Genomic, Mpx, ThresholdCycle
 from utils import fieldserializers
 from utils.validation import (
     enforce_optional_value_groups_create,
@@ -12,7 +12,17 @@ from utils.validation import (
 )
 
 
+class ThresholdCycleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ThresholdCycle
+        fields = ["test_id", "ct_value"]
+
+
 class RecordSerializer(DynamicFieldsModelSerializer):
+    thresholdcycle = ThresholdCycleSerializer(
+        many=True, required=False, allow_null=True
+    )
+
     class Meta:
         model = Record
         fields = [
@@ -23,7 +33,19 @@ class RecordSerializer(DynamicFieldsModelSerializer):
             "site",
             "cid",
             "published_date",
+            "thresholdcycle",
         ]
+
+    def create(self, validated_data):
+        cts = validated_data.pop("thresholdcycle", None)
+
+        record = super().create(validated_data)
+
+        if cts:
+            for ct in cts:
+                ThresholdCycle.objects.create(record=record, **ct)
+
+        return record
 
     def validate(self, data):
         """
@@ -96,21 +118,6 @@ class GenomicSerializer(RecordSerializer):
             "received_month",
             "fasta_path",
             "bam_path",
-        ]
-
-
-class MetagenomicSerializer(RecordSerializer):
-    collection_month = fieldserializers.YearMonthField(required=False, allow_null=True)
-    received_month = fieldserializers.YearMonthField()
-
-    class Meta:
-        model = Metagenomic
-        fields = RecordSerializer.Meta.fields + [
-            "sample_id",
-            "run_name",
-            "collection_month",
-            "received_month",
-            "fastq_path",
         ]
 
 

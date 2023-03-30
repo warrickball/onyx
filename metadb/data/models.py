@@ -54,10 +54,42 @@ class Record(models.Model):
         )
 
     class CustomMeta:
+        fields = [
+            "created",
+            "last_modified",
+            "suppressed",
+            "user",
+            "site",
+            "cid",
+            "published_date",
+        ]
         db_choice_fields = ["site"]
         optional_value_groups = []
         yearmonths = []
         yearmonth_orderings = []
+        metrics = ["thresholdcycle"]
+
+
+class Metric(models.Model):
+    class Meta:
+        abstract = True
+
+    class CustomMeta:
+        pass
+
+
+class ThresholdCycle(Metric):
+    record = models.ForeignKey(
+        Record, on_delete=models.CASCADE, related_name="thresholdcycle"
+    )
+    test_id = models.IntegerField(unique=True)
+    ct_value = models.FloatField()
+
+    class CustomMeta(Metric.CustomMeta):
+        fields = [
+            "test_id",
+            "ct_value",
+        ]
 
 
 class Genomic(Record):
@@ -93,6 +125,14 @@ class Genomic(Record):
         )
 
     class CustomMeta(Record.CustomMeta):
+        fields = Record.CustomMeta.fields + [
+            "sample_id",
+            "run_name",
+            "collection_month",
+            "received_month",
+            "fasta_path",
+            "bam_path",
+        ]
         yearmonths = Record.CustomMeta.yearmonths + [
             "collection_month",
             "received_month",
@@ -100,46 +140,6 @@ class Genomic(Record):
         yearmonth_orderings = Record.CustomMeta.yearmonth_orderings + [
             ("collection_month", "received_month")
         ]
-
-
-class Metagenomic(Record):
-    sample_id = models.CharField(max_length=24, validators=[MinLengthValidator(8)])
-    run_name = models.CharField(max_length=96, validators=[MinLengthValidator(18)])
-    collection_month = YearMonthField(null=True)
-    received_month = YearMonthField()
-    fastq_path = models.TextField()
-    sample_type = models.ForeignKey(
-        Choice,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_sample_type",
-    )
-    seq_platform = models.ForeignKey(
-        Choice,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_seq_platform",
-    )
-
-    class Meta:
-        unique_together = ["sample_id", "run_name"]
-        indexes = [
-            models.Index(fields=["sample_id"]),
-            models.Index(fields=["run_name"]),
-            models.Index(fields=["sample_id", "run_name"]),
-            models.Index(fields=["collection_month"]),
-            models.Index(fields=["received_month"]),
-            models.Index(fields=["fastq_path"]),
-        ]
-        default_permissions = ["add", "change", "view", "delete", "suppress"]
-        permissions = generate_permissions(
-            model_name="metagenomic",
-            fields=[
-                "sample_id",
-                "run_name",
-                "collection_month",
-                "received_month",
-                "fastq_path",
-            ],
-        )
 
 
 class Mpx(Genomic):
@@ -249,3 +249,25 @@ class Mpx(Genomic):
                 "csv_template_version",
             ],
         )
+
+    class CustomMeta(Genomic.CustomMeta):
+        fields = Genomic.CustomMeta.fields + [
+            "sample_type",
+            "sample_site",
+            "patient_ageband",
+            "country",
+            "patient_id",
+            "seq_platform",
+            "instrument_model",
+            "run_layout",
+            "enrichment_method",
+            "source_of_library",
+            "seq_strategy",
+            "bioinfo_pipe_name",
+            "bioinfo_pipe_version",
+            "ukhsa_region",
+            "travel_status",
+            "outer_postcode",
+            "epi_cluster",
+            "csv_template_version",
+        ]

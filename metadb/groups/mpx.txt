@@ -19,6 +19,8 @@ data,mpx,add_mpx__source_of_library
 data,mpx,add_mpx__seq_strategy
 data,mpx,add_mpx__bioinfo_pipe_name
 data,mpx,add_mpx__bioinfo_pipe_version
+data,mpx,add_record__thresholdcycle
+
 
 #view_mpx
 data,record,view_record__site
@@ -44,6 +46,7 @@ data,mpx,view_mpx__source_of_library
 data,mpx,view_mpx__seq_strategy
 data,mpx,view_mpx__bioinfo_pipe_name
 data,mpx,view_mpx__bioinfo_pipe_version
+data,mpx,view_record__thresholdcycle
 
 #change_mpx
 data,genomic,change_genomic__collection_month
