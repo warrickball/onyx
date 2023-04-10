@@ -65,4 +65,4 @@ class ChoiceField(serializers.RelatedField):
             self.fail("invalid")
 
     def to_representation(self, obj):
-        return getattr(obj, self.choice)  # type: ignore
+        return getattr(obj, "choice")  # type: ignore
