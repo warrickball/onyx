@@ -57,7 +57,6 @@ class CreateRecordView(METADBAPIView):
         # Get the model serializer, and validate the data
         serializer = get_serializer(project.model)(
             data=request.data,
-            context={"field_contexts": project.field_contexts},
         )
 
         # If data is valid, save to the database. Otherwise, return 400
@@ -127,7 +126,6 @@ class GetRecordView(METADBAPIView):
         serializer = get_serializer(project.model)(
             instance,
             fields=project.fields(),
-            context={"field_contexts": project.field_contexts},
         )
 
         # Return response with data
@@ -222,7 +220,6 @@ class FilterRecordView(METADBAPIView):
             result_page,
             many=True,
             fields=fields,
-            context={"field_contexts": project.field_contexts},
         )
 
         # Return paginated response
@@ -341,7 +338,6 @@ class QueryRecordView(METADBAPIView):
             result_page,
             many=True,
             fields=fields,
-            context={"field_contexts": project.field_contexts},
         )
 
         # Return paginated response
@@ -392,7 +388,6 @@ class UpdateRecordView(METADBAPIView):
             instance=instance,
             data=request.data,
             partial=True,
-            context={"field_contexts": project.field_contexts},
         )
 
         # If data is valid, update existing record in the database. Otherwise, return 400

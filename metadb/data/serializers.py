@@ -122,54 +122,54 @@ class GenomicSerializer(RecordSerializer):
 
 
 class MpxSerializer(GenomicSerializer):
-    sample_type = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    sample_type = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
     )
-    seq_platform = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    seq_platform = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
     )
-    enrichment_method = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    enrichment_method = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
     )
-    seq_strategy = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    seq_strategy = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
     )
-    source_of_library = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    source_of_library = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
     )
-    country = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    country = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
     )
-    run_layout = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    run_layout = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
     )
-    patient_ageband = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
-        queryset=Choice.objects.all(),
-        required=False,
-        allow_null=True,
-    )
-    sample_site = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    patient_ageband = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    ukhsa_region = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    sample_site = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
     )
-    travel_status = fieldserializers.ContextedSlugRelatedField(
-        slug_field="choice",
+    ukhsa_region = fieldserializers.ChoiceField(
+        model=Mpx,
+        queryset=Choice.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    travel_status = fieldserializers.ChoiceField(
+        model=Mpx,
         queryset=Choice.objects.all(),
         required=False,
         allow_null=True,
