@@ -1,7 +1,7 @@
 from rest_framework import serializers
-from internal.serializers import DynamicFieldsModelSerializer
+from internal.serializers import NestedDynamicFieldsModelSerializer
 from internal.models import Choice
-from data.models import Record, Genomic, Mpx, ThresholdCycle
+from data.models import Record, Genomic, Mpx, MpxThresholdCycle
 from utils import fieldserializers
 from utils.validation import (
     enforce_optional_value_groups_create,
@@ -12,17 +12,7 @@ from utils.validation import (
 )
 
 
-class ThresholdCycleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ThresholdCycle
-        fields = ["test_id", "ct_value"]
-
-
-class RecordSerializer(DynamicFieldsModelSerializer):
-    thresholdcycle = ThresholdCycleSerializer(
-        many=True, required=False, allow_null=True
-    )
-
+class RecordSerializer(NestedDynamicFieldsModelSerializer):
     class Meta:
         model = Record
         fields = [
@@ -33,7 +23,6 @@ class RecordSerializer(DynamicFieldsModelSerializer):
             "site",
             "cid",
             "published_date",
-            "thresholdcycle",
         ]
 
     def create(self, validated_data):
@@ -43,7 +32,7 @@ class RecordSerializer(DynamicFieldsModelSerializer):
 
         if cts:
             for ct in cts:
-                ThresholdCycle.objects.create(record=record, **ct)
+                MpxThresholdCycle.objects.create(record=record, **ct)
 
         return record
 
@@ -121,7 +110,17 @@ class GenomicSerializer(RecordSerializer):
         ]
 
 
+class MpxThresholdCycleSerializer(NestedDynamicFieldsModelSerializer):
+    class Meta:
+        model = MpxThresholdCycle
+        fields = ["test_id", "ct_value"]
+
+
 class MpxSerializer(GenomicSerializer):
+    # thresholdcycle = MpxThresholdCycleSerializer(
+    #     many=True, required=False, allow_null=True
+    # )
+
     sample_type = fieldserializers.ChoiceField(
         model=Mpx,
         queryset=Choice.objects.all(),
@@ -196,7 +195,22 @@ class MpxSerializer(GenomicSerializer):
             "outer_postcode",
             "epi_cluster",
             "csv_template_version",
+            # "thresholdcycle",  # TODO: Does this need to be here?
         ]
+
+    class CustomMeta(GenomicSerializer.CustomMeta):
+        GenomicSerializer.CustomMeta.relations.update(
+            {
+                "thresholdcycle": {
+                    "serializer": MpxThresholdCycleSerializer,
+                    "kwargs": {
+                        "many": True,
+                        "required": False,
+                        "allow_null": True,
+                    },
+                }
+            }
+        )
 
 
 def get_serializer(model):
