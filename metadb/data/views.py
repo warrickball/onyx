@@ -153,26 +153,26 @@ def filter_query(request, code):
     # If method == GET, then parameters were provided in the query_params
     # Convert these into the same format as the JSON provided when method == POST
     if request.method == "GET":
-        data = [
+        query = [
             {field: value}
             for field in request.query_params
             for value in list(set(request.query_params.getlist(field)))
         ]
-        if data:
-            data = {"&": data}
+        if query:
+            query = {"&": query}
     else:
-        data = request.data
+        query = request.data
 
-    # If data was provided
-    # Turn the value of each key-value pair in request.data into a 'QueryAtom' object
+    # If a query was provided
+    # Turn the value of each key-value pair in query into a 'QueryAtom' object
     # A list of QueryAtoms is returned by make_atoms
-    if data:
+    if query:
         try:
             # The value is turned into a str for the filterset form.
             # This is what the filterset is built to handle; it attempts to decode these strs and returns errors if it fails.
             # If we don't turn these values into strs, the filterset can crash
             # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
-            atoms = make_atoms(data, to_str=True)
+            atoms = make_atoms(query, to_str=True)
         except Exception:
             return METADBResponse.invalid_query()
     else:
@@ -219,16 +219,15 @@ def filter_query(request, code):
     for metric in project.model.CustomMeta.metrics:  # type: ignore
         qs = qs.prefetch_related(metric)
 
-    # If request data was provided, then it has now been validated
-    # So we form the query (a Q object)
-    # Then filter using the Q object
-    if request.data:
+    # If data was provided, then it has now been validated
+    # So we form the a Q object, and filter the queryset with it
+    if query:
         try:
-            query = make_query(request.data)
+            q_object = make_query(query)
         except Exception:
             return METADBResponse.invalid_query()
 
-        qs = qs.filter(query)
+        qs = qs.filter(q_object)
 
     # Add the pagination cursor param back into the request
     if cursor is not None:
