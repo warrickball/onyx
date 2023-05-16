@@ -118,7 +118,7 @@ class GetRecordView(METADBAPIView):
         # Serialize the result
         serializer = get_serializer(project.model)(
             instance,
-            fields=project.fields(),
+            fields=project.view_fields(),
         )
 
         # Return response with data
@@ -208,7 +208,7 @@ def filter_query(request, code):
         return handle_exception(e)
 
     # View fields
-    fields = project.fields()
+    fields = project.view_fields()
 
     # Initial queryset
     qs = project.model.objects.select_related()
