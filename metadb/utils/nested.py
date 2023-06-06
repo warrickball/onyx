@@ -24,3 +24,18 @@ def parse_dunders(obj):
         return []
 
     return list(set(dunders))
+
+
+def prefetch_nested(qs, fields, prefix=None):
+    """
+    For each field in `fields` that contains nested data, apply prefetching to the QuerySet `qs`.
+    """
+    for field, nested in fields.items():
+        if nested:
+            if prefix:
+                field = f"{prefix}__{field}"
+
+            qs = qs.prefetch_related(field)
+            qs = prefetch_nested(qs, nested, prefix=field)
+
+    return qs

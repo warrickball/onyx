@@ -11,7 +11,7 @@ from utils.project import METADBProject
 from utils.mutable import mutable
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
-from utils.parsedunders import parse_dunders
+from utils.nested import parse_dunders, prefetch_nested
 from .filters import METADBFilter
 from .serializers import get_serializer
 from django_query_tools.server import make_atoms, validate_atoms, make_query
@@ -210,12 +210,12 @@ def filter_query(request, code):
     # Initial queryset
     qs = project.model.objects.select_related()
 
+    # Ignore suppressed data
     if "suppressed" not in fields:
         qs = qs.filter(suppressed=False)
 
-    # TODO: Automated prefetch_related for nested data
-    for metric in project.model.ExtraMeta.metrics:  # type: ignore
-        qs = qs.prefetch_related(metric)
+    # Prefetch any nested fields within scope
+    qs = prefetch_nested(qs, fields)
 
     # If data was provided, then it has now been validated
     # So we form the Q object, and filter the queryset with it
@@ -225,7 +225,13 @@ def filter_query(request, code):
         except Exception:
             return METADBResponse.invalid_query()
 
-        qs = qs.filter(q_object)
+        # A queryset is not guaranteed to return unique objects
+        # Especially as a result of complex nested queries
+        # So a call to distinct is necessary.
+        # This (should) not affect the cursor pagination
+        # as removing duplicates is not changing any order in the result set
+        # Tests will be needed to confirm all of this
+        qs = qs.filter(q_object).distinct()
 
     # Add the pagination cursor param back into the request
     if cursor is not None:
