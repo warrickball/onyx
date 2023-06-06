@@ -1,10 +1,10 @@
 from django.db import models
-from django.db.models import ForeignKey
+from django.db.models import ForeignKey, ManyToOneRel
 from django_filters import rest_framework as filters
-from utils.fields import YearMonthField, LowerCharField, UpperCharField
+from internal.models import Choice
+from utils.fields import ChoiceField, YearMonthField, LowerCharField, UpperCharField
 from utils.filters import (
     ModelChoiceInFilter,
-    ModelChoiceRangeFilter,
     CharInFilter,
     CharRangeFilter,
     NumberInFilter,
@@ -14,10 +14,7 @@ from utils.filters import (
     DateTimeInFilter,
     DateTimeRangeFilter,
     TypedChoiceInFilter,
-    TypedChoiceRangeFilter,
 )
-from distutils.util import strtobool
-from internal.models import Choice
 
 
 # Lookups shared by all fields
@@ -30,6 +27,13 @@ BASE_LOOKUPS = [
     "gte",
     "in",
     "range",
+]
+
+# Lookups available for choice fields
+CHOICE_LOOKUPS = [
+    "exact",
+    "ne",
+    "in",
 ]
 
 # Additional lookups for text fields
@@ -65,6 +69,15 @@ DATE_LOOKUPS = [
     "week__range",
 ]
 
+ALL_LOOKUPS = set(
+    BASE_LOOKUPS
+    + CHOICE_LOOKUPS
+    + TEXT_LOOKUPS
+    + YEARMONTH_LOOKUPS
+    + DATE_LOOKUPS
+    + ["isnull"]
+)
+
 # Text field types
 TEXT_FIELDS = [
     LowerCharField,
@@ -86,6 +99,12 @@ DATE_FIELDS = [
     models.DateTimeField,
 ]
 
+# Relation field types
+RELATIONS = [
+    ForeignKey,
+    ManyToOneRel,
+]
+
 # Accepted strings for True and False when validating BooleanField
 BOOLEAN_CHOICES = (
     ("true", "true"),
@@ -97,7 +116,6 @@ BOOLEAN_CHOICES = (
 # Mappings from field type + lookup to filter
 FILTERS = {
     ("choice", "in"): ModelChoiceInFilter,
-    ("choice", "range"): ModelChoiceRangeFilter,
     ("text", "in"): CharInFilter,
     ("text", "range"): CharRangeFilter,
     ("number", "in"): NumberInFilter,
@@ -107,8 +125,17 @@ FILTERS = {
     ("datetime", "in"): DateTimeInFilter,
     ("datetime", "range"): DateTimeRangeFilter,
     ("bool", "in"): TypedChoiceInFilter,
-    ("bool", "range"): TypedChoiceRangeFilter,
 }
+
+
+def strtobool(val):
+    val = val.lower()
+    if val == "true":
+        return True
+    elif val == "false":
+        return False
+    else:
+        raise ValueError(f"Invalid truth value: {val}")
 
 
 def isnull(field):
@@ -120,109 +147,41 @@ def isnull(field):
     )
 
 
-def get_filter(model, user_field, field_contexts):
-    # Get the field and the lookup
-    field, underscore, lookup = user_field.partition("__")
-
-    # Check that there is no trailing underscore
-    if underscore and not lookup:
-        return None, None
-
-    # Retrieve the provided field from the model
-    model_field = model._meta.get_field(field)
-
-    # Determine whether the field is a foreign key to another field
-    # If it is, the field_path will map to a related field on the foreign model
-    if isinstance(model_field, ForeignKey):
-        related_field = model_field.foreign_related_fields[0].name  # type: ignore
-        field_type = type(model_field.related_model._meta.get_field(related_field))
-        field_path = field + "__" + related_field
-    elif field in model.CustomMeta.metrics:
-        related_field, underscore, lookup = lookup.partition("__")
-        related_model = model_field.related_model
-
-        if related_field not in related_model.CustomMeta.fields:
-            return None, None
-
-        if underscore and not lookup:
-            return None, None
-
-        field_type = type(model_field.related_model._meta.get_field(related_field))
-        field_path = field + "__" + related_field
-        field = field_path
-    else:
-        related_field = field
-        field_type = type(model_field)
-        field_path = field
-
-    # Return the correct filter, based on the field's type and the lookup string
-    # Choice
-    if (
-        field in model.CustomMeta.db_choice_fields
-        or model_field.related_model == Choice
-    ):
-        if field in model.CustomMeta.db_choice_fields:
-            db_model = model._meta.get_field(field).related_model
-            qs = db_model.objects.all()
-            to_field_name = related_field
-        else:
-            qs = Choice.objects.filter(
-                content_type=field_contexts[field].content_type,
-                field=field,
-            )
-            to_field_name = "choice"
-            field_type = LowerCharField
-            field_path = field + "__choice"
-
-        if not lookup:
-            return f"{field}", filters.ModelChoiceFilter(
-                field_name=field,
-                queryset=qs,
-                to_field_name=to_field_name,
-            )
-        elif lookup in BASE_LOOKUPS:
-            filter = FILTERS.get(("choice", lookup), filters.ModelChoiceFilter)
-            return f"{field}__{lookup}", filter(
-                field_name=field,
-                queryset=qs,
-                to_field_name=to_field_name,
-                lookup_expr=lookup,
-            )
-        elif field_type in TEXT_FIELDS and lookup in TEXT_LOOKUPS:
-            return f"{field}__{lookup}", filters.CharFilter(
-                field_name=field_path,
-                lookup_expr=lookup,
-            )
-        elif lookup == "isnull":
-            return f"{field}__isnull", isnull(field)
+def get_filter(
+    field_type,
+    field_path,
+    field_name,
+    lookup,
+    content_type=None,
+):
     # Text
-    elif field_type in TEXT_FIELDS:
+    if field_type in TEXT_FIELDS:
         if not lookup:
-            return f"{field}", filters.CharFilter(
+            return f"{field_path}", filters.CharFilter(
                 field_name=field_path,
             )
         elif lookup in BASE_LOOKUPS or lookup in TEXT_LOOKUPS:
             filter = FILTERS.get(("text", lookup), filters.CharFilter)
-            return f"{field}__{lookup}", filter(
+            return f"{field_path}__{lookup}", filter(
                 field_name=field_path,
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", isnull(field_path)
+            return f"{field_path}__isnull", isnull(field_path)
     # Number
     elif field_type in NUMBER_FIELDS:
         if not lookup:
-            return f"{field}", filters.NumberFilter(
+            return f"{field_path}", filters.NumberFilter(
                 field_name=field_path,
             )
         elif lookup in BASE_LOOKUPS:
             filter = FILTERS.get(("number", lookup), filters.NumberFilter)
-            return f"{field}__{lookup}", filter(
+            return f"{field_path}__{lookup}", filter(
                 field_name=field_path,
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", isnull(field_path)
+            return f"{field_path}__isnull", isnull(field_path)
     # Date
     elif field_type in DATE_FIELDS:
         if field_type == YearMonthField:
@@ -240,15 +199,14 @@ def get_filter(model, user_field, field_contexts):
             filter_type = "datetime"
             lookups = DATE_LOOKUPS
             input_formats = ["%Y-%m-%d"]
-
         if not lookup:
-            return f"{field}", filter(
+            return f"{field_path}", filter(
                 field_name=field_path,
                 input_formats=input_formats,
             )
         elif lookup in BASE_LOOKUPS:
             filter = FILTERS.get((filter_type, lookup), filter)  # type: ignore
-            return f"{field}__{lookup}", filter(
+            return f"{field_path}__{lookup}", filter(
                 field_name=field_path,
                 input_formats=input_formats,
                 lookup_expr=lookup,
@@ -260,43 +218,77 @@ def get_filter(model, user_field, field_contexts):
                 filter = NumberRangeFilter
             else:
                 filter = filters.NumberFilter
-            return f"{field}__{lookup}", filter(
+            return f"{field_path}__{lookup}", filter(
                 field_name=field_path,
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", isnull(field_path)
+            return f"{field_path}__isnull", isnull(field_path)
     # True/false
     elif field_type == models.BooleanField:
         if not lookup:
-            return f"{field}", filters.TypedChoiceFilter(
+            return f"{field_path}", filters.TypedChoiceFilter(
                 field_name=field_path,
                 choices=BOOLEAN_CHOICES,
                 coerce=strtobool,
             )
         elif lookup in BASE_LOOKUPS:
             filter = FILTERS.get(("bool", lookup), filters.TypedChoiceFilter)
-            return f"{field}__{lookup}", filter(
+            return f"{field_path}__{lookup}", filter(
                 field_name=field_path,
                 choices=BOOLEAN_CHOICES,
                 coerce=strtobool,
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
-            return f"{field}__isnull", isnull(field_path)
+            return f"{field_path}__isnull", isnull(field_path)
+    # Choice
+    elif field_type == ChoiceField:
+        qs = Choice.objects.filter(
+            content_type=content_type,
+            field=field_name,
+        )
+        if not lookup:
+            return f"{field_path}", filters.ModelChoiceFilter(
+                field_name=field_path,
+                queryset=qs,
+                to_field_name="choice",
+            )
+        elif lookup in CHOICE_LOOKUPS:
+            filter = FILTERS.get(("choice", lookup), filters.ModelChoiceFilter)
+            return f"{field_path}__{lookup}", filter(
+                field_name=field_path,
+                queryset=qs,
+                to_field_name="choice",
+                lookup_expr=lookup,
+            )
+        elif lookup == "isnull":
+            return f"{field_path}__isnull", isnull(field_path)
+    # Relations
+    elif field_type in RELATIONS:
+        if lookup == "isnull":
+            return f"{field_path}__isnull", isnull(field_path)
 
     return None, None
 
 
 class METADBFilter(filters.FilterSet):
-    def __init__(self, model, field_contexts, *args, **kwargs):
+    def __init__(self, project, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        for user_field in self.data:
+        # Constructing the filterset dynamically enables:
+        # Checking whether the provided field_path and lookup can be used together
+        # Validating the values provided by the user for the fields
+        # Returning cleaned values from user inputs, using the filterset's underlying form
+        for field in self.data:
+            mfield = project.fields[field]
+
             name, filter = get_filter(
-                model,
-                user_field,
-                field_contexts,
+                field_type=mfield.field_type,
+                field_path=mfield.field_path,
+                field_name=mfield.field_name,
+                lookup=mfield.lookup,
+                content_type=mfield.content_type,
             )
             if name:
                 self.filters[name] = filter
