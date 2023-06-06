@@ -3,11 +3,7 @@ from django.core.exceptions import FieldDoesNotExist, ValidationError, Permissio
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
-from accounts.permissions import (
-    Admin,
-    ApprovedOrAdmin,
-    SameSiteAuthorityAsCIDOrAdmin,
-)
+from accounts.permissions import Admin, ApprovedOrAdmin, SameSiteAuthorityAsCIDOrAdmin
 from internal.models import History
 from utils.views import METADBAPIView
 from utils.response import METADBResponse
@@ -15,6 +11,7 @@ from utils.project import METADBProject
 from utils.mutable import mutable
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
+from utils.parsedunders import parse_dunders
 from .filters import METADBFilter
 from .serializers import get_serializer
 from django_query_tools.server import make_atoms, validate_atoms, make_query
@@ -32,7 +29,7 @@ class CreateRecordView(METADBAPIView):
                 code,
                 user=request.user,
                 action="add",
-                fields=list(request.data),
+                fields=parse_dunders(request.data),
             )
         except (
             ProjectDoesNotExist,
@@ -156,7 +153,7 @@ def filter_query(request, code):
         query = [
             {field: value}
             for field in request.query_params
-            for value in list(set(request.query_params.getlist(field)))
+            for value in request.query_params.getlist(field)
         ]
         if query:
             query = {"&": query}
@@ -216,11 +213,12 @@ def filter_query(request, code):
     if "suppressed" not in fields:
         qs = qs.filter(suppressed=False)
 
-    for metric in project.model.CustomMeta.metrics:  # type: ignore
+    # TODO: Automated prefetch_related for nested data
+    for metric in project.model.ExtraMeta.metrics:  # type: ignore
         qs = qs.prefetch_related(metric)
 
     # If data was provided, then it has now been validated
-    # So we form the a Q object, and filter the queryset with it
+    # So we form the Q object, and filter the queryset with it
     if query:
         try:
             q_object = make_query(query)
@@ -288,7 +286,7 @@ class UpdateRecordView(METADBAPIView):
                 code,
                 user=request.user,
                 action="change",
-                fields=list(request.data),
+                fields=parse_dunders(request.data),
             )
         except (
             ProjectDoesNotExist,

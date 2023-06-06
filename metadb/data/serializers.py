@@ -25,6 +25,7 @@ class RecordSerializer(NestedDynamicFieldsModelSerializer):
         ]
 
     def create(self, validated_data):
+        print(validated_data)
         cts = validated_data.pop("thresholdcycle", None)
 
         record = super().create(validated_data)
@@ -116,10 +117,6 @@ class MpxThresholdCycleSerializer(NestedDynamicFieldsModelSerializer):
 
 
 class MpxSerializer(GenomicSerializer):
-    # thresholdcycle = MpxThresholdCycleSerializer(
-    #     many=True, required=False, allow_null=True
-    # )
-
     sample_type = fieldserializers.ChoiceField(Mpx)
     seq_platform = fieldserializers.ChoiceField(Mpx)
     enrichment_method = fieldserializers.ChoiceField(Mpx)
@@ -131,6 +128,9 @@ class MpxSerializer(GenomicSerializer):
     sample_site = fieldserializers.ChoiceField(Mpx, required=False, allow_null=True)
     ukhsa_region = fieldserializers.ChoiceField(Mpx, required=False, allow_null=True)
     travel_status = fieldserializers.ChoiceField(Mpx, required=False, allow_null=True)
+    thresholdcycle = MpxThresholdCycleSerializer(
+        many=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = Mpx
@@ -153,7 +153,7 @@ class MpxSerializer(GenomicSerializer):
             "outer_postcode",
             "epi_cluster",
             "csv_template_version",
-            # "thresholdcycle",  # TODO: Does this need to be here?
+            "thresholdcycle",
         ]
 
     class ExtraMeta(GenomicSerializer.ExtraMeta):
