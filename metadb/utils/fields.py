@@ -77,3 +77,12 @@ class UpperCharField(models.CharField):
             return value.upper()
 
         return str(value).upper()
+
+
+class ChoiceField(models.ForeignKey):
+    def __init__(self, *args, **kwargs):
+        name = kwargs.pop("name", None)
+        kwargs["to"] = "internal.Choice"
+        kwargs["on_delete"] = models.CASCADE
+        kwargs["related_name"] = f"%(app_label)s_%(class)s_{name}"
+        super().__init__(*args, **kwargs)

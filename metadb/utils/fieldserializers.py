@@ -5,6 +5,7 @@ from django.utils.encoding import smart_str
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from datetime import date
+from internal.models import Choice
 
 
 class YearMonthField(serializers.Field):
@@ -42,10 +43,9 @@ class ChoiceField(serializers.RelatedField):
         "invalid": _("Invalid value."),
     }
 
-    def __init__(self, **kwargs):
-        self.model = kwargs["model"]
-        kwargs.pop("model")
-        super().__init__(**kwargs)
+    def __init__(self, model, **kwargs):
+        self.model = model
+        super().__init__(queryset=Choice.objects.all(), **kwargs)
 
     def to_internal_value(self, data):
         queryset = self.get_queryset()

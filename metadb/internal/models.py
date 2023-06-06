@@ -108,6 +108,7 @@ class Request(models.Model):
     date = models.DateTimeField(auto_now=True)
 
 
+# TODO: Make this a generic relation?
 class History(models.Model):
     record = models.ForeignKey("data.Record", on_delete=models.SET_NULL, null=True)
     cid = UpperCharField(max_length=12)

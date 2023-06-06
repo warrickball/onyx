@@ -48,7 +48,7 @@ class NestedDynamicFieldsModelSerializer(serializers.ModelSerializer):
 
             # Handle relations
             for field_name, nested in relations.items():
-                relation = self.CustomMeta.relations[field_name]
+                relation = self.ExtraMeta.relations[field_name]
                 self.fields[field_name] = relation["serializer"](
                     fields=nested,
                     **relation["kwargs"],
@@ -60,5 +60,5 @@ class NestedDynamicFieldsModelSerializer(serializers.ModelSerializer):
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
 
-    class CustomMeta:
+    class ExtraMeta:
         relations = {}

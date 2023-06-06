@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from internal.serializers import NestedDynamicFieldsModelSerializer
-from internal.models import Choice
 from data.models import Record, Genomic, Mpx, MpxThresholdCycle
 from utils import fieldserializers
 from utils.validation import (
@@ -49,12 +48,12 @@ class RecordSerializer(NestedDynamicFieldsModelSerializer):
                 errors=errors,
                 instance=self.instance,
                 data=data,
-                groups=model.CustomMeta.optional_value_groups,
+                groups=model.ExtraMeta.optional_value_groups,
             )
             for (
                 lower_yearmonth,
                 higher_yearmonth,
-            ) in model.CustomMeta.yearmonth_orderings:
+            ) in model.ExtraMeta.yearmonth_orderings:
                 enforce_yearmonth_order_update(
                     errors=errors,
                     instance=self.instance,
@@ -67,12 +66,12 @@ class RecordSerializer(NestedDynamicFieldsModelSerializer):
             enforce_optional_value_groups_create(
                 errors=errors,
                 data=data,
-                groups=model.CustomMeta.optional_value_groups,
+                groups=model.ExtraMeta.optional_value_groups,
             )
             for (
                 lower_yearmonth,
                 higher_yearmonth,
-            ) in model.CustomMeta.yearmonth_orderings:
+            ) in model.ExtraMeta.yearmonth_orderings:
                 enforce_yearmonth_order_create(
                     errors=errors,
                     lower_yearmonth=lower_yearmonth,
@@ -80,7 +79,7 @@ class RecordSerializer(NestedDynamicFieldsModelSerializer):
                     data=data,
                 )
         # Object create and update validation
-        for yearmonth in model.CustomMeta.yearmonths:
+        for yearmonth in model.ExtraMeta.yearmonths:
             if data.get(yearmonth):
                 enforce_yearmonth_non_future(
                     errors=errors,
@@ -121,58 +120,17 @@ class MpxSerializer(GenomicSerializer):
     #     many=True, required=False, allow_null=True
     # )
 
-    sample_type = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-    )
-    seq_platform = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-    )
-    enrichment_method = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-    )
-    seq_strategy = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-    )
-    source_of_library = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-    )
-    country = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-    )
-    run_layout = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-    )
-    patient_ageband = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-        required=False,
-        allow_null=True,
-    )
-    sample_site = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-        required=False,
-        allow_null=True,
-    )
-    ukhsa_region = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-        required=False,
-        allow_null=True,
-    )
-    travel_status = fieldserializers.ChoiceField(
-        model=Mpx,
-        queryset=Choice.objects.all(),
-        required=False,
-        allow_null=True,
-    )
+    sample_type = fieldserializers.ChoiceField(Mpx)
+    seq_platform = fieldserializers.ChoiceField(Mpx)
+    enrichment_method = fieldserializers.ChoiceField(Mpx)
+    seq_strategy = fieldserializers.ChoiceField(Mpx)
+    source_of_library = fieldserializers.ChoiceField(Mpx)
+    country = fieldserializers.ChoiceField(Mpx)
+    run_layout = fieldserializers.ChoiceField(Mpx)
+    patient_ageband = fieldserializers.ChoiceField(Mpx, required=False, allow_null=True)
+    sample_site = fieldserializers.ChoiceField(Mpx, required=False, allow_null=True)
+    ukhsa_region = fieldserializers.ChoiceField(Mpx, required=False, allow_null=True)
+    travel_status = fieldserializers.ChoiceField(Mpx, required=False, allow_null=True)
 
     class Meta:
         model = Mpx
@@ -198,19 +156,17 @@ class MpxSerializer(GenomicSerializer):
             # "thresholdcycle",  # TODO: Does this need to be here?
         ]
 
-    class CustomMeta(GenomicSerializer.CustomMeta):
-        GenomicSerializer.CustomMeta.relations.update(
-            {
-                "thresholdcycle": {
-                    "serializer": MpxThresholdCycleSerializer,
-                    "kwargs": {
-                        "many": True,
-                        "required": False,
-                        "allow_null": True,
-                    },
-                }
+    class ExtraMeta(GenomicSerializer.ExtraMeta):
+        relations = GenomicSerializer.ExtraMeta.relations | {
+            "thresholdcycle": {
+                "serializer": MpxThresholdCycleSerializer,
+                "kwargs": {
+                    "many": True,
+                    "required": False,
+                    "allow_null": True,
+                },
             }
-        )
+        }
 
 
 def get_serializer(model):
