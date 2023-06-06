@@ -9,8 +9,8 @@ class Command(base.BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("code")
-        parser.add_argument("--content-type")
-        parser.add_argument("--groups")
+        parser.add_argument("--content-type", required=True)
+        parser.add_argument("--groups", required=True)
 
     def handle(self, *args, **options):
         code = options["code"].lower()
@@ -19,7 +19,7 @@ class Command(base.BaseCommand):
         groups = {}
 
         for gdef in read_groups(options["groups"]):
-            group, created = create_or_update_group(gdef)
+            group, created = create_or_update_group(app, model, gdef)
             action, _, _ = gdef.name.partition("_")
             groups[action] = group
 

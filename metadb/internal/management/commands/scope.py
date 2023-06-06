@@ -14,9 +14,11 @@ class Command(base.BaseCommand):
         code = options["code"].lower()
         project_code, _, scope_code = code.partition("-")
         project = Project.objects.get(code=project_code)
+        app = project.content_type.app_label
+        model = project.content_type.model
 
         for gdef in read_groups(options["groups"]):
-            group, created = create_or_update_group(gdef)
+            group, created = create_or_update_group(app, model, gdef)
             action, _, _ = gdef.name.partition("_")
 
             if created:

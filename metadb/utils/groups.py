@@ -38,13 +38,12 @@ def read_groups(scheme):
     yield gdef
 
 
-def create_or_update_group(gdef):
+def create_or_update_group(app_label, model, gdef):
     group, created = Group.objects.get_or_create(name=gdef.name)
     permissions = []
 
     for perm in gdef.permissions:
-        app_label, model, permission = perm
-
+        permission = perm[0]
         action, _, thing = permission.partition("_")
         project, _, field = thing.partition("__")
 
