@@ -4,7 +4,7 @@ from django.db.models import ForeignKey, ManyToOneRel
 from internal.models import Project, Scope
 from data.filters import ALL_LOOKUPS
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
-from utils.fields import ChoiceField
+from utils.fields import ModelChoiceField
 
 
 class METADBField:
@@ -158,8 +158,8 @@ class METADBProject:
                         )
                         break
                     else:
-                        if isinstance(component_instance, ChoiceField):
-                            # A ChoiceField can only be followed by a valid lookup
+                        if isinstance(component_instance, ModelChoiceField):
+                            # A ModelChoiceField can only be followed by a valid lookup
                             # If it is invalid, return unknown
                             unknown.append(field)
 

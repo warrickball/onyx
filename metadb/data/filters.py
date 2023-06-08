@@ -2,9 +2,15 @@ from django.db import models
 from django.db.models import ForeignKey, ManyToOneRel
 from django_filters import rest_framework as filters
 from internal.models import Choice
-from utils.fields import ChoiceField, YearMonthField, LowerCharField, UpperCharField
+from utils.choices import format_choices
+from utils.fields import (
+    LowerCharField,
+    UpperCharField,
+    YearMonthField,
+    ModelChoiceField,
+    ChoiceField,
+)
 from utils.filters import (
-    ModelChoiceInFilter,
     CharInFilter,
     CharRangeFilter,
     NumberInFilter,
@@ -14,8 +20,10 @@ from utils.filters import (
     DateTimeInFilter,
     DateTimeRangeFilter,
     TypedChoiceInFilter,
+    ModelChoiceInFilter,
+    ChoiceFilter,
+    ChoiceInFilter,
 )
-
 
 # Lookups shared by all fields
 BASE_LOOKUPS = [
@@ -106,16 +114,10 @@ RELATIONS = [
 ]
 
 # Accepted strings for True and False when validating BooleanField
-BOOLEAN_CHOICES = (
-    ("true", "true"),
-    ("True", "True"),
-    ("false", "false"),
-    ("False", "False"),
-)
+BOOLEAN_CHOICES = format_choices(["true", "True", "false", "False"])
 
 # Mappings from field type + lookup to filter
 FILTERS = {
-    ("choice", "in"): ModelChoiceInFilter,
     ("text", "in"): CharInFilter,
     ("text", "range"): CharRangeFilter,
     ("number", "in"): NumberInFilter,
@@ -125,6 +127,8 @@ FILTERS = {
     ("datetime", "in"): DateTimeInFilter,
     ("datetime", "range"): DateTimeRangeFilter,
     ("bool", "in"): TypedChoiceInFilter,
+    ("modelchoice", "in"): ModelChoiceInFilter,
+    ("choice", "in"): ChoiceInFilter,
 }
 
 
@@ -242,8 +246,8 @@ def get_filter(
             )
         elif lookup == "isnull":
             return f"{field_path}__isnull", isnull(field_path)
-    # Choice
-    elif field_type == ChoiceField:
+    # ModelChoice (will probably be removed soon)
+    elif field_type == ModelChoiceField:
         qs = Choice.objects.filter(
             content_type=content_type,
             field=field_name,
@@ -255,11 +259,36 @@ def get_filter(
                 to_field_name="choice",
             )
         elif lookup in CHOICE_LOOKUPS:
-            filter = FILTERS.get(("choice", lookup), filters.ModelChoiceFilter)
+            filter = FILTERS.get(("modelchoice", lookup), filters.ModelChoiceFilter)
             return f"{field_path}__{lookup}", filter(
                 field_name=field_path,
                 queryset=qs,
                 to_field_name="choice",
+                lookup_expr=lookup,
+            )
+        elif lookup == "isnull":
+            return f"{field_path}__isnull", isnull(field_path)
+    # Choice
+    elif field_type == ChoiceField:
+        choices = format_choices(
+            Choice.objects.filter(
+                content_type=content_type,
+                field=field_name,
+            ).values_list(
+                "choice",
+                flat=True,
+            )
+        )
+        if not lookup:
+            return f"{field_path}", ChoiceFilter(
+                field_name=field_path,
+                choices=choices,
+            )
+        elif lookup in CHOICE_LOOKUPS:
+            filter = FILTERS.get(("choice", lookup), ChoiceFilter)
+            return f"{field_path}__{lookup}", filter(
+                field_name=field_path,
+                choices=choices,
                 lookup_expr=lookup,
             )
         elif lookup == "isnull":
