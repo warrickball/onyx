@@ -11,9 +11,8 @@ positional arguments:
     register            Register a new user.
     login               Log in to metadb.
     logout              Log out of metadb.
-    logoutall           Log out of metadb on all devices.
+    logoutall           Log out of metadb everywhere.
     create              Upload metadata records.
-    testcreate          Test uploading metadata records.
     get                 Get a metadata record.
     filter              Filter metadata records.
     update              Update metadata records.
