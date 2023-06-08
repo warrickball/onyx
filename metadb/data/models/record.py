@@ -43,4 +43,3 @@ class Record(models.Model):
         optional_value_groups = []
         yearmonths = []
         yearmonth_orderings = []
-        metrics = []

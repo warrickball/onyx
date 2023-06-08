@@ -1,4 +1,6 @@
 from .record import RecordSerializer
-from .get_serializer import get_serializer
 
-from . import projects
+try:
+    from . import projects
+except (ImportError, ModuleNotFoundError):
+    pass

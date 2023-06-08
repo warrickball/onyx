@@ -135,8 +135,5 @@ class Choice(models.Model):
     class Meta:
         unique_together = ["content_type", "field", "choice"]
         indexes = [
-            models.Index(fields=["content_type", "field", "choice"]),
-            models.Index(fields=["content_type"]),
-            models.Index(fields=["field"]),
-            models.Index(fields=["choice"]),
+            models.Index(fields=["content_type", "field"]),
         ]

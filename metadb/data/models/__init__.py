@@ -1,3 +1,6 @@
 from .record import Record
 
-from . import projects
+try:
+    from . import projects
+except (ImportError, ModuleNotFoundError):
+    pass

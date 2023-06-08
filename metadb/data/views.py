@@ -13,8 +13,12 @@ from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
 from .filters import METADBFilter
-from .serializers import get_serializer
 from django_query_tools.server import make_atoms, validate_atoms, make_query
+
+try:
+    from data.serializers.projects import mapping
+except ImportError:
+    mapping = {}
 
 
 class CreateRecordView(METADBAPIView):
@@ -45,8 +49,13 @@ class CreateRecordView(METADBAPIView):
         if not request.data.get("site"):
             request.data["site"] = request.user.site.code
 
-        # Get the model serializer, and validate the data
-        serializer = get_serializer(project.model)(
+        # Get the model serializer
+        serializer_cls = mapping.get(project.model)
+        if not serializer_cls:
+            return METADBResponse.not_found("serializer")
+
+        # Validate the data using the serializer
+        serializer = serializer_cls(
             data=request.data,
         )
 
@@ -112,8 +121,13 @@ class GetRecordView(METADBAPIView):
         except project.model.DoesNotExist:
             return METADBResponse.not_found("cid")
 
+        # Get the model serializer
+        serializer_cls = mapping.get(project.model)
+        if not serializer_cls:
+            return METADBResponse.not_found("serializer")
+
         # Serialize the result
-        serializer = get_serializer(project.model)(
+        serializer = serializer_cls(
             instance,
             fields=project.view_fields(),
         )
@@ -242,8 +256,13 @@ def filter_query(request, code):
     instances = qs.order_by("id")
     result_page = paginator.paginate_queryset(instances, request)
 
+    # Get the model serializer
+    serializer_cls = mapping.get(project.model)
+    if not serializer_cls:
+        return METADBResponse.not_found("serializer")
+
     # Serialize the results
-    serializer = get_serializer(project.model)(
+    serializer = serializer_cls(
         result_page,
         many=True,
         fields=fields,
@@ -312,8 +331,13 @@ class UpdateRecordView(METADBAPIView):
         except project.model.DoesNotExist:
             return METADBResponse.not_found("cid")
 
-        # Get the model serializer, and validate the data
-        serializer = get_serializer(project.model)(
+        # Get the model serializer
+        serializer_cls = mapping.get(project.model)
+        if not serializer_cls:
+            return METADBResponse.not_found("serializer")
+
+        # Validate the data using the serializer
+        serializer = serializer_cls(
             instance=instance,
             data=request.data,
             partial=True,
