@@ -37,9 +37,9 @@ class Command(base.BaseCommand):
                 roles.append(role)
 
             user.save(update_fields=roles)
-            print("Granted access to roles:")
+            print("Granted roles:")
             for role in roles:
-                print(role)
+                print(f"\t{role}")
 
         elif options.get("revoke"):
             roles = []
@@ -54,12 +54,11 @@ class Command(base.BaseCommand):
                 roles.append(role)
 
             user.save(update_fields=roles)
-            print("Revoked access to roles:")
+            print("Revoked roles:")
             for role in roles:
-                print(role)
+                print(f"\t{role}")
 
         elif options.get("list"):
-            print("Has access to roles:")
+            print("Roles:")
             for role in allowed:
-                if getattr(user, role):
-                    print(role)
+                print(f"\t{role}:", getattr(user, role))

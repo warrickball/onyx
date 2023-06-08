@@ -54,7 +54,7 @@ def create_or_update_group(app_label, model, gdef):
             name=f"Can {action} {project}{' ' + field if field else ''}",
         )
         if created:
-            print("NOTE: CREATED PERMISSION:", permission)
+            print("Created permission:", permission)
         permissions.append(permission)
 
     group.permissions.set(permissions)

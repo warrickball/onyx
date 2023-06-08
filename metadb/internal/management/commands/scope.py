@@ -8,11 +8,13 @@ class Command(base.BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("code")
-        parser.add_argument("--groups")
+        parser.add_argument("scope")
+        parser.add_argument("--groups", required=True)
 
     def handle(self, *args, **options):
-        code = options["code"].lower()
-        project_code, _, scope_code = code.partition("-")
+        project_code = options["code"].lower()
+        scope_code = options["scope"].lower()
+
         project = Project.objects.get(code=project_code)
         app = project.content_type.app_label
         model = project.content_type.model
@@ -22,13 +24,14 @@ class Command(base.BaseCommand):
             action, _, _ = gdef.name.partition("_")
 
             if created:
-                print(f"Group created: {gdef.name}")
+                print(f"Created group: {gdef.name}")
             else:
-                print(f"Group updated: {gdef.name}")
+                print(f"Updated group: {gdef.name}")
 
             print("Permissions:")
             for perm in group.permissions.all():
-                print(perm)
+                print(f"\t{perm}")
+            print("")
 
             scope, created = Scope.objects.update_or_create(
                 project=project,
@@ -40,10 +43,10 @@ class Command(base.BaseCommand):
             )
 
             if created:
-                print("Scope created.")
+                print(f"Created scope: {scope.code}")
             else:
-                print("Scope updated.")
+                print(f"Updated scope: {scope.code}")
 
-            print("Project code:", project.code)
-            print("Scope code:", scope.code)
-            print("Action:", scope.action)
+            print("\tproject:", project.code)
+            print("\taction:", scope.action)
+            print("")

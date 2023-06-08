@@ -18,20 +18,20 @@ class Command(base.BaseCommand):
         print("User:", user.username)
 
         if options.get("grant"):
-            print("Granted access to groups:")
+            print("Granted groups:")
             for g in options["grant"]:
                 group = Group.objects.get(name=g)
                 user.groups.add(group)
-                print(group)
+                print(f"\t{group}")
 
         elif options.get("revoke"):
-            print("Revoked access to groups:")
+            print("Revoked groups:")
             for g in options["revoke"]:
                 group = Group.objects.get(name=g)
                 user.groups.remove(group)
-                print(group)
+                print(f"\t{group}")
 
         elif options.get("list"):
-            print("Has access to groups:")
+            print("Groups:")
             for group in user.groups.all():
-                print(group.name)
+                print(f"\t{group}")

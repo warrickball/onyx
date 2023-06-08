@@ -9,12 +9,17 @@ class Command(base.BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("code")
-        parser.add_argument("--content-type", required=True)
         parser.add_argument("--groups", required=True)
+        parser.add_argument("--content-type")
 
     def handle(self, *args, **options):
         code = options["code"].lower()
-        app, model = options["content_type"].split(".")
+
+        if options["content_type"]:
+            app, model = options["content_type"].split(".")
+        else:
+            app, model = "data", code
+
         content_type = ContentType.objects.get(app_label=app, model=model)
         groups = {}
 
@@ -24,13 +29,14 @@ class Command(base.BaseCommand):
             groups[action] = group
 
             if created:
-                print(f"Group created: {gdef.name}")
+                print(f"Created group: {gdef.name}")
             else:
-                print(f"Group updated: {gdef.name}")
+                print(f"Updated group: {gdef.name}")
 
             print("Permissions:")
             for perm in group.permissions.all():
-                print(perm)
+                print(f"\t{perm}")
+            print("")
 
         project, created = Project.objects.update_or_create(
             code=code,
@@ -45,9 +51,8 @@ class Command(base.BaseCommand):
         )
 
         if created:
-            print("Project created.")
+            print(f"Created project: {project.code}")
         else:
-            print("Project updated.")
+            print(f"Updated project: {project.code}")
 
-        print("Code:", project.code)
-        print("Model:", project.content_type.model_class())
+        print("\tmodel:", project.content_type.model_class())

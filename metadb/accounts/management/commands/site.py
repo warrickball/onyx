@@ -7,12 +7,12 @@ class Command(base.BaseCommand):
     help = "Create a site in the database."
 
     def add_arguments(self, parser):
+        parser.add_argument("code")
         parser.add_argument("-n", "--name", required=True)
-        parser.add_argument("-c", "--code", required=True)
 
     def handle(self, *args, **options):
+        code = options["code"].lower()
         name = options["name"]
-        code = options["code"]
 
         exists = False
         try:
@@ -21,12 +21,10 @@ class Command(base.BaseCommand):
             exists = True
 
         if exists:
-            site = Site.objects.get(code=code.lower())
-            print("Site already existed.")
-            print("Site name:", site.name)
-            print("Site code:", site.code)
+            site = Site.objects.get(code=code)
+            print(f"Existing site: {site.code}")
+            print("\tname:", site.name)
         else:
-            site = Site.objects.get(code=code.lower())
-            print("Site created successfully.")
-            print("Site name:", site.name)
-            print("Site code:", site.code)
+            site = Site.objects.get(code=code)
+            print(f"Created site: {site.code}")
+            print("\tname:", site.name)
