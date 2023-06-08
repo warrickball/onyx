@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 
-class METADBResponse:
+class OnyxResponse:
     @classmethod
     def invalid_query(cls):
         return Response(

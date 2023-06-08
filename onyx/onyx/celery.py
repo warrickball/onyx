@@ -4,9 +4,9 @@ from celery import Celery
 from celery.schedules import crontab
 
 # Set the default Django settings module for the 'celery' program.
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "metadb.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "onyx.settings")
 
-app = Celery("metadb", broker="pyamqp://guest@localhost//")
+app = Celery("onyx", broker="pyamqp://guest@localhost//")
 
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.
@@ -26,7 +26,7 @@ def debug_task(self):
 app.conf.beat_schedule = {
     "create-mpx-tables-task": {
         "task": "data.tasks.create_mpx_tables",
-        "schedule": crontab(minute=f"*/{os.environ['METADB_CELERY_BEAT_TIME']}"),
+        "schedule": crontab(minute=f"*/{os.environ['ONYX_CELERY_BEAT_TIME']}"),
     }
 }
 app.conf.task_routes = {"data.tasks.create_mpx_tables": {"queue": "create_mpx_tables"}}

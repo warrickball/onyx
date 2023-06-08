@@ -7,4 +7,4 @@ class DataConfig(AppConfig):
 
     def ready(self):
         import data.signals
-        import metadb.celery
+        import onyx.celery

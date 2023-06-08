@@ -3,7 +3,7 @@ from rest_framework.generics import CreateAPIView, ListAPIView
 
 
 # https://stackoverflow.com/a/40253614 # to ease your mind
-class METADBAPIMixin:
+class OnyxAPIMixin:
     def get_permission_classes(self):
         return self.permission_classes  # type: ignore
 
@@ -117,13 +117,13 @@ class METADBAPIMixin:
             return has_permission, message
 
 
-class METADBAPIView(METADBAPIMixin, APIView):
+class OnyxAPIView(OnyxAPIMixin, APIView):
     pass
 
 
-class METADBCreateAPIView(METADBAPIMixin, CreateAPIView):
+class OnyxCreateAPIView(OnyxAPIMixin, CreateAPIView):
     pass
 
 
-class METADBListAPIView(METADBAPIMixin, ListAPIView):
+class OnyxListAPIView(OnyxAPIMixin, ListAPIView):
     pass

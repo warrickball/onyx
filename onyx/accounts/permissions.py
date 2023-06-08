@@ -1,7 +1,7 @@
 from rest_framework import permissions, exceptions
 from data.models import Record
 from accounts.models import User
-from utils.response import METADBResponse
+from utils.response import OnyxResponse
 
 
 class AllowAny(permissions.BasePermission):
@@ -111,7 +111,7 @@ class IsSameSiteAsCID(permissions.BasePermission):
         try:
             obj = qs.get(cid=cid)
         except Record.DoesNotExist:
-            raise exceptions.NotFound(METADBResponse._not_found("cid"))
+            raise exceptions.NotFound(OnyxResponse._not_found("cid"))
 
         self.message = f"You need to be from site {obj.site.code}"
 
@@ -130,7 +130,7 @@ class IsSameSiteAsUser(permissions.BasePermission):
         try:
             obj = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise exceptions.NotFound(METADBResponse._not_found("user"))
+            raise exceptions.NotFound(OnyxResponse._not_found("user"))
 
         self.message = f"You need to be from site {obj.site.code}"
 

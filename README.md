@@ -1,7 +1,7 @@
-# `metadb`
+# `onyx`
 ```
-$ metadb -h
-usage: metadb [-h] [-u USER] [-p] [-v] {command} ...
+$ onyx -h
+usage: onyx [-h] [-u USER] [-p] [-v] {command} ...
 
 positional arguments:
   {command}
@@ -9,9 +9,9 @@ positional arguments:
     site                Site-specific commands.
     admin               Admin-specific commands.
     register            Register a new user.
-    login               Log in to metadb.
-    logout              Log out of metadb.
-    logoutall           Log out of metadb everywhere.
+    login               Log in to onyx.
+    logout              Log out of onyx.
+    logoutall           Log out of onyx everywhere.
     create              Upload metadata records.
     get                 Get a metadata record.
     filter              Filter metadata records.
@@ -22,27 +22,27 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -u USER, --user USER  Which user to execute the command as.
-  -p, --env-password    When a password is required, the client will use the env variable with format 'METADB_<USER>_PASSWORD'.
+  -p, --env-password    When a password is required, the client will use the env variable with format 'ONYX_<USER>_PASSWORD'.
   -v, --version         Client version number.
 ```
 
 ## Create a config
 ```
-$ metadb config create
+$ onyx config create
 ```
 
 ## Register a user
 ```
-$ metadb register
+$ onyx register
 ```
 
 ## Upload data
 #### Create a single record from name/value pairs
 ```
-$ metadb create <project> --field <name> <value> --field <name> <value> ...
+$ onyx create <project> --field <name> <value> --field <name> <value> ...
 ```
 ```python
-from metadb import Session
+from onyx import Session
 
 with Session() as client:
     # Create a single record
@@ -61,11 +61,11 @@ with Session() as client:
 
 #### Create multiple records from a csv/tsv
 ```
-$ metadb create <project> --csv <csv>
-$ metadb create <project> --tsv <tsv>
+$ onyx create <project> --csv <csv>
+$ onyx create <project> --tsv <tsv>
 ```
 ```python
-from metadb import Session
+from onyx import Session
 
 with Session() as client:
     # Create from a csv of records
@@ -83,10 +83,10 @@ with Session() as client:
 ## Retrieve data
 #### The `get` endpoint
 ```
-$ metadb get <project> <cid>
+$ onyx get <project> <cid>
 ```
 ```python
-from metadb import Session 
+from onyx import Session 
 
 with Session() as client:
     result = client.get("project", "cid")
@@ -95,10 +95,10 @@ with Session() as client:
 
 #### The `filter` endpoint
 ```
-$ metadb filter <project> --field <name> <value> --field <name> <value> ...
+$ onyx filter <project> --field <name> <value> --field <name> <value> ...
 ```
 ```python
-from metadb import Session
+from onyx import Session
 
 # Retrieve all results matching ALL of the field requirements
 with Session() as client:
@@ -121,7 +121,7 @@ with Session() as client:
 
 #### The `query` endpoint 
 ```python
-from metadb import Session, F
+from onyx import Session, F
 
 with Session() as client:
     # The python bitwise operators can be used in a query.
@@ -187,10 +187,10 @@ Most of these lookups (excluding `ne`, which is a custom lookup meaning `not equ
 ## Update data
 #### Update a single record from name/value pairs
 ```
-$ metadb update <project> <cid> --field <name> <value> --field <name> <value> ...
+$ onyx update <project> <cid> --field <name> <value> --field <name> <value> ...
 ```
 ```python
-from metadb import Session
+from onyx import Session
 
 with Session() as client:
     response = client.update(
@@ -209,11 +209,11 @@ with Session() as client:
 
 #### Update multiple records from a csv/tsv
 ```
-$ metadb update <project> --csv <csv>
-$ metadb update <project> --tsv <tsv>
+$ onyx update <project> --csv <csv>
+$ onyx update <project> --tsv <tsv>
 ```
 ```python
-from metadb import Session
+from onyx import Session
 
 with Session() as client:
     # Update from a csv of records
@@ -231,10 +231,10 @@ with Session() as client:
 ## Suppress data
 #### Suppress a single record
 ```
-$ metadb suppress <project> <cid>
+$ onyx suppress <project> <cid>
 ```
 ```python
-from metadb import Session 
+from onyx import Session 
 
 with Session() as client:
     result = client.suppress("project", "cid")
@@ -243,11 +243,11 @@ with Session() as client:
 
 #### Suppress multiple records from a csv/tsv
 ```
-$ metadb suppress <project> --csv <csv>
-$ metadb suppress <project> --tsv <tsv>
+$ onyx suppress <project> --csv <csv>
+$ onyx suppress <project> --tsv <tsv>
 ```
 ```python
-from metadb import Session
+from onyx import Session
 
 with Session() as client:
     # Suppress from a csv of records
@@ -265,10 +265,10 @@ with Session() as client:
 ## Delete data
 #### Delete a single record
 ```
-$ metadb delete <project> <cid>
+$ onyx delete <project> <cid>
 ```
 ```python
-from metadb import Session 
+from onyx import Session 
 
 with Session() as client:
     result = client.delete("project", "cid")
@@ -277,11 +277,11 @@ with Session() as client:
 
 #### Delete multiple records from a csv/tsv
 ```
-$ metadb delete <project> --csv <csv>
-$ metadb delete <project> --tsv <tsv>
+$ onyx delete <project> --csv <csv>
+$ onyx delete <project> --tsv <tsv>
 ```
 ```python
-from metadb import Session
+from onyx import Session
 
 with Session() as client:
     # Delete from a csv of records

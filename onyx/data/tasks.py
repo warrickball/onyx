@@ -38,17 +38,17 @@
 
 #     if (not created) and (
 #         (timezone.now() - signal.modified).total_seconds()
-#         > 60 * int(os.environ["METADB_CELERY_BEAT_TIME"])
+#         > 60 * int(os.environ["ONYX_CELERY_BEAT_TIME"])
 #     ):
 #         print("no changes detected")
 #         return None
 
 #     print("changes detected")
 
-#     temp_mpx_file = f"{os.environ['METADB_MPX_TSV']}.temp"
-#     final_mpx_file = os.environ["METADB_MPX_TSV"]
-#     temp_pha_mpx_file = f"{os.environ['METADB_PHA_MPX_TSV']}.temp"
-#     final_pha_mpx_file = os.environ["METADB_PHA_MPX_TSV"]
+#     temp_mpx_file = f"{os.environ['ONYX_MPX_TSV']}.temp"
+#     final_mpx_file = os.environ["ONYX_MPX_TSV"]
+#     temp_pha_mpx_file = f"{os.environ['ONYX_PHA_MPX_TSV']}.temp"
+#     final_pha_mpx_file = os.environ["ONYX_PHA_MPX_TSV"]
 
 #     mpx_project, _ = get_project_and_model("mpx")
 #     mpx_view_fields = get_fields_from_permissions(

@@ -1,4 +1,4 @@
-name: metadb
+name: onyx
 channels:
   - defaults
 dependencies:

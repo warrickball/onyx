@@ -1,6 +1,6 @@
 #### Start gunicorn
 ```
-$ gunicorn metadb.wsgi -c gunicorn.conf.py
+$ gunicorn onyx.wsgi -c gunicorn.conf.py
 ```
 
 #### Stop gunicorn
@@ -17,6 +17,6 @@ $ python manage.py test accounts.tests -v 2
 
 #### Run celery 
 ```
-celery -A metadb beat -l INFO
-celery -A metadb worker -Q create_mpx_tables --concurrency=1 -l INFO
+celery -A onyx beat -l INFO
+celery -A onyx worker -Q create_mpx_tables --concurrency=1 -l INFO
 ```

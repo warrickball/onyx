@@ -7,7 +7,7 @@ from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.fields import ModelChoiceField
 
 
-class METADBField:
+class OnyxField:
     def __init__(self, field_model, field_path, field_name, lookup):
         self.field_model = field_model
         self.field_instance = self.field_model._meta.get_field(field_name)
@@ -19,7 +19,7 @@ class METADBField:
         self.content_type = ContentType.objects.get_for_model(field_model)
 
 
-class METADBProject:
+class OnyxProject:
     def __init__(self, code, user, action, fields=None, scopes=None):
         """
         * Resolves `Project` and `Scope` instances for the provided `code` and `scopes`.
@@ -150,7 +150,7 @@ class METADBProject:
                     if not lookup or lookup in ALL_LOOKUPS:
                         # The field is determined, and the lookup is recognised
                         # So we instantiate the resolved field instance
-                        resolved[field] = METADBField(
+                        resolved[field] = OnyxField(
                             field_model=model,
                             field_path=field_path,
                             field_name=field_name,
@@ -177,7 +177,7 @@ class METADBProject:
                     if not lookup or lookup in ALL_LOOKUPS:
                         # The field is determined, and the lookup is recognised
                         # So we instantiate the resolved field instance
-                        resolved[field] = METADBField(
+                        resolved[field] = OnyxField(
                             field_model=model,
                             field_path=field_path,
                             field_name=field_name,
@@ -199,7 +199,7 @@ class METADBProject:
                     if not lookup or lookup in ALL_LOOKUPS:
                         # The field is determined, and the lookup is recognised
                         # So we instantiate the resolved field instance
-                        resolved[field] = METADBField(
+                        resolved[field] = OnyxField(
                             field_model=model,
                             field_path=field_path,
                             field_name=field_name,

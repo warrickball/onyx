@@ -1,7 +1,7 @@
 from rest_framework import renderers, status
 
 
-class METADBJSONRenderer(renderers.JSONRenderer):
+class OnyxJSONRenderer(renderers.JSONRenderer):
     def render(self, data, accepted_media_type=None, renderer_context=None):
         """
         Render `data` into JSON, returning a bytestring.

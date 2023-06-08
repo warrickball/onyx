@@ -5,14 +5,14 @@ from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from accounts.permissions import Admin, ApprovedOrAdmin, SameSiteAuthorityAsCIDOrAdmin
 from internal.models import History
-from utils.views import METADBAPIView
-from utils.response import METADBResponse
-from utils.project import METADBProject
+from utils.views import OnyxAPIView
+from utils.response import OnyxResponse
+from utils.project import OnyxProject
 from utils.mutable import mutable
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
-from .filters import METADBFilter
+from .filters import OnyxFilter
 from django_query_tools.server import make_atoms, validate_atoms, make_query
 
 try:
@@ -21,7 +21,7 @@ except ImportError:
     mapping = {}
 
 
-class CreateRecordView(METADBAPIView):
+class CreateRecordView(OnyxAPIView):
     permission_classes = Admin
 
     def post(self, request, code, test=False):
@@ -29,7 +29,7 @@ class CreateRecordView(METADBAPIView):
         Create an instance for the given project.
         """
         try:
-            project = METADBProject(
+            project = OnyxProject(
                 code,
                 user=request.user,
                 action="add",
@@ -52,7 +52,7 @@ class CreateRecordView(METADBAPIView):
         # Get the model serializer
         serializer_cls = mapping.get(project.model)
         if not serializer_cls:
-            return METADBResponse.not_found("serializer")
+            return OnyxResponse.not_found("serializer")
 
         # Validate the data using the serializer
         serializer = serializer_cls(
@@ -75,14 +75,14 @@ class CreateRecordView(METADBAPIView):
             else:
                 cid = None
 
-            return METADBResponse.action_success(
+            return OnyxResponse.action_success(
                 "add", cid, test=test, status=status.HTTP_201_CREATED
             )
         else:
-            return METADBResponse.validation_error(serializer.errors)
+            return OnyxResponse.validation_error(serializer.errors)
 
 
-class GetRecordView(METADBAPIView):
+class GetRecordView(OnyxAPIView):
     permission_classes = ApprovedOrAdmin
 
     def get(self, request, code, cid):
@@ -96,7 +96,7 @@ class GetRecordView(METADBAPIView):
                 query_params.pop("scope")
 
         try:
-            project = METADBProject(
+            project = OnyxProject(
                 code,
                 user=request.user,
                 action="view",
@@ -119,12 +119,12 @@ class GetRecordView(METADBAPIView):
                 .get(cid=cid)
             )
         except project.model.DoesNotExist:
-            return METADBResponse.not_found("cid")
+            return OnyxResponse.not_found("cid")
 
         # Get the model serializer
         serializer_cls = mapping.get(project.model)
         if not serializer_cls:
-            return METADBResponse.not_found("serializer")
+            return OnyxResponse.not_found("serializer")
 
         # Serialize the result
         serializer = serializer_cls(
@@ -185,12 +185,12 @@ def filter_query(request, code):
             # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
             atoms = make_atoms(query, to_str=True)
         except Exception:
-            return METADBResponse.invalid_query()
+            return OnyxResponse.invalid_query()
     else:
         atoms = []
 
     try:
-        project = METADBProject(
+        project = OnyxProject(
             code,
             user=request.user,
             action="view",
@@ -211,7 +211,7 @@ def filter_query(request, code):
     try:
         validate_atoms(
             atoms,
-            filterset=METADBFilter,
+            filterset=OnyxFilter,
             filterset_args=[project],
             filterset_model=project.model,
         )
@@ -237,7 +237,7 @@ def filter_query(request, code):
         try:
             q_object = make_query(query)
         except Exception:
-            return METADBResponse.invalid_query()
+            return OnyxResponse.invalid_query()
 
         # A queryset is not guaranteed to return unique objects
         # Especially as a result of complex nested queries
@@ -259,7 +259,7 @@ def filter_query(request, code):
     # Get the model serializer
     serializer_cls = mapping.get(project.model)
     if not serializer_cls:
-        return METADBResponse.not_found("serializer")
+        return OnyxResponse.not_found("serializer")
 
     # Serialize the results
     serializer = serializer_cls(
@@ -279,7 +279,7 @@ def filter_query(request, code):
     )
 
 
-class FilterRecordView(METADBAPIView):
+class FilterRecordView(OnyxAPIView):
     permission_classes = ApprovedOrAdmin
 
     def get(self, request, code):
@@ -289,7 +289,7 @@ class FilterRecordView(METADBAPIView):
         return filter_query(request, code)
 
 
-class QueryRecordView(METADBAPIView):
+class QueryRecordView(OnyxAPIView):
     permission_classes = ApprovedOrAdmin
 
     def post(self, request, code):
@@ -299,7 +299,7 @@ class QueryRecordView(METADBAPIView):
         return filter_query(request, code)
 
 
-class UpdateRecordView(METADBAPIView):
+class UpdateRecordView(OnyxAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
     def patch(self, request, code, cid, test=False):
@@ -307,7 +307,7 @@ class UpdateRecordView(METADBAPIView):
         Update an instance for the given project.
         """
         try:
-            project = METADBProject(
+            project = OnyxProject(
                 code,
                 user=request.user,
                 action="change",
@@ -329,12 +329,12 @@ class UpdateRecordView(METADBAPIView):
                 .get(cid=cid)
             )
         except project.model.DoesNotExist:
-            return METADBResponse.not_found("cid")
+            return OnyxResponse.not_found("cid")
 
         # Get the model serializer
         serializer_cls = mapping.get(project.model)
         if not serializer_cls:
-            return METADBResponse.not_found("serializer")
+            return OnyxResponse.not_found("serializer")
 
         # Validate the data using the serializer
         serializer = serializer_cls(
@@ -356,12 +356,12 @@ class UpdateRecordView(METADBAPIView):
                     changes=str(request.data),
                 )
 
-            return METADBResponse.action_success("change", cid, test=test)
+            return OnyxResponse.action_success("change", cid, test=test)
         else:
-            return METADBResponse.validation_error(serializer.errors)
+            return OnyxResponse.validation_error(serializer.errors)
 
 
-class SuppressRecordView(METADBAPIView):
+class SuppressRecordView(OnyxAPIView):
     permission_classes = SameSiteAuthorityAsCIDOrAdmin
 
     def delete(self, request, code, cid, test=False):
@@ -369,7 +369,7 @@ class SuppressRecordView(METADBAPIView):
         Suppress an instance of the given project.
         """
         try:
-            project = METADBProject(
+            project = OnyxProject(
                 code,
                 user=request.user,
                 action="suppress",
@@ -390,7 +390,7 @@ class SuppressRecordView(METADBAPIView):
                 .get(cid=cid)
             )
         except project.model.DoesNotExist:
-            return METADBResponse.not_found("cid")
+            return OnyxResponse.not_found("cid")
 
         # Suppress the instance
         if not test:
@@ -405,10 +405,10 @@ class SuppressRecordView(METADBAPIView):
             )
 
         # Return response indicating suppression
-        return METADBResponse.action_success("suppress", cid, test=test)
+        return OnyxResponse.action_success("suppress", cid, test=test)
 
 
-class DeleteRecordView(METADBAPIView):
+class DeleteRecordView(OnyxAPIView):
     permission_classes = Admin
 
     def delete(self, request, code, cid, test=False):
@@ -416,7 +416,7 @@ class DeleteRecordView(METADBAPIView):
         Permanently delete an instance of the given project.
         """
         try:
-            project = METADBProject(
+            project = OnyxProject(
                 code,
                 user=request.user,
                 action="delete",
@@ -433,7 +433,7 @@ class DeleteRecordView(METADBAPIView):
         try:
             instance = project.model.objects.select_related().get(cid=cid)
         except project.model.DoesNotExist:
-            return METADBResponse.not_found("cid")
+            return OnyxResponse.not_found("cid")
 
         # Delete the instance
         if not test:
@@ -447,4 +447,4 @@ class DeleteRecordView(METADBAPIView):
             )
 
         # Return response indicating deletion
-        return METADBResponse.action_success("delete", cid, test=test)
+        return OnyxResponse.action_success("delete", cid, test=test)

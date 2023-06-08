@@ -9,8 +9,8 @@ from .serializers import (
     SiteWaitingUserSerializer,
     AdminWaitingUserSerializer,
 )
-from utils.response import METADBResponse
-from utils.views import METADBAPIView, METADBCreateAPIView, METADBListAPIView
+from utils.response import OnyxResponse
+from utils.views import OnyxAPIView, OnyxCreateAPIView, OnyxListAPIView
 from .permissions import (
     Any,
     Admin,
@@ -32,7 +32,7 @@ class LoginView(KnoxLoginView):
     authentication_classes = [BasicAuthentication]
 
 
-class CreateUserView(METADBCreateAPIView):
+class CreateUserView(OnyxCreateAPIView):
     """
     Create a user.
     """
@@ -61,7 +61,7 @@ class CreateUserView(METADBCreateAPIView):
             ]
 
         if errors:
-            return METADBResponse.validation_error(errors)
+            return OnyxResponse.validation_error(errors)
 
         # Enable mutability if required
         mutable = getattr(request.data, "_mutable", None)
@@ -82,7 +82,7 @@ class CreateUserView(METADBCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class SiteApproveView(METADBAPIView):
+class SiteApproveView(OnyxAPIView):
     """
     Grant site approval to a user.
     """
@@ -94,7 +94,7 @@ class SiteApproveView(METADBAPIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return METADBResponse.not_found("user")
+            return OnyxResponse.not_found("user")
 
         # Approve user
         user.is_site_approved = True
@@ -110,7 +110,7 @@ class SiteApproveView(METADBAPIView):
         )
 
 
-class AdminApproveView(METADBAPIView):
+class AdminApproveView(OnyxAPIView):
     """
     Grant admin approval to a user.
     """
@@ -122,7 +122,7 @@ class AdminApproveView(METADBAPIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return METADBResponse.not_found("user")
+            return OnyxResponse.not_found("user")
 
         # Approve target user
         user.is_admin_approved = True
@@ -138,7 +138,7 @@ class AdminApproveView(METADBAPIView):
         )
 
 
-class SiteWaitingView(METADBListAPIView):
+class SiteWaitingView(OnyxListAPIView):
     """
     List all users waiting for site approval.
     """
@@ -162,7 +162,7 @@ class SiteWaitingView(METADBListAPIView):
             )
 
 
-class AdminWaitingView(METADBListAPIView):
+class AdminWaitingView(OnyxListAPIView):
     """
     List all users waiting for admin approval.
     """
@@ -179,7 +179,7 @@ class AdminWaitingView(METADBListAPIView):
         )
 
 
-class SiteUsersView(METADBListAPIView):
+class SiteUsersView(OnyxListAPIView):
     """
     List all users in the site of the requesting user.
     """
@@ -191,7 +191,7 @@ class SiteUsersView(METADBListAPIView):
         return User.objects.filter(site=self.request.user.site).order_by("-date_joined")  # type: ignore
 
 
-class AdminUsersView(METADBListAPIView):
+class AdminUsersView(OnyxListAPIView):
     """
     List all users.
     """

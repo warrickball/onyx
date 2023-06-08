@@ -301,7 +301,7 @@ def get_filter(
     return None, None
 
 
-class METADBFilter(filters.FilterSet):
+class OnyxFilter(filters.FilterSet):
     def __init__(self, project, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
