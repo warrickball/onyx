@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from data.models import Record
-from internal.serializers import NestedDynamicFieldsModelSerializer
+from utils.serializers import OnyxSerializer
 from utils.validation import (
     enforce_optional_value_groups_create,
     enforce_optional_value_groups_update,
@@ -10,7 +10,7 @@ from utils.validation import (
 )
 
 
-class RecordSerializer(NestedDynamicFieldsModelSerializer):
+class RecordSerializer(OnyxSerializer):
     class Meta:
         model = Record
         fields = [
