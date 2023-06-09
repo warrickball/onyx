@@ -4,7 +4,6 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from accounts.permissions import Admin, ApprovedOrAdmin, SameSiteAuthorityAsCIDOrAdmin
-from internal.models import History
 from utils.views import OnyxAPIView
 from utils.response import OnyxResponse
 from utils.project import OnyxProject
@@ -12,6 +11,7 @@ from utils.mutable import mutable
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
+from .models import History, Choice
 from .filters import OnyxFilter
 from django_query_tools.server import make_atoms, validate_atoms, make_query
 
@@ -448,3 +448,51 @@ class DeleteRecordView(OnyxAPIView):
 
         # Return response indicating deletion
         return OnyxResponse.action_success("delete", cid, test=test)
+
+
+class ProjectView(OnyxAPIView):
+    pass  # TODO
+
+
+class ScopesView(OnyxAPIView):
+    pass  # TODO
+
+
+class FieldsView(OnyxAPIView):
+    pass  # TODO
+
+
+class ChoicesView(OnyxAPIView):
+    permission_classes = ApprovedOrAdmin
+
+    def get(self, request, code, field):
+        """
+        List all choices for a given field.
+        """
+
+        try:
+            project = OnyxProject(
+                code,
+                user=request.user,
+                action="view",
+                fields=[field],
+            )
+        except (
+            ProjectDoesNotExist,
+            ScopesDoNotExist,
+            PermissionDenied,
+            FieldDoesNotExist,
+        ) as e:
+            return handle_exception(e)
+
+        field = project.fields[field.lower()]
+
+        choices = Choice.objects.filter(
+            content_type=field.content_type,
+            field=field.field_name,
+        ).values_list(
+            "choice",
+            flat=True,
+        )
+
+        return Response({"action": "view", "choices": choices})

@@ -1,12 +1,11 @@
 from rest_framework import serializers
 from rest_framework.validators import ValidationError
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import OperationalError
 from django.utils.encoding import smart_str
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from datetime import date
-from internal.models import Choice
+from data.models import Choice
 
 
 class YearMonthField(serializers.Field):
@@ -69,30 +68,42 @@ class ModelChoiceField(serializers.RelatedField):
         return getattr(obj, "choice")  # type: ignore
 
 
+# TODO: Some silly hacks being considered here, which is best?
 class ChoiceField(serializers.ChoiceField):
     default_error_messages = {
         "invalid_choice": "Select a valid choice. That choice is not one of the available choices."
     }
 
     def __init__(self, model, field, **kwargs):
-        try:
-            content_type = ContentType.objects.get_for_model(model)
-            choices = list(
-                Choice.objects.filter(
-                    content_type=content_type,
-                    field=field,
-                ).values_list(
-                    "choice",
-                    flat=True,
-                )
-            )
-        except OperationalError:
-            # TODO: Bit of a silly hack
-            print("OperationalError due to ContentType table not existing yet.")
-            choices = []
-        super().__init__(choices, **kwargs)
+        # try:
+        #     content_type = ContentType.objects.get_for_model(model)
+        #     choices = list(
+        #         Choice.objects.filter(
+        #             content_type=content_type,
+        #             field=field,
+        #         ).values_list(
+        #             "choice",
+        #             flat=True,
+        #         )
+        #     )
+        # except OperationalError:
+        #     print("OperationalError due to ContentType table not existing yet.")
+        #     choices = []
+        self.model = model
+        self.field = field
+        super().__init__([], **kwargs)
 
     def to_internal_value(self, data):
+        content_type = ContentType.objects.get_for_model(self.model)
+        self.choices = list(
+            Choice.objects.filter(
+                content_type=content_type,
+                field=self.field,
+            ).values_list(
+                "choice",
+                flat=True,
+            )
+        )
         if isinstance(data, str):
             data = data.lower()
         return super().to_internal_value(data)
