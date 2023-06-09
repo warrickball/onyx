@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import ForeignKey, ManyToOneRel
 from django_filters import rest_framework as filters
-from internal.models import Choice
+from data.models import Choice
 from utils.choices import format_choices
 from utils.fields import (
     LowerCharField,

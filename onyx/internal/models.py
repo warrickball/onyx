@@ -1,11 +1,7 @@
 from django.db import models
 from django.db.models.lookups import BuiltinLookup
 from django.db.models.fields.related_lookups import RelatedLookupMixin
-from django.contrib.auth.models import Group
-from django.contrib.contenttypes.models import ContentType
 from accounts.models import User
-from utils.fields import LowerCharField, UpperCharField
-from utils.choices import format_choices
 
 
 class NotEqual(models.Lookup):
@@ -49,55 +45,6 @@ class IsNullRelated(RelatedLookupMixin, IsNull):
     pass
 
 
-class Signal(models.Model):
-    code = LowerCharField(max_length=8, unique=True)
-    modified = models.DateTimeField(auto_now=True)
-
-
-# TODO: Don't actually need half the stuff being recorded in Project and Scope models
-class Project(models.Model):
-    code = LowerCharField(max_length=50, unique=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    add_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_add",
-    )
-    view_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_view",
-    )
-    change_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_change",
-    )
-    suppress_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_suppress",
-    )
-    delete_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_delete",
-    )
-
-
-class Scope(models.Model):
-    project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    code = LowerCharField(max_length=50)
-    action = LowerCharField(
-        max_length=10,
-        choices=format_choices(["add", "view", "change", "suppress", "delete"]),
-    )
-    group = models.OneToOneField(Group, on_delete=models.CASCADE)
-
-    class Meta:
-        unique_together = ["project", "code", "action"]
-
-
 class Request(models.Model):
     endpoint = models.CharField(max_length=100, null=True)
     method = models.CharField(max_length=10, null=True)
@@ -106,34 +53,3 @@ class Request(models.Model):
     address = models.CharField(max_length=20, null=True)
     exec_time = models.IntegerField(null=True)
     date = models.DateTimeField(auto_now=True)
-
-
-# TODO: Make this a generic relation?
-class History(models.Model):
-    record = models.ForeignKey("data.Record", on_delete=models.SET_NULL, null=True)
-    cid = UpperCharField(max_length=12)
-    user = models.ForeignKey(User, on_delete=models.PROTECT)
-    action = LowerCharField(
-        max_length=10, choices=format_choices(["add", "change", "suppress", "delete"])
-    )
-    taken = models.DateTimeField(auto_now_add=True)
-    changes = models.TextField(null=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["record", "user"]),
-            models.Index(fields=["record"]),
-            models.Index(fields=["user"]),
-        ]
-
-
-class Choice(models.Model):
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    field = models.TextField()
-    choice = LowerCharField(max_length=100)
-
-    class Meta:
-        unique_together = ["content_type", "field", "choice"]
-        indexes = [
-            models.Index(fields=["content_type", "field"]),
-        ]

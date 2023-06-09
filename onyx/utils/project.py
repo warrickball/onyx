@@ -1,7 +1,7 @@
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import ForeignKey, ManyToOneRel
-from internal.models import Project, Scope
+from data.models import Project, Scope
 from data.filters import ALL_LOOKUPS
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.fields import ModelChoiceField
