@@ -7,7 +7,7 @@ from utils.fields import LowerCharField
 
 class Site(models.Model):
     code = LowerCharField(max_length=10, unique=True)
-    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(null=True)
     is_active = models.BooleanField(default=True)
 
 
@@ -19,7 +19,7 @@ class User(AbstractUser):
         help_text=_(
             "Required. 100 characters or fewer. Letters, digits and @/./+/-/_ only."
         ),
-        validators=[AbstractUser.username_validator, MinLengthValidator(5)],
+        validators=[AbstractUser.username_validator, MinLengthValidator(3)],
         error_messages={
             "unique": _("A user with that username already exists."),
         },

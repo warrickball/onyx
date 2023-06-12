@@ -1,30 +1,25 @@
 from django.core.management import base
-from django.db.utils import IntegrityError
 from ...models import Site
 
 
 class Command(base.BaseCommand):
-    help = "Create a site in the database."
+    help = "Create or update a site in the database."
 
     def add_arguments(self, parser):
         parser.add_argument("code")
-        parser.add_argument("-n", "--name", required=True)
+        parser.add_argument("-d", "--description")
 
     def handle(self, *args, **options):
         code = options["code"].lower()
-        name = options["name"]
+        description = options["description"]
 
-        exists = False
-        try:
-            site = Site.objects.create(name=name, code=code)
-        except IntegrityError:
-            exists = True
+        site, created = Site.objects.update_or_create(
+            code=code, defaults={"description": description}
+        )
 
-        if exists:
-            site = Site.objects.get(code=code)
-            print(f"Existing site: {site.code}")
-            print("\tname:", site.name)
-        else:
-            site = Site.objects.get(code=code)
+        if created:
             print(f"Created site: {site.code}")
-            print("\tname:", site.name)
+        else:
+            print(f"Updated site: {site.code}")
+
+        print("\tdescription:", site.description)
