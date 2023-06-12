@@ -1,4 +1,4 @@
-name: onyx
+name: onyx-server
 channels:
   - defaults
 dependencies:
@@ -12,5 +12,4 @@ dependencies:
     - django-filter
     - django-cursor-pagination
     - celery
-    - requests
     - django-query-tools

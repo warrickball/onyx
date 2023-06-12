@@ -1,4 +1,4 @@
-from .record import RecordSerializer
+from .serializers import RecordSerializer
 
 try:
     from . import projects

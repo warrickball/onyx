@@ -1,9 +1,9 @@
-from rest_framework import serializers
 from django.db import IntegrityError, transaction
+from rest_framework import serializers
 
 
 # https://www.django-rest-framework.org/api-guide/serializers/#dynamically-modifying-fields
-class NestedDynamicFieldsModelSerializer(serializers.ModelSerializer):
+class OnyxSerializer(serializers.ModelSerializer):
     """
     A ModelSerializer that takes an additional `fields` argument that
     controls which fields should be displayed.

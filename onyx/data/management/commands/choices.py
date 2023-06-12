@@ -1,6 +1,6 @@
 from django.core.management import base
 from django.contrib.contenttypes.models import ContentType
-from internal.models import Choice
+from data.models import Choice
 import csv
 
 

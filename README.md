@@ -89,8 +89,10 @@ $ onyx get <project> <cid>
 from onyx import Session 
 
 with Session() as client:
-    result = client.get("project", "cid")
-    print(result) # This is a dictionary representing a record, not a response object
+    response = client.get("project", "cid")
+
+    # Print the response
+    print(response)
 ```
 
 #### The `filter` endpoint
@@ -100,9 +102,9 @@ $ onyx filter <project> --field <name> <value> --field <name> <value> ...
 ```python
 from onyx import Session
 
-# Retrieve all results matching ALL of the field requirements
+# Retrieve all records matching ALL of the field requirements
 with Session() as client:
-    results = client.filter(
+    responses = client.filter(
         "project",
         fields={
             "name1" : "value1",
@@ -113,10 +115,9 @@ with Session() as client:
         }
     )
 
-    # Display the results
-    # These are dictionaries representing records, not response objects
-    for result in results:
-        print(result)
+    # Print the responses (each contains a batch of records)
+    for response in responses:
+        print(response)
 ```
 
 #### The `query` endpoint 
@@ -136,7 +137,7 @@ with Session() as client:
     # Do NOT have a sample_type of 'swab', AND:
     # - Have a collection_month between Feb-Mar 2022
     # - OR have a collection_month between Jun-Sept 2022
-    results = client.query(
+    responses = client.query(
         "project",
         query=(~F(sample_type="swab"))
         & (
@@ -145,10 +146,9 @@ with Session() as client:
         ),
     )
 
-    # Display the results
-    # These are dictionaries representing records, not response objects
-    for result in results:
-        print(result)
+    # Print the responses (each contains a batch of records)
+    for response in responses:
+        print(response)
 ```
 
 #### Supported lookups for `filter` and `query`
@@ -237,8 +237,8 @@ $ onyx suppress <project> <cid>
 from onyx import Session 
 
 with Session() as client:
-    result = client.suppress("project", "cid")
-    print(result)
+    response = client.suppress("project", "cid")
+    print(response)
 ```
 
 #### Suppress multiple records from a csv/tsv
@@ -271,8 +271,8 @@ $ onyx delete <project> <cid>
 from onyx import Session 
 
 with Session() as client:
-    result = client.delete("project", "cid")
-    print(result)
+    response = client.delete("project", "cid")
+    print(response)
 ```
 
 #### Delete multiple records from a csv/tsv

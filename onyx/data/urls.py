@@ -50,4 +50,8 @@ urlpatterns = [
         views.DeleteRecordView.as_view(),
         kwargs={"test": True},
     ),
+    path(
+        "choices/<code>/<field>/",
+        views.ChoicesView.as_view(),
+    ),
 ]

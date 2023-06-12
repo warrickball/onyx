@@ -1,7 +1,7 @@
 # from django.db.models.signals import post_save
 # from django.dispatch import receiver
 # from data.models.projects import Mpx
-# from internal.models import Signal
+# from data.models import Signal
 # from django.utils import timezone
 
 

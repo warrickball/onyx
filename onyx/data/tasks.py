@@ -1,6 +1,6 @@
 # from django.utils import timezone
 # from data.models.projects import Mpx
-# from internal.models import Signal
+# from data.models import Signal
 # from utils.project import (
 #     get_project_and_model,
 # )

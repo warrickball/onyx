@@ -1,4 +1,4 @@
-from .record import Record
+from .models import Project, Scope, Signal, Choice, Record, History
 
 try:
     from . import projects
