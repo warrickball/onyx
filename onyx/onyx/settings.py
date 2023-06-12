@@ -104,7 +104,7 @@ WSGI_APPLICATION = "onyx.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.environ["ONYX_SQLITE_DB_PATH"],
+        "NAME": os.path.join(BASE_DIR, "onyx.sqlite3"),
     }
 }
 
@@ -175,7 +175,7 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": "WARNING",
+        "level": "DEBUG",
     },
 }
 
