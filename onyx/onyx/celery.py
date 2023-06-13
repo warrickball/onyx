@@ -23,10 +23,10 @@ def debug_task(self):
     print(f"Request: {self.request!r}")
 
 
-app.conf.beat_schedule = {
-    "create-mpx-tables-task": {
-        "task": "data.tasks.create_mpx_tables",
-        "schedule": crontab(minute=f"*/{os.environ['ONYX_CELERY_BEAT_TIME']}"),
-    }
-}
-app.conf.task_routes = {"data.tasks.create_mpx_tables": {"queue": "create_mpx_tables"}}
+# app.conf.beat_schedule = {
+#     "create-mpx-tables-task": {
+#         "task": "data.tasks.create_mpx_tables",
+#         "schedule": crontab(minute=f"*/{os.environ['ONYX_CELERY_BEAT_TIME']}"),
+#     }
+# }
+# app.conf.task_routes = {"data.tasks.create_mpx_tables": {"queue": "create_mpx_tables"}}
