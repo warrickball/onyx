@@ -39,3 +39,18 @@ def prefetch_nested(qs, fields, prefix=None):
             qs = prefetch_nested(qs, nested, prefix=field)
 
     return qs
+
+
+# TODO: Not sure the best way to use this, but its here if I need it.
+def lowercase_keys(obj):
+    """
+    Create a new object from the provided JSON object, with lowercased keys.
+    """
+    if isinstance(obj, dict):
+        return {key.lower(): lowercase_keys(value) for key, value in obj.items()}
+
+    elif isinstance(obj, list):
+        return [lowercase_keys(item) for item in obj]
+
+    else:
+        return obj
