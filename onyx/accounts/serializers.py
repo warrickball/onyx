@@ -4,18 +4,46 @@ from django.core.exceptions import ValidationError
 import django.contrib.auth.password_validation as validators
 
 
-class UserSerializer(serializers.ModelSerializer):
+class CreateUserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=False)
     password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(required=True)
+    last_name = serializers.CharField(required=True)
 
     def create(self, validated_data):
-        # User.objects.create_user() hashes the password
-        user = User.objects.create_user(  # type: ignore
-            username=validated_data["username"],
+        username = validated_data["last_name"] + validated_data["first_name"][:1]
+        increment = 0
+
+        while User.objects.filter(
+            username=f"{username}{increment if increment else ''}"
+        ).exists():
+            increment += 1
+
+        if increment:
+            username = f"{username}{increment}"
+
+        return User.objects.create_user(  # This function hashes the password
+            username=username,
             email=validated_data["email"],
             password=validated_data["password"],
             site=validated_data["site"],
+            first_name=validated_data["first_name"],
+            last_name=validated_data["last_name"],
         )
-        return user
+
+    def validate_first_name(self, value):
+        if not value.isalpha():
+            raise serializers.ValidationError(
+                "This field must only contain alphabetic characters."
+            )
+        return value
+
+    def validate_last_name(self, value):
+        if not value.isalpha():
+            raise serializers.ValidationError(
+                "This field must only contain alphabetic characters."
+            )
+        return value
 
     def validate(self, data):
         # https://stackoverflow.com/a/36419160/16088113
@@ -35,16 +63,38 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["username", "password", "email", "site"]
+        fields = [
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "site",
+            "password",
+        ]
 
 
-class SiteWaitingUserSerializer(UserSerializer):
+class ViewUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["username", "email", "site", "date_joined"]
+        fields = [
+            "username",
+            "email",
+            "site",
+        ]
 
 
-class AdminWaitingUserSerializer(UserSerializer):
+class SiteWaitingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "username",
+            "email",
+            "site",
+            "date_joined",
+        ]
+
+
+class AdminWaitingSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
