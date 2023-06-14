@@ -84,6 +84,8 @@ def generate_cid():
     return cid
 
 
+# TODO: Extend this class to have a ProjectRecord, where you store the cid?
+# And make it so that ALL tables inherit from a record table?
 class Record(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
@@ -109,8 +111,8 @@ class Record(models.Model):
         yearmonth_orderings = []
 
 
-# TODO: Make this a generic relation?
-class History(models.Model):
+# TODO: How best to track changes to any inherited models?
+class RecordHistory(models.Model):
     record = models.ForeignKey(Record, on_delete=models.SET_NULL, null=True)
     cid = UpperCharField(max_length=12)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
