@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from accounts.models import Site, User
 from utils.fields import LowerCharField, UpperCharField
 from utils.choices import format_choices
+from utils.constraints import unique_together
 from secrets import token_hex
 
 
@@ -48,7 +49,12 @@ class Scope(models.Model):
     group = models.OneToOneField(Group, on_delete=models.CASCADE)
 
     class Meta:
-        unique_together = ["project", "code", "action"]
+        constraints = [
+            unique_together(
+                model_name="scope",
+                fields=["project", "code", "action"],
+            ),
+        ]
 
 
 class Signal(models.Model):
@@ -62,9 +68,14 @@ class Choice(models.Model):
     choice = LowerCharField(max_length=100)
 
     class Meta:
-        unique_together = ["content_type", "field", "choice"]
         indexes = [
             models.Index(fields=["content_type", "field"]),
+        ]
+        constraints = [
+            unique_together(
+                model_name="choice",
+                fields=["content_type", "field", "choice"],
+            ),
         ]
 
 
@@ -84,9 +95,15 @@ def generate_cid():
     return cid
 
 
+# TODO: Move some things into here?
+class AbstractRecord(models.Model):
+    class Meta:
+        abstract = True
+
+
 # TODO: Extend this class to have a ProjectRecord, where you store the cid?
-# And make it so that ALL tables inherit from a record table?
-class Record(models.Model):
+# And make it so that ALL tables inherit from a different record table?
+class Record(AbstractRecord):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     suppressed = models.BooleanField(default=False)
@@ -103,12 +120,6 @@ class Record(models.Model):
             models.Index(fields=["published_date"]),
         ]
         default_permissions = []
-
-    class ExtraMeta:
-        db_choice_fields = ["site"]
-        optional_value_groups = []
-        yearmonths = []
-        yearmonth_orderings = []
 
 
 # TODO: How best to track changes to any inherited models?

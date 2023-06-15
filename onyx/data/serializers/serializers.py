@@ -1,16 +1,129 @@
-from rest_framework import serializers
 from data.models import Record
-from utils.serializers import OnyxSerializer
+from django.db import IntegrityError, transaction
+from rest_framework import serializers
 from utils.validation import (
-    enforce_optional_value_groups_create,
-    enforce_optional_value_groups_update,
-    enforce_yearmonth_order_create,
-    enforce_yearmonth_order_update,
-    enforce_yearmonth_non_future,
+    enforce_optional_value_groups,
+    enforce_orderings,
+    enforce_non_futures,
 )
 
 
-class RecordSerializer(OnyxSerializer):
+# https://www.django-rest-framework.org/api-guide/serializers/#dynamically-modifying-fields
+class AbstractRecordSerializer(serializers.ModelSerializer):
+    def __init__(self, *args, **kwargs):
+        # Don't pass the 'fields' arg up to the superclass
+        fields = kwargs.pop("fields", None)
+
+        # Instantiate the superclass normally
+        super().__init__(*args, **kwargs)
+
+        if fields is not None:
+            allowed = []
+            relations = {}
+
+            for field_name, nested in fields.items():
+                allowed.append(field_name)
+
+                if nested:
+                    relations[field_name] = nested
+
+            # Handle relations
+            for field_name, nested in relations.items():
+                relation = self.ExtraMeta.relations[field_name]
+                self.fields[field_name] = relation["serializer"](
+                    fields=nested,
+                    **relation["kwargs"],
+                )
+
+            # Drop any fields that are not specified in the `fields` argument.
+            allowed = set(allowed)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
+
+    def create(self, validated_data):
+        try:
+            # Any exceptions thrown during the creation process will
+            # cause the entire database transaction to be rolled back
+            with transaction.atomic():
+                record = self._create(validated_data)
+        except IntegrityError as e:
+            # Any keys that are meant to be unique within validated_data
+            # are known to be unique from when compared to the database during validation.
+            # But this still leaves some possible causes for an integrity error:
+            # > another process tries to create the same validated_data while this one is (race condition)
+            # > the validated_data contains duplicate keys within itself, that do not exist in the database
+            raise serializers.ValidationError({"detail": f"IntegrityError: {e}"})
+        return record
+
+    @classmethod
+    def _create(cls, validated_data, link=None):
+        # Get the serializer's model
+        model = getattr(cls, "Meta").model
+
+        # Move any nested data from validated_data into related_data
+        related_data = {}
+        for name in cls.ExtraMeta.relations:
+            related_data[name] = validated_data.pop(name, None)
+
+        # Create the record with validated_data, with a FK if provided
+        if link:
+            record = model.objects.create(link=link, **validated_data)
+        else:
+            record = model.objects.create(**validated_data)
+
+        # Recursively handle creation of related_data
+        for name, data in related_data.items():
+            serializer = cls.ExtraMeta.relations[name]["serializer"]
+            many = cls.ExtraMeta.relations[name]["kwargs"].get("many")
+
+            if many:
+                for x in data:
+                    serializer._create(x, link=record)
+            else:
+                serializer._create(data, link=record)
+
+        return record
+
+    def validate(self, data):
+        """
+        Additional validation carried out on either object creation or update
+        """
+        errors = {}
+
+        enforce_optional_value_groups(
+            errors=errors,
+            data=data,
+            groups=self.ExtraMeta.optional_value_groups,
+            instance=self.instance,
+        )
+
+        enforce_orderings(
+            errors=errors,
+            data=data,
+            orderings=self.ExtraMeta.orderings,
+            instance=self.instance,
+        )
+
+        enforce_non_futures(
+            errors=errors,
+            data=data,
+            non_futures=self.ExtraMeta.non_futures,
+        )
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return data
+
+    class ExtraMeta:
+        relations = {}
+        optional_value_groups = []
+        orderings = []
+        non_futures = []
+
+
+class RecordSerializer(AbstractRecordSerializer):
     class Meta:
         model = Record
         fields = [
@@ -22,60 +135,3 @@ class RecordSerializer(OnyxSerializer):
             "cid",
             "published_date",
         ]
-
-    def validate(self, data):
-        """
-        Additional validation carried out on either object creation or update
-        """
-        model = self.Meta.model
-        errors = {}
-
-        # Object update validation
-        if self.instance:
-            enforce_optional_value_groups_update(
-                errors=errors,
-                instance=self.instance,
-                data=data,
-                groups=model.ExtraMeta.optional_value_groups,
-            )
-            for (
-                lower_yearmonth,
-                higher_yearmonth,
-            ) in model.ExtraMeta.yearmonth_orderings:
-                enforce_yearmonth_order_update(
-                    errors=errors,
-                    instance=self.instance,
-                    lower_yearmonth=lower_yearmonth,
-                    higher_yearmonth=higher_yearmonth,
-                    data=data,
-                )
-        # Object create validation
-        else:
-            enforce_optional_value_groups_create(
-                errors=errors,
-                data=data,
-                groups=model.ExtraMeta.optional_value_groups,
-            )
-            for (
-                lower_yearmonth,
-                higher_yearmonth,
-            ) in model.ExtraMeta.yearmonth_orderings:
-                enforce_yearmonth_order_create(
-                    errors=errors,
-                    lower_yearmonth=lower_yearmonth,
-                    higher_yearmonth=higher_yearmonth,
-                    data=data,
-                )
-        # Object create and update validation
-        for yearmonth in model.ExtraMeta.yearmonths:
-            if data.get(yearmonth):
-                enforce_yearmonth_non_future(
-                    errors=errors,
-                    name=yearmonth,
-                    value=data[yearmonth],
-                )
-
-        if errors:
-            raise serializers.ValidationError(errors)
-
-        return data
