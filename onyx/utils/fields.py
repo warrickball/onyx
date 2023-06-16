@@ -57,28 +57,6 @@ class YearMonthField(models.DateField):
         )
 
 
-class LowerCharField(models.CharField):
-    def to_python(self, value):
-        if value is None:
-            return value
-
-        if isinstance(value, str):
-            return value.lower()
-
-        return str(value).lower()
-
-
-class UpperCharField(models.CharField):
-    def to_python(self, value):
-        if value is None:
-            return value
-
-        if isinstance(value, str):
-            return value.upper()
-
-        return str(value).upper()
-
-
 class ModelChoiceField(models.ForeignKey):
     def __init__(self, *args, **kwargs):
         name = kwargs.pop("name", None)
@@ -88,5 +66,44 @@ class ModelChoiceField(models.ForeignKey):
         super().__init__(*args, **kwargs)
 
 
+class StrippedCharField(models.CharField):
+    def to_python(self, value):
+        if value is None:
+            return value
+
+        if isinstance(value, str):
+            value = value.strip()
+        else:
+            value = str(value).strip()
+
+        return super().to_python(value)
+
+
+class LowerCharField(StrippedCharField):
+    def to_python(self, value):
+        if value is None:
+            return value
+
+        if isinstance(value, str):
+            value = value.lower()
+        else:
+            value = str(value).lower()
+
+        return super().to_python(value)
+
+
 class ChoiceField(LowerCharField):
     pass
+
+
+class UpperCharField(StrippedCharField):
+    def to_python(self, value):
+        if value is None:
+            return value
+
+        if isinstance(value, str):
+            value = value.upper()
+        else:
+            value = str(value).upper()
+
+        return super().to_python(value)

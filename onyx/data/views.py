@@ -490,6 +490,7 @@ class ChoicesView(OnyxAPIView):
         choices = Choice.objects.filter(
             content_type=field.content_type,
             field=field.field_name,
+            is_active=True,
         ).values_list(
             "choice",
             flat=True,

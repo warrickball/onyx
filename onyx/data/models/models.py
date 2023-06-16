@@ -57,6 +57,7 @@ class Scope(models.Model):
         ]
 
 
+# TODO: Ditch this
 class Signal(models.Model):
     code = LowerCharField(max_length=8, unique=True)
     modified = models.DateTimeField(auto_now=True)
@@ -66,6 +67,7 @@ class Choice(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     field = models.TextField()
     choice = LowerCharField(max_length=100)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         indexes = [
