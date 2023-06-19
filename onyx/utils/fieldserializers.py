@@ -99,6 +99,7 @@ class ChoiceField(serializers.ChoiceField):
             Choice.objects.filter(
                 content_type=content_type,
                 field=self.field,
+                is_active=True,
             ).values_list(
                 "choice",
                 flat=True,

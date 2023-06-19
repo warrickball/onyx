@@ -11,7 +11,7 @@ from utils.mutable import mutable
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
-from .models import History, Choice
+from .models import RecordHistory, Choice
 from .filters import OnyxFilter
 from django_query_tools.server import make_atoms, validate_atoms, make_query
 
@@ -65,7 +65,7 @@ class CreateRecordView(OnyxAPIView):
                 instance = serializer.save()
                 cid = instance.cid
 
-                History.objects.create(
+                RecordHistory.objects.create(
                     record=instance,
                     cid=cid,
                     user=request.user,
@@ -348,7 +348,7 @@ class UpdateRecordView(OnyxAPIView):
             if not test:
                 instance = serializer.save()
 
-                History.objects.create(
+                RecordHistory.objects.create(
                     record=instance,
                     cid=cid,
                     user=request.user,
@@ -397,7 +397,7 @@ class SuppressRecordView(OnyxAPIView):
             instance.suppressed = True  # type: ignore
             instance.save(update_fields=["suppressed", "last_modified"])
 
-            History.objects.create(
+            RecordHistory.objects.create(
                 record=instance,
                 cid=cid,
                 user=request.user,
@@ -439,7 +439,7 @@ class DeleteRecordView(OnyxAPIView):
         if not test:
             instance.delete()
 
-            History.objects.create(
+            RecordHistory.objects.create(
                 record=None,
                 cid=cid,
                 user=request.user,
@@ -490,6 +490,7 @@ class ChoicesView(OnyxAPIView):
         choices = Choice.objects.filter(
             content_type=field.content_type,
             field=field.field_name,
+            is_active=True,
         ).values_list(
             "choice",
             flat=True,

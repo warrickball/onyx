@@ -4,6 +4,7 @@ from django_filters import rest_framework as filters
 from data.models import Choice
 from utils.choices import format_choices
 from utils.fields import (
+    StrippedCharField,
     LowerCharField,
     UpperCharField,
     YearMonthField,
@@ -88,6 +89,7 @@ ALL_LOOKUPS = set(
 
 # Text field types
 TEXT_FIELDS = [
+    StrippedCharField,
     LowerCharField,
     UpperCharField,
     models.CharField,

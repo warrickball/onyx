@@ -1,6 +1,5 @@
 from django.core.management import base
-from accounts.serializers import UserSerializer
-import json
+from accounts.models import User, Site
 import os
 
 
@@ -17,27 +16,36 @@ class Command(base.BaseCommand):
             "--password-env-var",
             help="Name of environment variable containing password.",
         )
+        parser.add_argument("--first-name", default="")
+        parser.add_argument("--last-name", default="")
 
     def handle(self, *args, **options):
         username = options["username"]
         email = options["email"]
-        site = options["site"]
 
         if options["password"]:
             password = options["password"]
         else:
             password = os.environ[options["password_env_var"]]
 
-        data = {
-            "username": username,
-            "email": email,
-            "site": site,
-            "password": password,
-        }
-        serializer = UserSerializer(data=data)  # type: ignore
+        if User.objects.filter(username=username).exists():
+            print(f"User with username '{username}' already exists.")
+            exit()
 
-        if serializer.is_valid():
-            serializer.save()
-            print(f"Created user: {username}")
-        else:
-            print(json.dumps(serializer.errors, indent=4))
+        if User.objects.filter(email=email).exists():
+            print(f"User with email '{email}' already exists.")
+            exit()
+
+        site = Site.objects.get(code=options["site"])
+
+        user = User.objects.create_user(
+            username=options["username"],
+            email=options["email"],
+            password=password,
+            site=site,
+            first_name=options["first_name"],
+            last_name=options["last_name"],
+        )
+        print("Created user:", user.username)
+        print("\temail:", user.email)
+        print("\tsite:", user.site.code)

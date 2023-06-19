@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from accounts.models import Site, User
 from utils.fields import LowerCharField, UpperCharField
 from utils.choices import format_choices
+from utils.constraints import unique_together
 from secrets import token_hex
 
 
@@ -48,9 +49,15 @@ class Scope(models.Model):
     group = models.OneToOneField(Group, on_delete=models.CASCADE)
 
     class Meta:
-        unique_together = ["project", "code", "action"]
+        constraints = [
+            unique_together(
+                model_name="scope",
+                fields=["project", "code", "action"],
+            ),
+        ]
 
 
+# TODO: Ditch this
 class Signal(models.Model):
     code = LowerCharField(max_length=8, unique=True)
     modified = models.DateTimeField(auto_now=True)
@@ -60,11 +67,17 @@ class Choice(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     field = models.TextField()
     choice = LowerCharField(max_length=100)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ["content_type", "field", "choice"]
         indexes = [
             models.Index(fields=["content_type", "field"]),
+        ]
+        constraints = [
+            unique_together(
+                model_name="choice",
+                fields=["content_type", "field", "choice"],
+            ),
         ]
 
 
@@ -84,7 +97,15 @@ def generate_cid():
     return cid
 
 
-class Record(models.Model):
+# TODO: Move some things into here?
+class AbstractRecord(models.Model):
+    class Meta:
+        abstract = True
+
+
+# TODO: Extend this class to have a ProjectRecord, where you store the cid?
+# And make it so that ALL tables inherit from a different record table?
+class Record(AbstractRecord):
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     suppressed = models.BooleanField(default=False)
@@ -102,15 +123,9 @@ class Record(models.Model):
         ]
         default_permissions = []
 
-    class ExtraMeta:
-        db_choice_fields = ["site"]
-        optional_value_groups = []
-        yearmonths = []
-        yearmonth_orderings = []
 
-
-# TODO: Make this a generic relation?
-class History(models.Model):
+# TODO: How best to track changes to any inherited models?
+class RecordHistory(models.Model):
     record = models.ForeignKey(Record, on_delete=models.SET_NULL, null=True)
     cid = UpperCharField(max_length=12)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
