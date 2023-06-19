@@ -13,12 +13,8 @@ from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
 from .models import RecordHistory, Choice
 from .filters import OnyxFilter
+from .serializers import mapping
 from django_query_tools.server import make_atoms, validate_atoms, make_query
-
-try:
-    from data.serializers.projects import mapping
-except ImportError:
-    mapping = {}
 
 
 class CreateRecordView(OnyxAPIView):
