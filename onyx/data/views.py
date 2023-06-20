@@ -38,12 +38,12 @@ class CreateRecordView(OnyxAPIView):
         ) as e:
             return handle_exception(e)
 
-        # Add the user id to the metadata
-        request.data["user"] = request.user.id
+        # Add user id and site code (if not provided) to the request
+        with mutable(request.data) as data:
+            data["user"] = request.user.id
 
-        # If a site code was not provided, use the user's site code
-        if not request.data.get("site"):
-            request.data["site"] = request.user.site.code
+            if not data.get("site"):
+                data["site"] = request.user.site.code
 
         # Get the model serializer
         serializer_cls = mapping.get(project.model)
