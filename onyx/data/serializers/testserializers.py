@@ -8,11 +8,11 @@ class TestSerializer(RecordSerializer):
     collection_month = YearMonthField(required=False, allow_null=True)
     received_month = YearMonthField(required=False, allow_null=True)
     country = ChoiceField(TestModel, "country")
-    region = ChoiceField(TestModel, "region")
+    region = ChoiceField(TestModel, "region", required=False, allow_null=True)
 
     class Meta:
         model = TestModel
-        fields = [
+        fields = RecordSerializer.Meta.fields + [
             "sample_id",
             "run_name",
             "collection_month",

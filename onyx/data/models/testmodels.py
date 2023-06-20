@@ -4,6 +4,9 @@ from utils.fields import YearMonthField, StrippedCharField, ChoiceField
 from utils.constraints import unique_together, optional_value_group
 
 
+# TODO: Create a middle class between TestModel and Record, for sake of testing inheritance-related things
+
+
 class TestModel(Record):
     sample_id = StrippedCharField(max_length=24)
     run_name = StrippedCharField(max_length=96)
@@ -11,8 +14,8 @@ class TestModel(Record):
     received_month = YearMonthField(null=True)
     submission_date = models.DateField()
     country = ChoiceField(max_length=20)
-    region = ChoiceField(max_length=20)
-    concern = models.BooleanField(null=True)
+    region = ChoiceField(max_length=20, null=True)
+    concern = models.BooleanField()
     tests = models.IntegerField()
     score = models.FloatField()
 
