@@ -4,6 +4,11 @@ from ...models import Project
 from utils.groups import read_groups, create_or_update_group
 
 
+def _print(*args, quiet=False, **kwargs):
+    if not quiet:
+        print(*args, **kwargs)
+
+
 class Command(base.BaseCommand):
     help = "Create or update a project in the database."
 
@@ -11,6 +16,7 @@ class Command(base.BaseCommand):
         parser.add_argument("code")
         parser.add_argument("--groups", required=True)
         parser.add_argument("--content-type")
+        parser.add_argument("--quiet", default=False)
 
     def handle(self, *args, **options):
         code = options["code"].lower()
@@ -24,19 +30,21 @@ class Command(base.BaseCommand):
         groups = {}
 
         for gdef in read_groups(options["groups"]):
-            group, created = create_or_update_group(app, model, gdef)
+            group, created = create_or_update_group(
+                app, model, gdef, quiet=options["quiet"]
+            )
             action, _, _ = gdef.name.partition("_")
             groups[action] = group
 
             if created:
-                print(f"Created group: {gdef.name}")
+                _print(f"Created group: {gdef.name}", quiet=options["quiet"])
             else:
-                print(f"Updated group: {gdef.name}")
+                _print(f"Updated group: {gdef.name}", quiet=options["quiet"])
 
-            print("Permissions:")
+            _print("Permissions:", quiet=options["quiet"])
             for perm in group.permissions.all():
-                print(f"\t{perm}")
-            print("")
+                _print(f"\t{perm}", quiet=options["quiet"])
+            _print("", quiet=options["quiet"])
 
         project, created = Project.objects.update_or_create(
             code=code,
@@ -51,8 +59,8 @@ class Command(base.BaseCommand):
         )
 
         if created:
-            print(f"Created project: {project.code}")
+            _print(f"Created project: {project.code}", quiet=options["quiet"])
         else:
-            print(f"Updated project: {project.code}")
+            _print(f"Updated project: {project.code}", quiet=options["quiet"])
 
-        print("\tmodel:", project.content_type.model_class())
+        _print("\tmodel:", project.content_type.model_class(), quiet=options["quiet"])

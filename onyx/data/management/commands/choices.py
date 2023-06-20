@@ -4,11 +4,17 @@ from data.models import Choice
 import csv
 
 
+def _print(*args, quiet=False, **kwargs):
+    if not quiet:
+        print(*args, **kwargs)
+
+
 class Command(base.BaseCommand):
     help = "Set choice groups in the database."
 
     def add_arguments(self, parser):
         parser.add_argument("scheme")
+        parser.add_argument("--quiet")
 
     def handle(self, *args, **options):
         with open(options["scheme"]) as scheme:
@@ -29,18 +35,21 @@ class Command(base.BaseCommand):
                     )
 
                     if created:
-                        print(
-                            f"Created choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}"
+                        _print(
+                            f"Created choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            quiet=options["quiet"],
                         )
                     elif not db_choice.is_active:
                         db_choice.is_active = True
                         db_choice.save()
-                        print(
-                            f"Reactivated choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}"
+                        _print(
+                            f"Reactivated choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            quiet=options["quiet"],
                         )
                     else:
-                        print(
-                            f"Active choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}"
+                        _print(
+                            f"Active choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            quiet=options["quiet"],
                         )
 
                 # Deactivate choices no longer in the set
@@ -54,6 +63,7 @@ class Command(base.BaseCommand):
                     if db_choice.choice not in choices:
                         db_choice.is_active = False
                         db_choice.save()
-                        print(
-                            f"Deactivated choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}"
+                        _print(
+                            f"Deactivated choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            quiet=options["quiet"],
                         )

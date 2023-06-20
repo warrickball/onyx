@@ -38,7 +38,7 @@ def read_groups(scheme):
     yield gdef
 
 
-def create_or_update_group(app_label, model, gdef):
+def create_or_update_group(app_label, model, gdef, quiet=False):
     group, created = Group.objects.get_or_create(name=gdef.name)
     permissions = []
 
@@ -53,7 +53,7 @@ def create_or_update_group(app_label, model, gdef):
             codename=permission,
             name=f"Can {action} {project}{' ' + field if field else ''}",
         )
-        if created:
+        if not quiet and created:
             print("Created permission:", permission)
         permissions.append(permission)
 
