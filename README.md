@@ -1,24 +1,22 @@
 # `onyx`
 
-#### Start gunicorn
+Start the server:
 ```
-$ gunicorn onyx.wsgi -c gunicorn.conf.py
-```
-
-#### Stop gunicorn
-```
-$ pkill gunicorn
+$ gunicorn -c onyx/onyx.gunicorn.py
 ```
 
-#### Run tests
+Stop the server:
+```
+$ pkill -f onyx.gunicorn.py
+```
+
+View server access/error logs:
+```
+$ tail -f logs/access.log
+$ tail -f logs/error.log
+```
+
+Run the tests:
 ```
 $ python manage.py test -v 2
-$ python manage.py test data.tests -v 2
-$ python manage.py test accounts.tests -v 2
-```
-
-#### Run celery 
-```
-celery -A onyx beat -l INFO
-celery -A onyx worker -Q create_mpx_tables --concurrency=1 -l INFO
 ```
