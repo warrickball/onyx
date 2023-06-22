@@ -30,7 +30,7 @@ SECRET_KEY = os.environ["ONYX_DJANGO_SECRET_KEY"]
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+ALLOWED_HOSTS = [os.environ["ONYX_DOMAIN"]]
 
 # ADMINS = [(os.environ["ONYX_ADMIN_NAME"], os.environ["ONYX_ADMIN_EMAIL"])]
 
@@ -93,11 +93,11 @@ WSGI_APPLICATION = "onyx.wsgi.application"
 # DATABASES = {
 #     "default": {
 #         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": "onyx",
-#         # "USER": os.environ["ONYX_POSTGRES_USER"],
-#         # "PASSWORD": os.environ["ONYX_POSTGRES_PASSWORD"],
-#         # "HOST": "localhost",
-#         # "PORT": "5432",
+#         "NAME": os.environ["ONYX_POSTGRES_DB"],
+#         "USER": os.environ["ONYX_POSTGRES_USER"],
+#         "PASSWORD": os.environ["ONYX_POSTGRES_PASSWORD"],
+#         "HOST": os.environ["ONYX_POSTGRES_HOST"],
+#         "PORT": os.environ["ONYX_POSTGRES_PORT"],
 #     }
 # }
 
@@ -168,9 +168,17 @@ REST_KNOX = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "timestamp": {
+            "format": "[{asctime}] [{process}] [{levelname}] {message}",
+            "datefmt": "%Y-%m-%d %H:%M:%S %z",
+            "style": "{",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter" : "timestamp"
         },
     },
     "root": {
