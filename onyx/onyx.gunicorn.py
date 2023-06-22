@@ -5,8 +5,7 @@ import os
 chdir = os.path.join(os.environ["ONYX_WORKING_DIR"], "onyx")
 wsgi_app = "onyx.wsgi"
 
-bind = f"{os.environ['ONYX_HOST']}:{os.environ['ONYX_PORT']}"
-
+bind = os.environ["ONYX_GUNICORN_BIND"]
 workers = os.environ["ONYX_GUNICORN_WORKERS"]
 
 accesslog = os.path.join(os.environ["ONYX_WORKING_DIR"], "logs", "access.log")
