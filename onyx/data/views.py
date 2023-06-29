@@ -13,10 +13,11 @@ from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
 from .models import RecordHistory, Choice
 from .filters import OnyxFilter
-from .serializers import mapping
+from .serializers import ModelSerializerMap, SerializerNode
 from django_query_tools.server import make_atoms, validate_atoms, make_query
 
 
+# TODO: Handle request.data = None ISE
 class CreateRecordView(OnyxAPIView):
     permission_classes = Admin
 
@@ -46,36 +47,39 @@ class CreateRecordView(OnyxAPIView):
                 data["site"] = request.user.site.code
 
         # Get the model serializer
-        serializer_cls = mapping.get(project.model)
+        serializer_cls = ModelSerializerMap.get(project.model)
         if not serializer_cls:
             return OnyxResponse.not_found("serializer")
 
-        # Validate the data using the serializer
-        serializer = serializer_cls(
+        # Validate the data
+        # If data is valid, save to the database. Otherwise, return 400
+        node = SerializerNode(
+            serializer_cls,
             data=request.data,
         )
 
-        # If data is valid, save to the database. Otherwise, return 400
-        if serializer.is_valid():
-            if not test:
-                instance = serializer.save()
-                cid = instance.cid
+        if not node.is_valid():
+            return OnyxResponse.validation_error(node.errors)
 
-                RecordHistory.objects.create(
-                    record=instance,
-                    cid=cid,
-                    user=request.user,
-                    action="add",
-                    changes=str(request.data),
-                )
-            else:
-                cid = None
+        # Create the instance
+        if not test:
+            instance = node.save()
+            cid = instance.cid
 
-            return OnyxResponse.action_success(
-                "add", cid, test=test, status=status.HTTP_201_CREATED
+            RecordHistory.objects.create(
+                record=instance,
+                cid=cid,
+                user=request.user,
+                action="add",
+                changes=str(request.data),
             )
         else:
-            return OnyxResponse.validation_error(serializer.errors)
+            cid = None
+
+        # Return response indicating creation
+        return OnyxResponse.action_success(
+            "add", cid, test=test, status=status.HTTP_201_CREATED
+        )
 
 
 class GetRecordView(OnyxAPIView):
@@ -118,7 +122,7 @@ class GetRecordView(OnyxAPIView):
             return OnyxResponse.not_found("cid")
 
         # Get the model serializer
-        serializer_cls = mapping.get(project.model)
+        serializer_cls = ModelSerializerMap.get(project.model)
         if not serializer_cls:
             return OnyxResponse.not_found("serializer")
 
@@ -240,7 +244,7 @@ def filter_query(request, code):
         # So a call to distinct is necessary.
         # This (should) not affect the cursor pagination
         # as removing duplicates is not changing any order in the result set
-        # Tests will be needed to confirm all of this
+        # TODO: Tests will be needed to confirm all of this
         qs = qs.filter(q_object).distinct()
 
     # Add the pagination cursor param back into the request
@@ -253,7 +257,7 @@ def filter_query(request, code):
     result_page = paginator.paginate_queryset(instances, request)
 
     # Get the model serializer
-    serializer_cls = mapping.get(project.model)
+    serializer_cls = ModelSerializerMap.get(project.model)
     if not serializer_cls:
         return OnyxResponse.not_found("serializer")
 
@@ -307,7 +311,9 @@ class UpdateRecordView(OnyxAPIView):
                 code,
                 user=request.user,
                 action="change",
-                fields=parse_dunders(request.data),
+                fields=parse_dunders(
+                    request.data
+                ),  # TODO: separate identifiers into 'add' permission
             )
         except (
             ProjectDoesNotExist,
@@ -328,33 +334,35 @@ class UpdateRecordView(OnyxAPIView):
             return OnyxResponse.not_found("cid")
 
         # Get the model serializer
-        serializer_cls = mapping.get(project.model)
+        serializer_cls = ModelSerializerMap.get(project.model)
         if not serializer_cls:
             return OnyxResponse.not_found("serializer")
 
         # Validate the data using the serializer
-        serializer = serializer_cls(
-            instance=instance,
+        # If data is valid, update existing record in the database.
+        # Otherwise, return 400
+        node = SerializerNode(
+            serializer_cls,
             data=request.data,
-            partial=True,
         )
 
-        # If data is valid, update existing record in the database. Otherwise, return 400
-        if serializer.is_valid():
-            if not test:
-                instance = serializer.save()
+        if not node.is_valid(instance=instance):
+            return OnyxResponse.validation_error(node.errors)
 
-                RecordHistory.objects.create(
-                    record=instance,
-                    cid=cid,
-                    user=request.user,
-                    action="change",
-                    changes=str(request.data),
-                )
+        # Update the instance
+        if not test:
+            instance = node.save()
 
-            return OnyxResponse.action_success("change", cid, test=test)
-        else:
-            return OnyxResponse.validation_error(serializer.errors)
+            RecordHistory.objects.create(
+                record=instance,
+                cid=cid,
+                user=request.user,
+                action="change",
+                changes=str(request.data),
+            )
+
+        # Return response indicating update
+        return OnyxResponse.action_success("change", cid, test=test)
 
 
 class SuppressRecordView(OnyxAPIView):
