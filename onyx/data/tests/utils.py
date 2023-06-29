@@ -3,6 +3,7 @@ from django.contrib.auth.models import Group
 from rest_framework.test import APITestCase
 from rest_framework import status
 from accounts.models import User, Site
+import logging
 import os
 
 
@@ -11,6 +12,8 @@ directory = os.path.dirname(os.path.abspath(__file__))
 
 class OnyxTestCase(APITestCase):
     def setUp(self):
+        logging.disable(logging.CRITICAL)
+
         # Set up test project, choices, and site
         call_command(
             "project",
@@ -56,33 +59,3 @@ class OnyxTestCase(APITestCase):
 
         self.client.force_authenticate(user)  # type: ignore
         return user
-
-    def assertEqualCids(self, results, internal):
-        self.assertEqual(
-            sorted(result["cid"] for result in results),
-            sorted(internal.values_list("cid", flat=True)),
-        )
-
-    def showEqualCids(self, results, internal):
-        return sorted(result["cid"] for result in results) == sorted(
-            internal.values_list("cid", flat=True)
-        )
-
-    def client_get_paginated(
-        self, *args, expected_status_code=status.HTTP_200_OK, **kwargs
-    ):
-        response = self.client.get(*args, **kwargs)
-        self.assertEqual(response.status_code, expected_status_code)
-
-        results = response.json().get("results")
-        _next = response.json().get("next")
-
-        while _next is not None:
-            response = self.client.get(
-                _next,
-            )
-            self.assertEqual(response.status_code, expected_status_code)
-            results.extend(response.json().get("results"))
-            _next = response.json().get("next")
-
-        return results
