@@ -100,42 +100,9 @@ class IsSameSiteAsObject(permissions.BasePermission):
 
 
 # Useful permissions groupings
-Any = [
-    AllowAny,
-]
-
-Approved = [
-    IsAuthenticated,
-    IsActiveSite,
-    IsActiveUser,
-    IsSiteApproved,
-    IsAdminApproved,
-]
-
-SiteAuthority = [
-    IsAuthenticated,
-    IsActiveSite,
-    IsActiveUser,
-    IsSiteApproved,
-    IsAdminApproved,
-    IsSiteAuthority,
-]
-
-
-Admin = [
-    IsAuthenticated,
-    IsActiveSite,
-    IsActiveUser,
-    IsAdminUser,
-]
-
-
-SiteAuthorityForObject = [
-    IsAuthenticated,
-    IsActiveSite,
-    IsActiveUser,
-    IsSiteApproved,
-    IsAdminApproved,
-    IsSiteAuthority,
-    IsSameSiteAsObject,
-]
+Any = [AllowAny]
+Active = [IsAuthenticated, IsActiveSite, IsActiveUser]
+Approved = Active + [IsSiteApproved, IsAdminApproved]
+SiteAuthority = Approved + [IsSiteAuthority]
+SiteAuthorityForObject = SiteAuthority + [IsSameSiteAsObject]
+Admin = Approved + [IsAdminUser]
