@@ -3,8 +3,8 @@ from django.core.exceptions import FieldDoesNotExist, ValidationError, Permissio
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
-from accounts.permissions import Admin, ApprovedOrAdmin, SameSiteAuthorityAsCIDOrAdmin
-from utils.views import OnyxAPIView
+from rest_framework.views import APIView
+from accounts.permissions import Approved, Admin
 from utils.response import OnyxResponse
 from utils.project import OnyxProject
 from utils.mutable import mutable
@@ -18,7 +18,7 @@ from django_query_tools.server import make_atoms, validate_atoms, make_query
 
 
 # TODO: Handle request.data = None ISE
-class CreateRecordView(OnyxAPIView):
+class CreateRecordView(APIView):
     permission_classes = Admin
 
     def post(self, request, code, test=False):
@@ -40,6 +40,7 @@ class CreateRecordView(OnyxAPIView):
             return handle_exception(e)
 
         # Add user id and site code (if not provided) to the request
+        # TODO: Move these out of here
         with mutable(request.data) as data:
             data["user"] = request.user.id
 
@@ -82,8 +83,8 @@ class CreateRecordView(OnyxAPIView):
         )
 
 
-class GetRecordView(OnyxAPIView):
-    permission_classes = ApprovedOrAdmin
+class GetRecordView(APIView):
+    permission_classes = Approved
 
     def get(self, request, code, cid):
         """
@@ -279,8 +280,8 @@ def filter_query(request, code):
     )
 
 
-class FilterRecordView(OnyxAPIView):
-    permission_classes = ApprovedOrAdmin
+class FilterRecordView(APIView):
+    permission_classes = Approved
 
     def get(self, request, code):
         """
@@ -289,8 +290,8 @@ class FilterRecordView(OnyxAPIView):
         return filter_query(request, code)
 
 
-class QueryRecordView(OnyxAPIView):
-    permission_classes = ApprovedOrAdmin
+class QueryRecordView(APIView):
+    permission_classes = Approved
 
     def post(self, request, code):
         """
@@ -299,8 +300,8 @@ class QueryRecordView(OnyxAPIView):
         return filter_query(request, code)
 
 
-class UpdateRecordView(OnyxAPIView):
-    permission_classes = SameSiteAuthorityAsCIDOrAdmin
+class UpdateRecordView(APIView):
+    permission_classes = Admin
 
     def patch(self, request, code, cid, test=False):
         """
@@ -365,8 +366,8 @@ class UpdateRecordView(OnyxAPIView):
         return OnyxResponse.action_success("change", cid, test=test)
 
 
-class SuppressRecordView(OnyxAPIView):
-    permission_classes = SameSiteAuthorityAsCIDOrAdmin
+class SuppressRecordView(APIView):
+    permission_classes = Admin
 
     def delete(self, request, code, cid, test=False):
         """
@@ -412,7 +413,7 @@ class SuppressRecordView(OnyxAPIView):
         return OnyxResponse.action_success("suppress", cid, test=test)
 
 
-class DeleteRecordView(OnyxAPIView):
+class DeleteRecordView(APIView):
     permission_classes = Admin
 
     def delete(self, request, code, cid, test=False):
@@ -454,20 +455,20 @@ class DeleteRecordView(OnyxAPIView):
         return OnyxResponse.action_success("delete", cid, test=test)
 
 
-class ProjectView(OnyxAPIView):
+class ProjectView(APIView):
     pass  # TODO
 
 
-class ScopesView(OnyxAPIView):
+class ScopesView(APIView):
     pass  # TODO
 
 
-class FieldsView(OnyxAPIView):
+class FieldsView(APIView):
     pass  # TODO
 
 
-class ChoicesView(OnyxAPIView):
-    permission_classes = ApprovedOrAdmin
+class ChoicesView(APIView):
+    permission_classes = Approved
 
     def get(self, request, code, field):
         """
