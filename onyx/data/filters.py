@@ -5,6 +5,7 @@ from data.models import Choice
 from utils.choices import format_choices
 from utils.fields import (
     StrippedCharField,
+    HashField,
     LowerCharField,
     UpperCharField,
     YearMonthField,
@@ -89,11 +90,12 @@ ALL_LOOKUPS = set(
 
 # Text field types
 TEXT_FIELDS = [
-    StrippedCharField,
-    LowerCharField,
-    UpperCharField,
     models.CharField,
     models.TextField,
+    StrippedCharField,
+    HashField,
+    LowerCharField,
+    UpperCharField,
 ]
 
 # Number field types
