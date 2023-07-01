@@ -1,7 +1,6 @@
 from .models import (
     Project,
     Scope,
-    Signal,
     Choice,
     AbstractRecord,
     Record,
