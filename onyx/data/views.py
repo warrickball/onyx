@@ -39,14 +39,6 @@ class CreateRecordView(APIView):
         ) as e:
             return handle_exception(e)
 
-        # Add user id and site code (if not provided) to the request
-        # TODO: Move these out of here
-        with mutable(request.data) as data:
-            data["user"] = request.user.id
-
-            if not data.get("site"):
-                data["site"] = request.user.site.code
-
         # Get the model serializer
         serializer_cls = ModelSerializerMap.get(project.model)
         if not serializer_cls:
@@ -57,6 +49,7 @@ class CreateRecordView(APIView):
         node = SerializerNode(
             serializer_cls,
             data=request.data,
+            context={"request": self.request},
         )
 
         if not node.is_valid():

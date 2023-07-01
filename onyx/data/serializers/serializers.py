@@ -1,6 +1,8 @@
 from data.models import Record
 from django.db import transaction, IntegrityError, DatabaseError
 from rest_framework import serializers
+from accounts.models import User, Site
+from utils.defaults import CurrentUserSiteDefault
 from utils.validation import (
     enforce_optional_value_groups,
     enforce_orderings,
@@ -12,8 +14,9 @@ from utils.validation import (
 # TODO: Need to handle all manner of malformed `data`
 # TODO: Also need to handle required FKs, not just optional many-to-one
 class SerializerNode:
-    def __init__(self, serializer_class, data=None):
+    def __init__(self, serializer_class, data=None, context=None):
         self.serializer_class = serializer_class
+        self.context = context
         self.model = serializer_class.Meta.model
         self.identifiers = serializer_class.OnyxMeta.identifiers
         self.relations = serializer_class.OnyxMeta.relations
@@ -40,12 +43,14 @@ class SerializerNode:
                             SerializerNode(
                                 serializer_class=relation["serializer"],
                                 data=f_d,
+                                context=context,
                             )
                         )
                 else:
                     self.nodes[field] = SerializerNode(
                         serializer_class=relation["serializer"],
                         data=field_data,
+                        context=context,
                     )
 
     def _validate_subnode_create(self, subnode):
@@ -91,6 +96,7 @@ class SerializerNode:
             instance=instance,
             data=self.data,
             partial=bool(instance),
+            context=self.context,
         )
         valid.append(self.serializer.is_valid())
         self.errors = dict(self.serializer.errors)
@@ -347,6 +353,13 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
 
 
 class RecordSerializer(AbstractRecordSerializer):
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), default=serializers.CurrentUserDefault()
+    )
+    site = serializers.PrimaryKeyRelatedField(
+        queryset=Site.objects.all(), default=CurrentUserSiteDefault()
+    )
+
     class Meta:
         model = Record
         fields = [
