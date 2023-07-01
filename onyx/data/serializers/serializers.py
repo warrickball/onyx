@@ -15,8 +15,8 @@ class SerializerNode:
     def __init__(self, serializer_class, data=None):
         self.serializer_class = serializer_class
         self.model = serializer_class.Meta.model
-        self.identifiers = serializer_class.ExtraMeta.identifiers
-        self.relations = serializer_class.ExtraMeta.relations
+        self.identifiers = serializer_class.OnyxMeta.identifiers
+        self.relations = serializer_class.OnyxMeta.relations
         self.nodes = {}
         self.data = {}
 
@@ -186,7 +186,7 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
 
             # Initialise serializers for relations
             for field_name, nested in relations.items():
-                relation = self.ExtraMeta.relations[field_name]
+                relation = self.OnyxMeta.relations[field_name]
                 self.fields[field_name] = relation["serializer"](
                     fields=nested,
                     **relation["kwargs"],
@@ -207,7 +207,7 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
         enforce_identifiers(
             errors=errors,
             data=data,
-            identifiers=self.ExtraMeta.identifiers,
+            identifiers=self.OnyxMeta.identifiers,
         )
 
         if (not self.instance) and self.partial:
@@ -216,21 +216,21 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
             enforce_optional_value_groups(
                 errors=errors,
                 data=data,
-                groups=self.ExtraMeta.optional_value_groups,
+                groups=self.OnyxMeta.optional_value_groups,
                 instance=self.instance,
             )
 
             enforce_orderings(
                 errors=errors,
                 data=data,
-                orderings=self.ExtraMeta.orderings,
+                orderings=self.OnyxMeta.orderings,
                 instance=self.instance,
             )
 
             enforce_non_futures(
                 errors=errors,
                 data=data,
-                non_futures=self.ExtraMeta.non_futures,
+                non_futures=self.OnyxMeta.non_futures,
             )
 
         if errors:
@@ -275,7 +275,7 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
 
     #     # Move any nested data from validated_data into related_data
     #     related_data = {}
-    #     for name in cls.ExtraMeta.relations:
+    #     for name in cls.OnyxMeta.relations:
     #         r_d = validated_data.pop(name, None)
     #         if r_d:
     #             related_data[name] = r_d
@@ -288,8 +288,8 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
 
     #     # Recursively handle creation of related_data
     #     for name, data in related_data.items():
-    #         serializer = cls.ExtraMeta.relations[name]["serializer"]
-    #         many = cls.ExtraMeta.relations[name]["kwargs"].get("many")
+    #         serializer = cls.OnyxMeta.relations[name]["serializer"]
+    #         many = cls.OnyxMeta.relations[name]["kwargs"].get("many")
 
     #         if many:
     #             for x in data:
@@ -306,7 +306,7 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
 
     #     # Move any nested data from validated_data into related_data
     #     related_data = {}
-    #     for name in cls.ExtraMeta.relations:
+    #     for name in cls.OnyxMeta.relations:
     #         r_d = validated_data.pop(name, None)
     #         if r_d:
     #             related_data[name] = r_d
@@ -318,7 +318,7 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
     #     else:
     #         identifiers = {
     #             identifier: validated_data.pop(identifier)
-    #             for identifier in cls.ExtraMeta.identifiers
+    #             for identifier in cls.OnyxMeta.identifiers
     #         }
 
     #         instance, _ = model.objects.update_or_create(
@@ -327,8 +327,8 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
 
     #     # Recursively handle update of related_data
     #     for name, data in related_data.items():
-    #         serializer = cls.ExtraMeta.relations[name]["serializer"]
-    #         many = cls.ExtraMeta.relations[name]["kwargs"].get("many")
+    #         serializer = cls.OnyxMeta.relations[name]["serializer"]
+    #         many = cls.OnyxMeta.relations[name]["kwargs"].get("many")
 
     #         if many:
     #             for x in data:
@@ -338,7 +338,7 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
 
     #     return instance
 
-    class ExtraMeta:
+    class OnyxMeta:
         relations = {}
         identifiers = []
         optional_value_groups = []

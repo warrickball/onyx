@@ -31,14 +31,14 @@ class TestSerializer(RecordSerializer):
             )
         ]
 
-    class ExtraMeta(RecordSerializer.ExtraMeta):
-        optional_value_groups = RecordSerializer.ExtraMeta.optional_value_groups + [
+    class OnyxMeta(RecordSerializer.OnyxMeta):
+        optional_value_groups = RecordSerializer.OnyxMeta.optional_value_groups + [
             ("collection_month", "received_month")
         ]
-        orderings = RecordSerializer.ExtraMeta.orderings + [
+        orderings = RecordSerializer.OnyxMeta.orderings + [
             ("collection_month", "received_month")
         ]
-        non_futures = RecordSerializer.ExtraMeta.non_futures + [
+        non_futures = RecordSerializer.OnyxMeta.non_futures + [
             "collection_month",
             "received_month",
             "submission_date",
