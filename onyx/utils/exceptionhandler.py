@@ -5,7 +5,7 @@ from utils.response import OnyxResponse
 
 def handle_exception(e):
     if isinstance(e, ProjectDoesNotExist):
-        return OnyxResponse.not_found("project")
+        return OnyxResponse.not_found("Project")
 
     elif isinstance(e, ScopesDoNotExist):
         return OnyxResponse.unknown_aspect("scopes", e.args[0])
