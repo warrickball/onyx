@@ -8,7 +8,6 @@ from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGro
 from utils.response import OnyxResponse
 from utils.project import OnyxProject
 from utils.mutable import mutable
-from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
 from .models import Choice
@@ -33,11 +32,7 @@ class CreateRecordView(APIView):
                 action=self.action,
                 fields=parse_dunders(request.data),
             )
-        except (
-            ProjectDoesNotExist,
-            PermissionDenied,
-            FieldDoesNotExist,
-        ) as e:
+        except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
         # Get the model serializer
@@ -94,12 +89,7 @@ class GetRecordView(APIView):
                 action="view",
                 scopes=scopes,
             )
-        except (
-            ProjectDoesNotExist,
-            ScopesDoNotExist,
-            PermissionDenied,
-            FieldDoesNotExist,
-        ) as e:
+        except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
         # Get the instance
@@ -194,12 +184,7 @@ def filter_query(request, code):
             fields=[x.key for x in atoms],
             scopes=scopes,
         )
-    except (
-        ProjectDoesNotExist,
-        ScopesDoNotExist,
-        PermissionDenied,
-        FieldDoesNotExist,
-    ) as e:
+    except (PermissionDenied, FieldDoesNotExist) as e:
         return handle_exception(e)
 
     # Validate and clean the provided key-value pairs
@@ -316,11 +301,7 @@ class UpdateRecordView(APIView):
                     request.data
                 ),  # TODO: separate identifiers into 'add' permission
             )
-        except (
-            ProjectDoesNotExist,
-            PermissionDenied,
-            FieldDoesNotExist,
-        ) as e:
+        except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
         # Get the instance to be updated
@@ -372,11 +353,7 @@ class SuppressRecordView(APIView):
                 user=request.user,
                 action="suppress",
             )
-        except (
-            ProjectDoesNotExist,
-            PermissionDenied,
-            FieldDoesNotExist,
-        ) as e:
+        except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
         # Get the instance to be suppressed
@@ -413,11 +390,7 @@ class DeleteRecordView(APIView):
                 user=request.user,
                 action="delete",
             )
-        except (
-            ProjectDoesNotExist,
-            PermissionDenied,
-            FieldDoesNotExist,
-        ) as e:
+        except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
         # Get the instance to be deleted
@@ -463,12 +436,7 @@ class ChoicesView(APIView):
                 action="view",
                 fields=[field],
             )
-        except (
-            ProjectDoesNotExist,
-            ScopesDoNotExist,
-            PermissionDenied,
-            FieldDoesNotExist,
-        ) as e:
+        except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
         field = project.fields[field.lower()]

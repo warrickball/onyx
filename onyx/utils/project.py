@@ -3,7 +3,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import ForeignKey, ManyToOneRel
 from data.models import Project, Scope
 from data.filters import ALL_LOOKUPS
-from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.fields import ModelChoiceField
 
 
@@ -30,32 +29,19 @@ class OnyxProject:
 
         * Checks `user` permissions to view and perform given `action` on these.
         """
-        # Get and save the project instance
-        try:
-            self.project = Project.objects.get(code__iexact=code)
-        except Project.DoesNotExist:
-            raise ProjectDoesNotExist
+        if not scopes:
+            scopes = []
 
-        # Get and save the scope instances
-        if scopes:
-            scopes = set(scopes)
-            self.scopes = []
-            unknown = []
-            for scope in scopes:
-                try:
-                    self.scopes.append(
-                        Scope.objects.get(
-                            project=self.project,
-                            code__iexact=scope,
-                            action=action,
-                        )
-                    )
-                except Scope.DoesNotExist:
-                    unknown.append(scope.lower())
-            if unknown:
-                raise ScopesDoNotExist(unknown)
-        else:
-            self.scopes = None
+        # Get and save the project and scope instances
+        self.project = Project.objects.get(code__iexact=code)
+        self.scopes = [
+            Scope.objects.get(
+                project=self.project,
+                code__iexact=s,
+                action=action,
+            )
+            for s in set(scopes)
+        ]
 
         # Assign model to the project
         model = self.project.content_type.model_class()

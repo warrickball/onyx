@@ -1,16 +1,9 @@
 from django.core.exceptions import FieldDoesNotExist, ValidationError, PermissionDenied
-from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.response import OnyxResponse
 
 
 def handle_exception(e):
-    if isinstance(e, ProjectDoesNotExist):
-        return OnyxResponse.not_found("Project")
-
-    elif isinstance(e, ScopesDoNotExist):
-        return OnyxResponse.unknown_aspect("scopes", e.args[0])
-
-    elif isinstance(e, PermissionDenied):
+    if isinstance(e, PermissionDenied):
         return OnyxResponse.forbidden(e.args[0])
 
     elif isinstance(e, FieldDoesNotExist):
