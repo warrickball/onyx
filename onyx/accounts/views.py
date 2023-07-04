@@ -52,7 +52,7 @@ class SiteApproveView(APIView):
                     username=username
                 )
         except User.DoesNotExist:
-            return OnyxResponse.not_found("user")
+            return OnyxResponse.not_found("User")
 
         # Approve user
         user.is_site_approved = True
@@ -80,7 +80,7 @@ class AdminApproveView(APIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return OnyxResponse.not_found("user")
+            return OnyxResponse.not_found("User")
 
         # Approve user
         user.is_admin_approved = True
