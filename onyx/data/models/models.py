@@ -94,7 +94,7 @@ def generate_cid():
 
 
 class BaseRecord(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     history = HistoricalRecords(inherit=True)
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
@@ -113,7 +113,6 @@ class ProjectRecord(BaseRecord):
     class Meta:
         default_permissions = []
         indexes = [
-            models.Index(fields=["cid"]),
             models.Index(fields=["published_date"]),
             models.Index(fields=["suppressed"]),
         ]
