@@ -4,14 +4,14 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
-from accounts.permissions import Approved, Admin
+from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGroups
 from utils.response import OnyxResponse
 from utils.project import OnyxProject
 from utils.mutable import mutable
 from utils.errors import ProjectDoesNotExist, ScopesDoNotExist
 from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
-from .models import RecordHistory, Choice
+from .models import Choice
 from .filters import OnyxFilter
 from .serializers import ModelSerializerMap, SerializerNode
 from django_query_tools.server import make_atoms, validate_atoms, make_query
@@ -19,7 +19,8 @@ from django_query_tools.server import make_atoms, validate_atoms, make_query
 
 # TODO: Handle request.data = None ISE
 class CreateRecordView(APIView):
-    permission_classes = Admin
+    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+    action = "add"
 
     def post(self, request, code, test=False):
         """
@@ -29,7 +30,7 @@ class CreateRecordView(APIView):
             project = OnyxProject(
                 code,
                 user=request.user,
-                action="add",
+                action=self.action,
                 fields=parse_dunders(request.data),
             )
         except (
@@ -42,7 +43,7 @@ class CreateRecordView(APIView):
         # Get the model serializer
         serializer_cls = ModelSerializerMap.get(project.model)
         if not serializer_cls:
-            return OnyxResponse.not_found("serializer")
+            return OnyxResponse.not_found("Serializer")
 
         # Validate the data
         # If data is valid, save to the database. Otherwise, return 400
@@ -59,25 +60,18 @@ class CreateRecordView(APIView):
         if not test:
             instance = node.save()
             cid = instance.cid
-
-            RecordHistory.objects.create(
-                record=instance,
-                cid=cid,
-                user=request.user,
-                action="add",
-                changes=str(request.data),
-            )
         else:
             cid = None
 
         # Return response indicating creation
         return OnyxResponse.action_success(
-            "add", cid, test=test, status=status.HTTP_201_CREATED
+            self.action, cid, test=test, status=status.HTTP_201_CREATED
         )
 
 
 class GetRecordView(APIView):
-    permission_classes = Approved
+    permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
+    action = "view"
 
     def get(self, request, code, cid):
         """
@@ -85,6 +79,10 @@ class GetRecordView(APIView):
         """
         # Take out the scope param from the request
         with mutable(request.query_params) as query_params:
+            exclude = query_params.getlist("exclude")
+            if exclude:
+                query_params.pop("exclude")
+
             scopes = query_params.getlist("scope")
             if scopes:
                 query_params.pop("scope")
@@ -113,17 +111,18 @@ class GetRecordView(APIView):
                 .get(cid=cid)
             )
         except project.model.DoesNotExist:
-            return OnyxResponse.not_found("cid")
+            return OnyxResponse.not_found("CID")
 
         # Get the model serializer
         serializer_cls = ModelSerializerMap.get(project.model)
         if not serializer_cls:
-            return OnyxResponse.not_found("serializer")
+            return OnyxResponse.not_found("Serializer")
 
         # Serialize the result
         serializer = serializer_cls(
             instance,
-            fields=project.view_fields(),
+            fields=project.view_fields(exclude=exclude),
+            read_only=True,
         )
 
         # Return response with data
@@ -150,6 +149,10 @@ def filter_query(request, code):
         cursor = query_params.get(paginator.cursor_query_param)
         if cursor:
             query_params.pop(paginator.cursor_query_param)
+
+        exclude = query_params.getlist("exclude")
+        if exclude:
+            query_params.pop("exclude")
 
         scopes = query_params.getlist("scope")
         if scopes:
@@ -213,7 +216,7 @@ def filter_query(request, code):
         return handle_exception(e)
 
     # View fields
-    fields = project.view_fields()
+    fields = project.view_fields(exclude=exclude)
 
     # Initial queryset
     qs = project.model.objects.select_related()
@@ -253,13 +256,14 @@ def filter_query(request, code):
     # Get the model serializer
     serializer_cls = ModelSerializerMap.get(project.model)
     if not serializer_cls:
-        return OnyxResponse.not_found("serializer")
+        return OnyxResponse.not_found("Serializer")
 
     # Serialize the results
     serializer = serializer_cls(
         result_page,
         many=True,
         fields=fields,
+        read_only=True,
     )
 
     # Return paginated response
@@ -274,7 +278,8 @@ def filter_query(request, code):
 
 
 class FilterRecordView(APIView):
-    permission_classes = Approved
+    permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
+    action = "view"
 
     def get(self, request, code):
         """
@@ -284,7 +289,8 @@ class FilterRecordView(APIView):
 
 
 class QueryRecordView(APIView):
-    permission_classes = Approved
+    permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
+    action = "view"
 
     def post(self, request, code):
         """
@@ -294,7 +300,8 @@ class QueryRecordView(APIView):
 
 
 class UpdateRecordView(APIView):
-    permission_classes = Admin
+    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+    action = "change"
 
     def patch(self, request, code, cid, test=False):
         """
@@ -325,12 +332,12 @@ class UpdateRecordView(APIView):
                 .get(cid=cid)
             )
         except project.model.DoesNotExist:
-            return OnyxResponse.not_found("cid")
+            return OnyxResponse.not_found("CID")
 
         # Get the model serializer
         serializer_cls = ModelSerializerMap.get(project.model)
         if not serializer_cls:
-            return OnyxResponse.not_found("serializer")
+            return OnyxResponse.not_found("Serializer")
 
         # Validate the data using the serializer
         # If data is valid, update existing record in the database.
@@ -347,20 +354,13 @@ class UpdateRecordView(APIView):
         if not test:
             instance = node.save()
 
-            RecordHistory.objects.create(
-                record=instance,
-                cid=cid,
-                user=request.user,
-                action="change",
-                changes=str(request.data),
-            )
-
         # Return response indicating update
         return OnyxResponse.action_success("change", cid, test=test)
 
 
 class SuppressRecordView(APIView):
-    permission_classes = Admin
+    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+    action = "suppress"
 
     def delete(self, request, code, cid, test=False):
         """
@@ -388,26 +388,20 @@ class SuppressRecordView(APIView):
                 .get(cid=cid)
             )
         except project.model.DoesNotExist:
-            return OnyxResponse.not_found("cid")
+            return OnyxResponse.not_found("CID")
 
         # Suppress the instance
         if not test:
             instance.suppressed = True  # type: ignore
             instance.save(update_fields=["suppressed", "last_modified"])
 
-            RecordHistory.objects.create(
-                record=instance,
-                cid=cid,
-                user=request.user,
-                action="suppress",
-            )
-
         # Return response indicating suppression
         return OnyxResponse.action_success("suppress", cid, test=test)
 
 
 class DeleteRecordView(APIView):
-    permission_classes = Admin
+    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+    action = "delete"
 
     def delete(self, request, code, cid, test=False):
         """
@@ -431,18 +425,11 @@ class DeleteRecordView(APIView):
         try:
             instance = project.model.objects.select_related().get(cid=cid)
         except project.model.DoesNotExist:
-            return OnyxResponse.not_found("cid")
+            return OnyxResponse.not_found("CID")
 
         # Delete the instance
         if not test:
             instance.delete()
-
-            RecordHistory.objects.create(
-                record=None,
-                cid=cid,
-                user=request.user,
-                action="delete",
-            )
 
         # Return response indicating deletion
         return OnyxResponse.action_success("delete", cid, test=test)
@@ -461,7 +448,8 @@ class FieldsView(APIView):
 
 
 class ChoicesView(APIView):
-    permission_classes = Approved
+    permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
+    action = "view"
 
     def get(self, request, code, field):
         """

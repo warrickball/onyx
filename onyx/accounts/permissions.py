@@ -1,4 +1,6 @@
-from rest_framework import permissions
+from django.contrib.auth.models import Group
+from rest_framework import permissions, exceptions
+from utils.response import OnyxResponse
 
 
 class AllowAny(permissions.AllowAny):
@@ -97,6 +99,55 @@ class IsSameSiteAsObject(permissions.BasePermission):
         return bool(
             request.user and (request.user.site == obj.site or request.user.is_staff)
         )
+
+
+class IsInProjectGroup(permissions.BasePermission):
+    def has_permission(self, request, view):
+        project_code = view.kwargs["code"].lower()
+        view_group = f"view.{project_code}"
+        action_group = f"{view.action}.{project_code}"
+
+        # Check the user's permission to view the project
+        # If the project isn't found, or the user doesn't have permission, tell them it doesn't exist
+        if not request.user.groups.filter(name=view_group).exists():
+            raise exceptions.NotFound(OnyxResponse._not_found("Project"))
+
+        # Check the user's permission to perform action on the project
+        # If the user is missing permissions, tell them
+        if (
+            view.action != "view"
+            and not request.user.groups.filter(name=action_group).exists()
+        ):
+            self.message = f"You do not have permission to perform action '{view.action}' on project '{project_code}'."
+            return False
+
+        return True
+
+
+class IsInScopeGroups(permissions.BasePermission):
+    def has_permission(self, request, view):
+        project_code = view.kwargs["code"].lower()
+        scope_codes = [code.lower() for code in request.query_params.getlist("scope")]
+
+        for scope_code in scope_codes:
+            view_group = f"view.{project_code}.{scope_code}"
+            action_group = f"{view.action}.{project_code}.{scope_code}"
+
+            # Check the user's permission to view the scope
+            # If the scope isn't found, or the user doesn't have permission, tell them it doesn't exist
+            if not request.user.groups.filter(name=view_group).exists():
+                raise exceptions.NotFound(OnyxResponse._not_found("Scope"))
+
+            # Check the user's permission to perform action on the scope
+            # If the user is missing permissions, tell them
+            if (
+                view.action != "view"
+                and not request.user.groups.filter(name=action_group).exists()
+            ):
+                self.message = f"You do not have permission to perform action '{view.action}' on scope '{scope_code}'."
+                return False
+
+        return True
 
 
 # Useful permissions groupings

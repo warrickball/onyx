@@ -63,53 +63,10 @@ class OnyxProject:
             raise Exception("Model could not be found when loading project")
         self.model = model
 
-        # Check user's permission to view project and perform action on the project
-        self._check_project_permissions(user, action)
-
         # Check user's permission to view each field provided and perform action on each field provided
         # If passed, stores information on model, contenttype, path etc for each provided field
         if fields:
             self.fields = self._get_fields_check_permissions(user, action, fields)
-
-    def _check_project_permissions(self, user, action):
-        app_label = self.project.content_type.app_label
-
-        # Check the user's permission to view the project
-        # If the user doesn't have permission, tell them it doesn't exist
-        view_project_permission = f"{app_label}.view_{self.project.code}"
-        if not user.has_perm(view_project_permission):
-            raise ProjectDoesNotExist
-
-        # Check the user's permission to view each scope they provided
-        # If the user doesn't have permission on a scope, tell them it doesn't exist
-        if self.scopes:
-            unknown = []
-            for scope in self.scopes:
-                view_scope_permission = (
-                    f"{app_label}.view_{self.project.code}-{scope.code}"
-                )
-                if not user.has_perm(view_scope_permission):
-                    unknown.append(scope.code)
-
-            if unknown:
-                raise ScopesDoNotExist(unknown)
-
-        # Check the user's permission to perform action on the project and the provided scopes
-        # If the user is missing permissions, return the ones required
-        if action != "view":
-            action_permissions = [f"{app_label}.{action}_{self.project.code}"]
-            if self.scopes:
-                for scope in self.scopes:
-                    action_permissions.append(
-                        f"{app_label}.{action}_{self.project.code}-{scope.code}"
-                    )
-            required = [
-                perm
-                for perm in sorted(set(action_permissions))
-                if not user.has_perm(perm)
-            ]
-            if required:
-                raise PermissionDenied(required)
 
     def _get_fields_check_permissions(self, user, action, fields):
         resolved = {}
@@ -243,7 +200,7 @@ class OnyxProject:
 
         return resolved
 
-    def _get_fields_from_permissions(self, fields_dict, permissions):
+    def _get_fields_from_permissions(self, fields_dict, permissions, exclude):
         for permission in permissions:
             _, _, field = permission.codename.partition("__")
             field_path = field.split("__")
@@ -260,17 +217,36 @@ class OnyxProject:
 
                     current_dict.setdefault(p, {})
                     current_dict = current_dict[p]
+
+        for field in exclude:
+            fs = field.split("__")
+            level = fields_dict
+            last_index = len(fs) - 1
+
+            for i, f in enumerate(fs):
+                if f not in level:
+                    break
+
+                if i == last_index:
+                    level.pop(f)
+                else:
+                    level = level[f]
+
         return fields_dict
 
-    def view_fields(self):
+    def view_fields(self, exclude=None):
         # Dictionary structure detailing all viewable fields based on
         # the project code and the scopes provided
         fields_dict = {}
+
+        if not exclude:
+            exclude = []
 
         # Update the fields dict with all viewable fields in the base project
         self._get_fields_from_permissions(
             fields_dict,
             self.project.view_group.permissions.all(),
+            exclude,
         )
 
         # For each scope
@@ -278,7 +254,9 @@ class OnyxProject:
         if self.scopes:
             for scope in self.scopes:
                 self._get_fields_from_permissions(
-                    fields_dict, scope.group.permissions.all()
+                    fields_dict,
+                    scope.group.permissions.all(),
+                    exclude,
                 )
 
         return fields_dict
