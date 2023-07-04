@@ -2,9 +2,8 @@ from .models import (
     Project,
     Scope,
     Choice,
-    AbstractRecord,
-    Record,
-    RecordHistory,
+    BaseRecord,
+    ProjectRecord,
 )
 from .testmodels import TestModel
 

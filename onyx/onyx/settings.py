@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "knox",
     "django_filters",
+    "simple_history",
     "internal",
     "data",
     "accounts",
@@ -176,10 +177,7 @@ LOGGING = {
         },
     },
     "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter" : "timestamp"
-        },
+        "console": {"class": "logging.StreamHandler", "formatter": "timestamp"},
     },
     "root": {
         "handlers": ["console"],

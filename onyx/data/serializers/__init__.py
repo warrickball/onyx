@@ -1,12 +1,16 @@
-from data.models import AbstractRecord, Record, TestModel
-from .serializers import AbstractRecordSerializer, RecordSerializer, SerializerNode
+from data.models import BaseRecord, ProjectRecord, TestModel
+from .serializers import (
+    BaseRecordSerializer,
+    ProjectRecordSerializer,
+    SerializerNode,
+)
 from .testserializers import TestSerializer
 
 
 class ModelSerializerMap:
     MAPPING = {
-        AbstractRecord: AbstractRecordSerializer,
-        Record: RecordSerializer,
+        BaseRecord: BaseRecordSerializer,
+        ProjectRecord: ProjectRecordSerializer,
         TestModel: TestSerializer,
     }
 

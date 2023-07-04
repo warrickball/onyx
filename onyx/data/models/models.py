@@ -5,7 +5,9 @@ from accounts.models import Site, User
 from utils.fields import LowerCharField, UpperCharField
 from utils.choices import format_choices
 from utils.constraints import unique_together
+from simple_history.models import HistoricalRecords
 from secrets import token_hex
+import uuid
 
 
 # TODO: Don't actually need half the stuff being recorded in Project and Scope models
@@ -85,53 +87,33 @@ def generate_cid():
     """
     cid = "C-" + "".join(token_hex(5).upper())
 
-    if Record.objects.filter(cid=cid).exists():
+    if ProjectRecord.objects.filter(cid=cid).exists():
         cid = generate_cid()
 
     return cid
 
 
-# TODO: Move some things into here?
-class AbstractRecord(models.Model):
-    class Meta:
-        abstract = True
-
-
-# TODO: Extend this class to have a ProjectRecord, where you store the cid?
-# And make it so that ALL tables inherit from a different record table?
-class Record(AbstractRecord):
+class BaseRecord(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    history = HistoricalRecords(inherit=True)
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
-    suppressed = models.BooleanField(default=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
-    cid = UpperCharField(default=generate_cid, max_length=12, unique=True)
-    published_date = models.DateField(auto_now_add=True)
+    # site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
 
     class Meta:
-        indexes = [
-            models.Index(fields=["site", "published_date"]),
-            models.Index(fields=["site"]),
-            models.Index(fields=["cid"]),
-            models.Index(fields=["published_date"]),
-        ]
         default_permissions = []
 
 
-# TODO: How best to track changes to any inherited models?
-class RecordHistory(models.Model):
-    record = models.ForeignKey(Record, on_delete=models.SET_NULL, null=True)
-    cid = UpperCharField(max_length=12)
-    user = models.ForeignKey(User, on_delete=models.PROTECT)
-    action = LowerCharField(
-        max_length=10, choices=format_choices(["add", "change", "suppress", "delete"])
-    )
-    taken = models.DateTimeField(auto_now_add=True)
-    changes = models.TextField(null=True)
+class ProjectRecord(BaseRecord):
+    cid = UpperCharField(default=generate_cid, max_length=12, unique=True)
+    published_date = models.DateField(auto_now_add=True)
+    suppressed = models.BooleanField(default=False)
 
     class Meta:
+        default_permissions = []
         indexes = [
-            models.Index(fields=["record", "user"]),
-            models.Index(fields=["record"]),
-            models.Index(fields=["user"]),
+            models.Index(fields=["cid"]),
+            models.Index(fields=["published_date"]),
+            models.Index(fields=["suppressed"]),
         ]
