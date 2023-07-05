@@ -306,7 +306,7 @@ def get_filter(
 
 
 class OnyxFilter(filters.FilterSet):
-    def __init__(self, project, *args, **kwargs):
+    def __init__(self, fields, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Constructing the filterset dynamically enables:
@@ -314,7 +314,7 @@ class OnyxFilter(filters.FilterSet):
         # Validating the values provided by the user for the fields
         # Returning cleaned values from user inputs, using the filterset's underlying form
         for field in self.data:
-            mfield = project.fields[field]
+            mfield = fields[field]
 
             name, filter = get_filter(
                 field_type=mfield.field_type,

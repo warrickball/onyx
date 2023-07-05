@@ -6,19 +6,55 @@ from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGroups
 from utils.response import OnyxResponse
-from utils.project import OnyxProject
+from utils.projectfields import resolve_fields, view_fields
 from utils.mutable import mutable
 from utils.exceptionhandler import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
-from .models import Choice
+from .models import Project, Choice
 from .filters import OnyxFilter
 from .serializers import ModelSerializerMap, SerializerNode
 from django_query_tools.server import make_atoms, validate_atoms, make_query
 
 
+class ProjectAPIView(APIView):
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+
+        self.project = Project.objects.get(code__iexact=kwargs["code"])
+
+        # Get the model
+        model = self.project.content_type.model_class()
+        if not model:
+            raise Exception("Model could not be found when loading project")
+        self.model = model
+
+        # Get the model serializer
+        serializer_cls = ModelSerializerMap.get(self.model)
+        if not serializer_cls:
+            raise Exception("Serializer could not be found for the project model")
+        self.serializer_cls = serializer_cls
+
+        # Take out any special params from the request
+        with mutable(request.query_params) as query_params:
+            # Used for cursor pagination
+            self.cursor = query_params.get("cursor")
+            if self.cursor:
+                query_params.pop("cursor")
+
+            # Used for excluding fields in output of get/filter/query
+            self.exclude = query_params.getlist("exclude")
+            if self.exclude:
+                query_params.pop("exclude")
+
+            # Used for specifying scopes of fields in get/filter/query
+            self.scopes = query_params.getlist("scope")
+            if self.scopes:
+                query_params.pop("scope")
+
+
 # TODO: Handle request.data = None ISE
-class CreateRecordView(APIView):
-    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+class CreateRecordView(ProjectAPIView):
+    permission_classes = Admin + [IsInProjectGroup]
     action = "add"
 
     def post(self, request, code, test=False):
@@ -26,8 +62,9 @@ class CreateRecordView(APIView):
         Create an instance for the given project.
         """
         try:
-            project = OnyxProject(
-                code,
+            resolve_fields(
+                project=self.project,
+                model=self.model,
                 user=request.user,
                 action=self.action,
                 fields=parse_dunders(request.data),
@@ -35,15 +72,10 @@ class CreateRecordView(APIView):
         except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
-        # Get the model serializer
-        serializer_cls = ModelSerializerMap.get(project.model)
-        if not serializer_cls:
-            return OnyxResponse.not_found("Serializer")
-
         # Validate the data
         # If data is valid, save to the database. Otherwise, return 400
         node = SerializerNode(
-            serializer_cls,
+            self.serializer_cls,
             data=request.data,
             context={"request": self.request},
         )
@@ -64,7 +96,7 @@ class CreateRecordView(APIView):
         )
 
 
-class GetRecordView(APIView):
+class GetRecordView(ProjectAPIView):
     permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
     action = "view"
 
@@ -72,46 +104,23 @@ class GetRecordView(APIView):
         """
         Get an instance for the given project.
         """
-        # Take out the scope param from the request
-        with mutable(request.query_params) as query_params:
-            exclude = query_params.getlist("exclude")
-            if exclude:
-                query_params.pop("exclude")
-
-            scopes = query_params.getlist("scope")
-            if scopes:
-                query_params.pop("scope")
-
-        try:
-            project = OnyxProject(
-                code,
-                user=request.user,
-                action="view",
-                scopes=scopes,
-            )
-        except (PermissionDenied, FieldDoesNotExist) as e:
-            return handle_exception(e)
-
         # Get the instance
         # If the instance does not exist, return 404
         try:
             instance = (
-                project.model.objects.select_related()
+                self.model.objects.select_related()
                 .filter(suppressed=False)
                 .get(cid=cid)
             )
-        except project.model.DoesNotExist:
+        except self.model.DoesNotExist:
             return OnyxResponse.not_found("CID")
 
-        # Get the model serializer
-        serializer_cls = ModelSerializerMap.get(project.model)
-        if not serializer_cls:
-            return OnyxResponse.not_found("Serializer")
-
         # Serialize the result
-        serializer = serializer_cls(
+        serializer = self.serializer_cls(
             instance,
-            fields=project.view_fields(exclude=exclude),
+            fields=view_fields(
+                code=self.project.code, scopes=self.scopes, exclude=self.exclude
+            ),
             read_only=True,
         )
 
@@ -125,7 +134,7 @@ class GetRecordView(APIView):
         )
 
 
-def filter_query(request, code):
+def filter_query(self, request, code):
     """
     Handles the logic for both the `filter` and `query` endpoints.
     """
@@ -133,20 +142,6 @@ def filter_query(request, code):
     paginator = CursorPagination()
     paginator.ordering = "created"
     paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
-
-    # Take out the cursor param and scope params from the request
-    with mutable(request.query_params) as query_params:
-        cursor = query_params.get(paginator.cursor_query_param)
-        if cursor:
-            query_params.pop(paginator.cursor_query_param)
-
-        exclude = query_params.getlist("exclude")
-        if exclude:
-            query_params.pop("exclude")
-
-        scopes = query_params.getlist("scope")
-        if scopes:
-            query_params.pop("scope")
 
     # If method == GET, then parameters were provided in the query_params
     # Convert these into the same format as the JSON provided when method == POST
@@ -177,12 +172,12 @@ def filter_query(request, code):
         atoms = []
 
     try:
-        project = OnyxProject(
-            code,
+        self.fields = resolve_fields(
+            project=self.project,
+            model=self.model,
             user=request.user,
-            action="view",
+            action=self.action,
             fields=[x.key for x in atoms],
-            scopes=scopes,
         )
     except (PermissionDenied, FieldDoesNotExist) as e:
         return handle_exception(e)
@@ -194,17 +189,21 @@ def filter_query(request, code):
         validate_atoms(
             atoms,
             filterset=OnyxFilter,
-            filterset_args=[project],
-            filterset_model=project.model,
+            filterset_args=[self.fields],
+            filterset_model=self.model,
         )
     except (FieldDoesNotExist, ValidationError) as e:
         return handle_exception(e)
 
     # View fields
-    fields = project.view_fields(exclude=exclude)
+    fields = view_fields(
+        self.project.code,
+        scopes=self.scopes,
+        exclude=self.exclude,
+    )
 
     # Initial queryset
-    qs = project.model.objects.select_related()
+    qs = self.model.objects.select_related()
 
     # Ignore suppressed data
     if "suppressed" not in fields:
@@ -230,21 +229,16 @@ def filter_query(request, code):
         qs = qs.filter(q_object).distinct()
 
     # Add the pagination cursor param back into the request
-    if cursor is not None:
+    if self.cursor:
         with mutable(request.query_params) as query_params:
-            query_params[paginator.cursor_query_param] = cursor
+            query_params[paginator.cursor_query_param] = self.cursor
 
     # Paginate the response
     instances = qs.order_by("id")
     result_page = paginator.paginate_queryset(instances, request)
 
-    # Get the model serializer
-    serializer_cls = ModelSerializerMap.get(project.model)
-    if not serializer_cls:
-        return OnyxResponse.not_found("Serializer")
-
     # Serialize the results
-    serializer = serializer_cls(
+    serializer = self.serializer_cls(
         result_page,
         many=True,
         fields=fields,
@@ -262,7 +256,7 @@ def filter_query(request, code):
     )
 
 
-class FilterRecordView(APIView):
+class FilterRecordView(ProjectAPIView):
     permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
     action = "view"
 
@@ -270,10 +264,10 @@ class FilterRecordView(APIView):
         """
         Filter and return instances for the given project.
         """
-        return filter_query(request, code)
+        return filter_query(self, request, code)
 
 
-class QueryRecordView(APIView):
+class QueryRecordView(ProjectAPIView):
     permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
     action = "view"
 
@@ -281,11 +275,11 @@ class QueryRecordView(APIView):
         """
         Filter and return instances for the given project.
         """
-        return filter_query(request, code)
+        return filter_query(self, request, code)
 
 
-class UpdateRecordView(APIView):
-    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+class UpdateRecordView(ProjectAPIView):
+    permission_classes = Admin + [IsInProjectGroup]
     action = "change"
 
     def patch(self, request, code, cid, test=False):
@@ -293,13 +287,13 @@ class UpdateRecordView(APIView):
         Update an instance for the given project.
         """
         try:
-            project = OnyxProject(
-                code,
+            # TODO: separate identifiers into 'add' permission
+            resolve_fields(
+                project=self.project,
+                model=self.model,
                 user=request.user,
-                action="change",
-                fields=parse_dunders(
-                    request.data
-                ),  # TODO: separate identifiers into 'add' permission
+                action=self.action,
+                fields=parse_dunders(request.data),
             )
         except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
@@ -308,23 +302,18 @@ class UpdateRecordView(APIView):
         # If the instance does not exist, return 404
         try:
             instance = (
-                project.model.objects.select_related()
+                self.model.objects.select_related()
                 .filter(suppressed=False)
                 .get(cid=cid)
             )
-        except project.model.DoesNotExist:
+        except self.model.DoesNotExist:
             return OnyxResponse.not_found("CID")
-
-        # Get the model serializer
-        serializer_cls = ModelSerializerMap.get(project.model)
-        if not serializer_cls:
-            return OnyxResponse.not_found("Serializer")
 
         # Validate the data using the serializer
         # If data is valid, update existing record in the database.
         # Otherwise, return 400
         node = SerializerNode(
-            serializer_cls,
+            self.serializer_cls,
             data=request.data,
         )
 
@@ -339,32 +328,23 @@ class UpdateRecordView(APIView):
         return OnyxResponse.action_success("change", cid, test=test)
 
 
-class SuppressRecordView(APIView):
-    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+class SuppressRecordView(ProjectAPIView):
+    permission_classes = Admin + [IsInProjectGroup]
     action = "suppress"
 
     def delete(self, request, code, cid, test=False):
         """
         Suppress an instance of the given project.
         """
-        try:
-            project = OnyxProject(
-                code,
-                user=request.user,
-                action="suppress",
-            )
-        except (PermissionDenied, FieldDoesNotExist) as e:
-            return handle_exception(e)
-
         # Get the instance to be suppressed
         # If the instance does not exist, return 404
         try:
             instance = (
-                project.model.objects.select_related()
+                self.model.objects.select_related()
                 .filter(suppressed=False)
                 .get(cid=cid)
             )
-        except project.model.DoesNotExist:
+        except self.model.DoesNotExist:
             return OnyxResponse.not_found("CID")
 
         # Suppress the instance
@@ -373,31 +353,22 @@ class SuppressRecordView(APIView):
             instance.save(update_fields=["suppressed", "last_modified"])
 
         # Return response indicating suppression
-        return OnyxResponse.action_success("suppress", cid, test=test)
+        return OnyxResponse.action_success(self.action, cid, test=test)
 
 
-class DeleteRecordView(APIView):
-    permission_classes = Admin + [IsInProjectGroup, IsInScopeGroups]
+class DeleteRecordView(ProjectAPIView):
+    permission_classes = Admin + [IsInProjectGroup]
     action = "delete"
 
     def delete(self, request, code, cid, test=False):
         """
         Permanently delete an instance of the given project.
         """
-        try:
-            project = OnyxProject(
-                code,
-                user=request.user,
-                action="delete",
-            )
-        except (PermissionDenied, FieldDoesNotExist) as e:
-            return handle_exception(e)
-
         # Get the instance to be deleted
-        # If it does not exist, return 404
+        # If the instance does not exist, return 404
         try:
-            instance = project.model.objects.select_related().get(cid=cid)
-        except project.model.DoesNotExist:
+            instance = self.model.objects.select_related().get(cid=cid)
+        except self.model.DoesNotExist:
             return OnyxResponse.not_found("CID")
 
         # Delete the instance
@@ -405,7 +376,7 @@ class DeleteRecordView(APIView):
             instance.delete()
 
         # Return response indicating deletion
-        return OnyxResponse.action_success("delete", cid, test=test)
+        return OnyxResponse.action_success(self.action, cid, test=test)
 
 
 class ProjectView(APIView):
@@ -420,26 +391,26 @@ class FieldsView(APIView):
     pass  # TODO
 
 
-class ChoicesView(APIView):
-    permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
+class ChoicesView(ProjectAPIView):
+    permission_classes = Approved + [IsInProjectGroup]
     action = "view"
 
     def get(self, request, code, field):
         """
         List all choices for a given field.
         """
-
         try:
-            project = OnyxProject(
-                code,
+            self.fields = resolve_fields(
+                project=self.project,
+                model=self.model,
                 user=request.user,
-                action="view",
+                action=self.action,
                 fields=[field],
             )
         except (PermissionDenied, FieldDoesNotExist) as e:
             return handle_exception(e)
 
-        field = project.fields[field.lower()]
+        field = self.fields[field.lower()]
 
         choices = Choice.objects.filter(
             content_type=field.content_type,

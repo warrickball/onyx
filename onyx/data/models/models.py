@@ -14,6 +14,7 @@ import uuid
 class Project(models.Model):
     code = LowerCharField(max_length=50, unique=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+
     add_group = models.OneToOneField(
         Group,
         on_delete=models.CASCADE,
