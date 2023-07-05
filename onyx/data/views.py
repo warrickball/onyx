@@ -119,9 +119,10 @@ class GetRecordView(ProjectAPIView):
         serializer = self.serializer_cls(
             instance,
             fields=view_fields(
-                code=self.project.code, scopes=self.scopes, exclude=self.exclude
+                code=self.project.code,
+                scopes=self.scopes,
+                exclude=self.exclude,
             ),
-            read_only=True,
         )
 
         # Return response with data
@@ -242,7 +243,6 @@ def filter_query(self, request, code):
         result_page,
         many=True,
         fields=fields,
-        read_only=True,
     )
 
     # Return paginated response

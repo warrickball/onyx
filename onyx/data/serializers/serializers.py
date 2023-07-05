@@ -185,7 +185,6 @@ class BaseRecordSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         # Don't pass the 'fields' arg up to the superclass
         fields = kwargs.pop("fields", None)
-        read_only = kwargs.pop("read_only", None)
 
         # Instantiate the superclass normally
         super().__init__(*args, **kwargs)
@@ -208,7 +207,6 @@ class BaseRecordSerializer(serializers.ModelSerializer):
                 relation = self.OnyxMeta.relations[field_name]
                 self.fields[field_name] = relation["serializer"](
                     fields=nested,
-                    read_only=read_only,
                     **relation["kwargs"],
                 )
 
@@ -217,11 +215,6 @@ class BaseRecordSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
-
-        if read_only:
-            # TODO: This only works for fields not explicitly defined in the given serializer
-            # Do we want to have separate read-only serializers?
-            setattr(self.Meta, "read_only_fields", [*self.fields])
 
     def validate(self, data):
         """
