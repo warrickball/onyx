@@ -1,4 +1,3 @@
-from django.contrib.auth.models import Group
 from rest_framework import permissions, exceptions
 from utils.response import OnyxResponse
 
@@ -102,10 +101,14 @@ class IsSameSiteAsObject(permissions.BasePermission):
 
 
 class IsInProjectGroup(permissions.BasePermission):
+    """
+    Allows access only to users who are in the view group and the given action group for the given project.
+    """
+
     def has_permission(self, request, view):
         project_code = view.kwargs["code"].lower()
-        view_group = f"view.{project_code}"
-        action_group = f"{view.action}.{project_code}"
+        view_group = f"view.project.{project_code}"
+        action_group = f"{view.action}.project.{project_code}"
 
         # Check the user's permission to view the project
         # If the project isn't found, or the user doesn't have permission, tell them it doesn't exist
@@ -125,13 +128,17 @@ class IsInProjectGroup(permissions.BasePermission):
 
 
 class IsInScopeGroups(permissions.BasePermission):
+    """
+    Allows access only to users who are in the view group and the given action group for the given scope.
+    """
+
     def has_permission(self, request, view):
         project_code = view.kwargs["code"].lower()
         scope_codes = [code.lower() for code in request.query_params.getlist("scope")]
 
         for scope_code in scope_codes:
-            view_group = f"view.{project_code}.{scope_code}"
-            action_group = f"{view.action}.{project_code}.{scope_code}"
+            view_group = f"view.scope.{project_code}.{scope_code}"
+            action_group = f"{view.action}.scope.{project_code}.{scope_code}"
 
             # Check the user's permission to view the scope
             # If the scope isn't found, or the user doesn't have permission, tell them it doesn't exist
