@@ -11,5 +11,5 @@ dependencies:
     - django-rest-knox
     - django-filter
     - django-cursor-pagination
-    - celery
+    - django-simple-history
     - django-query-tools

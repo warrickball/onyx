@@ -33,7 +33,7 @@ class Command(base.BaseCommand):
             group, created = create_or_update_group(
                 app, model, gdef, quiet=options["quiet"]
             )
-            action, _, _ = gdef.name.partition("_")
+            action, _, _ = gdef.name.partition(".")
             groups[action] = group
 
             if created:

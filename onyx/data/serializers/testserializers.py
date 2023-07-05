@@ -1,10 +1,10 @@
 from rest_framework.validators import UniqueTogetherValidator
-from ..serializers import RecordSerializer
+from ..serializers import ProjectRecordSerializer
 from data.models import TestModel
 from utils.fieldserializers import ChoiceField, YearMonthField
 
 
-class TestSerializer(RecordSerializer):
+class TestSerializer(ProjectRecordSerializer):
     collection_month = YearMonthField(required=False, allow_null=True)
     received_month = YearMonthField(required=False, allow_null=True)
     country = ChoiceField(TestModel, "country")
@@ -12,7 +12,7 @@ class TestSerializer(RecordSerializer):
 
     class Meta:
         model = TestModel
-        fields = RecordSerializer.Meta.fields + [
+        fields = ProjectRecordSerializer.Meta.fields + [
             "sample_id",
             "run_name",
             "collection_month",
@@ -31,14 +31,15 @@ class TestSerializer(RecordSerializer):
             )
         ]
 
-    class ExtraMeta(RecordSerializer.ExtraMeta):
-        optional_value_groups = RecordSerializer.ExtraMeta.optional_value_groups + [
+    class OnyxMeta(ProjectRecordSerializer.OnyxMeta):
+        optional_value_groups = (
+            ProjectRecordSerializer.OnyxMeta.optional_value_groups
+            + [("collection_month", "received_month")]
+        )
+        orderings = ProjectRecordSerializer.OnyxMeta.orderings + [
             ("collection_month", "received_month")
         ]
-        orderings = RecordSerializer.ExtraMeta.orderings + [
-            ("collection_month", "received_month")
-        ]
-        non_futures = RecordSerializer.ExtraMeta.non_futures + [
+        non_futures = ProjectRecordSerializer.OnyxMeta.non_futures + [
             "collection_month",
             "received_month",
             "submission_date",

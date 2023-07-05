@@ -1,13 +1,32 @@
-from data.models import TestModel
-from .serializers import RecordSerializer
+from data.models import BaseRecord, ProjectRecord, TestModel
+from .serializers import (
+    BaseRecordSerializer,
+    ProjectRecordSerializer,
+    SerializerNode,
+)
 from .testserializers import TestSerializer
 
-mapping = {TestModel: TestSerializer}
+
+class ModelSerializerMap:
+    MAPPING = {
+        BaseRecord: BaseRecordSerializer,
+        ProjectRecord: ProjectRecordSerializer,
+        TestModel: TestSerializer,
+    }
+
+    @classmethod
+    def get(cls, model):
+        return cls.MAPPING.get(model)
+
+    @classmethod
+    def update(cls, mapping):
+        cls.MAPPING = cls.MAPPING | mapping
+
 
 try:
-    from . import projects
+    from .projects import *
 
     if hasattr(projects, "mapping"):
-        mapping = mapping | projects.mapping
+        ModelSerializerMap.update(projects.mapping)
 except (ImportError, ModuleNotFoundError):
     pass

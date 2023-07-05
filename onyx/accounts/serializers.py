@@ -22,7 +22,8 @@ class CreateUserSerializer(serializers.ModelSerializer):
         if increment:
             username = f"{username}{increment}"
 
-        return User.objects.create_user(  # This function hashes the password
+        # This function handles password hashing
+        return User.objects.create_user(  #  type: ignore
             username=username,
             email=validated_data["email"],
             password=validated_data["password"],

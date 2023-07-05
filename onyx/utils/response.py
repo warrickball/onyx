@@ -19,7 +19,7 @@ class OnyxResponse:
 
     @classmethod
     def _not_found(cls, name):
-        return {"detail": f"{str(name).capitalize()} not found."}
+        return {"detail": f"{str(name)} not found."}
 
     @classmethod
     def not_found(cls, name):

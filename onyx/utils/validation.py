@@ -72,3 +72,9 @@ def enforce_non_futures(errors, data, non_futures):
     for non_future in non_futures:
         if data.get(non_future) and data[non_future] > datetime.now().date():
             errors.setdefault(non_future, []).append("Value cannot be from the future.")
+
+
+def enforce_identifiers(errors, data, identifiers):
+    for identifier in identifiers:
+        if identifier not in data:
+            errors.setdefault(identifier, []).append("This field is required.")

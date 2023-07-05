@@ -1,37 +1,214 @@
-from data.models import Record
-from django.db import IntegrityError, transaction
+from data.models import BaseRecord, ProjectRecord
+from django.db import transaction, IntegrityError, DatabaseError
 from rest_framework import serializers
+from accounts.models import User, Site
+from utils.defaults import CurrentUserSiteDefault
 from utils.validation import (
     enforce_optional_value_groups,
     enforce_orderings,
     enforce_non_futures,
+    enforce_identifiers,
 )
 
 
+# TODO: Need to handle all manner of malformed `data`
+# TODO: Also need to handle required FKs, not just optional many-to-one
+class SerializerNode:
+    def __init__(self, serializer_class, data=None, context=None):
+        self.serializer_class = serializer_class
+        self.context = context
+        self.model = serializer_class.Meta.model
+        self.identifiers = serializer_class.OnyxMeta.identifiers
+        self.relations = serializer_class.OnyxMeta.relations
+        self.nodes = {}
+        self.data = {}
+
+        if isinstance(data, dict):
+            related_data = {}
+
+            for field, field_data in data.items():
+                if field in self.relations:
+                    related_data[field] = field_data
+                else:
+                    self.data[field] = field_data
+
+            for field, field_data in related_data.items():
+                relation = self.relations[field]
+
+                if relation["kwargs"].get("many"):
+                    self.nodes[field] = []
+
+                    for f_d in field_data:
+                        self.nodes[field].append(
+                            SerializerNode(
+                                serializer_class=relation["serializer"],
+                                data=f_d,
+                                context=context,
+                            )
+                        )
+                else:
+                    self.nodes[field] = SerializerNode(
+                        serializer_class=relation["serializer"],
+                        data=field_data,
+                        context=context,
+                    )
+
+    def _validate_subnode_create(self, subnode):
+        if not subnode.is_valid():
+            return False, subnode.errors
+
+        return True, {}
+
+    def _validate_subnode_update(self, subnode, link=None):
+        identifiers = {
+            key: value
+            for key, value in subnode.data.items()
+            if key in subnode.identifiers
+        }
+        identifier_serializer = subnode.serializer_class(
+            data=identifiers,
+            partial=True,
+        )
+
+        if not identifier_serializer.is_valid():
+            return False, identifier_serializer.errors
+        else:
+            ins = None
+
+            if link:
+                try:
+                    ins = subnode.model.objects.get(
+                        link=link,
+                        **identifier_serializer.validated_data,
+                    )
+                except subnode.model.DoesNotExist:
+                    pass
+
+            if not subnode.is_valid(instance=ins):
+                return False, subnode.errors
+
+        return True, {}
+
+    def is_valid(self, instance=None):
+        valid = []
+
+        # Initialise a serializer and validate self.data
+        # If an instance was not provided, will validate self.data for creation of an instance
+        # If an instance was provided, will validate self.data for partial update of the instance
+        self.serializer = self.serializer_class(
+            instance=instance,
+            data=self.data,
+            partial=bool(instance),
+            context=self.context,
+        )
+        valid.append(self.serializer.is_valid())
+        self.errors = dict(self.serializer.errors)
+
+        for field, node in self.nodes.items():
+            if isinstance(node, list):
+                subnode_errors = {}
+
+                for i, n in enumerate(node):
+                    if not instance:
+                        val, errors = self._validate_subnode_create(n)
+                    else:
+                        val, errors = self._validate_subnode_update(n, link=instance)
+
+                    valid.append(val)
+                    if errors:
+                        subnode_errors[i] = errors
+
+                if subnode_errors:
+                    self.errors[field] = subnode_errors
+
+            else:
+                if not instance:
+                    val, errors = self._validate_subnode_create(node)
+                else:
+                    val, errors = self._validate_subnode_update(node, link=instance)
+
+                valid.append(val)
+                if errors:
+                    self.errors[field] = errors
+
+        return all(valid)
+
+    def _save(self, link=None):
+        # Save the serializer and retrieve an instance
+        # If a link was provided, pass it through to the serializer
+        if link:
+            instance = self.serializer.save(link=link)
+        else:
+            instance = self.serializer.save()
+
+        # Save any nested objects, providing a link to the current instance
+        for node in self.nodes.values():
+            if isinstance(node, list):
+                for n in node:
+                    n._save(link=instance)
+            else:
+                node._save(link=instance)
+
+        return instance
+
+    def save(self):
+        try:
+            # Any exceptions thrown during the creation process will be re-raised as
+            # DatabaseErrors, causing the entire database transaction to be rolled back
+            with transaction.atomic():
+                try:
+                    instance = self._save()
+                except Exception as e:
+                    raise DatabaseError from e
+        except DatabaseError as e:
+            # Inform the user of any details regarding an IntegrityError
+            # Otherwise, they will just see the generic 'Internal Server Error' message
+            if isinstance(e.__cause__, IntegrityError):
+                raise serializers.ValidationError(
+                    {"detail": f"IntegrityError: {e.__cause__}"}
+                )
+            else:
+                raise e.__cause__  #  type: ignore
+
+        return instance
+
+
 # https://www.django-rest-framework.org/api-guide/serializers/#dynamically-modifying-fields
-class AbstractRecordSerializer(serializers.ModelSerializer):
+class BaseRecordSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), default=serializers.CurrentUserDefault()
+    )
+    # site = serializers.PrimaryKeyRelatedField(
+    #     queryset=Site.objects.all(), default=CurrentUserSiteDefault()
+    # )
+
     def __init__(self, *args, **kwargs):
         # Don't pass the 'fields' arg up to the superclass
         fields = kwargs.pop("fields", None)
+        read_only = kwargs.pop("read_only", None)
 
         # Instantiate the superclass normally
         super().__init__(*args, **kwargs)
 
+        # The fields argument should be used ONLY for viewing data
         if fields is not None:
             allowed = []
             relations = {}
 
+            # Add each provided field to the 'allowed' list
+            # If a field is nested, also add it to the 'relations' dict
             for field_name, nested in fields.items():
                 allowed.append(field_name)
 
                 if nested:
                     relations[field_name] = nested
 
-            # Handle relations
+            # Initialise serializers for relations
             for field_name, nested in relations.items():
-                relation = self.ExtraMeta.relations[field_name]
+                relation = self.OnyxMeta.relations[field_name]
                 self.fields[field_name] = relation["serializer"](
                     fields=nested,
+                    read_only=read_only,
                     **relation["kwargs"],
                 )
 
@@ -41,97 +218,76 @@ class AbstractRecordSerializer(serializers.ModelSerializer):
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
 
-    def create(self, validated_data):
-        try:
-            # Any exceptions thrown during the creation process will
-            # cause the entire database transaction to be rolled back
-            with transaction.atomic():
-                record = self._create(validated_data)
-        except IntegrityError as e:
-            # Any keys that are meant to be unique within validated_data
-            # are known to be unique from when compared to the database during validation.
-            # But this still leaves some possible causes for an integrity error:
-            # > another process tries to create the same validated_data while this one is (race condition)
-            # > the validated_data contains duplicate keys within itself, that do not exist in the database
-            raise serializers.ValidationError({"detail": f"IntegrityError: {e}"})
-        return record
-
-    @classmethod
-    def _create(cls, validated_data, link=None):
-        # Get the serializer's model
-        model = getattr(cls, "Meta").model
-
-        # Move any nested data from validated_data into related_data
-        related_data = {}
-        for name in cls.ExtraMeta.relations:
-            related_data[name] = validated_data.pop(name, None)
-
-        # Create the record with validated_data, with a FK if provided
-        if link:
-            record = model.objects.create(link=link, **validated_data)
-        else:
-            record = model.objects.create(**validated_data)
-
-        # Recursively handle creation of related_data
-        for name, data in related_data.items():
-            serializer = cls.ExtraMeta.relations[name]["serializer"]
-            many = cls.ExtraMeta.relations[name]["kwargs"].get("many")
-
-            if many:
-                for x in data:
-                    serializer._create(x, link=record)
-            else:
-                serializer._create(data, link=record)
-
-        return record
+        if read_only:
+            # TODO: This only works for fields not explicitly defined in the given serializer
+            # Do we want to have separate read-only serializers?
+            setattr(self.Meta, "read_only_fields", [*self.fields])
 
     def validate(self, data):
         """
-        Additional validation carried out on either object creation or update
+        Additional object-level validation.
         """
         errors = {}
 
-        enforce_optional_value_groups(
+        enforce_identifiers(
             errors=errors,
             data=data,
-            groups=self.ExtraMeta.optional_value_groups,
-            instance=self.instance,
+            identifiers=self.OnyxMeta.identifiers,
         )
 
-        enforce_orderings(
-            errors=errors,
-            data=data,
-            orderings=self.ExtraMeta.orderings,
-            instance=self.instance,
-        )
+        if (not self.instance) and self.partial:
+            # We only get to here if a serializer was initialised with no instance and partial = True.
+            # This only happens when we create the serializer for validating just the identifiers.
+            # In this case, we don't want to apply the other object-level validation.
+            pass
+        else:
+            enforce_optional_value_groups(
+                errors=errors,
+                data=data,
+                groups=self.OnyxMeta.optional_value_groups,
+                instance=self.instance,
+            )
 
-        enforce_non_futures(
-            errors=errors,
-            data=data,
-            non_futures=self.ExtraMeta.non_futures,
-        )
+            enforce_orderings(
+                errors=errors,
+                data=data,
+                orderings=self.OnyxMeta.orderings,
+                instance=self.instance,
+            )
+
+            enforce_non_futures(
+                errors=errors,
+                data=data,
+                non_futures=self.OnyxMeta.non_futures,
+            )
 
         if errors:
             raise serializers.ValidationError(errors)
 
         return data
 
-    class ExtraMeta:
+    class Meta:
+        model = BaseRecord
+        fields = [
+            "created",
+            "last_modified",
+            "user",
+            # "site",
+        ]
+
+    class OnyxMeta:
         relations = {}
+        identifiers = []
         optional_value_groups = []
         orderings = []
         non_futures = []
 
 
-class RecordSerializer(AbstractRecordSerializer):
+class ProjectRecordSerializer(BaseRecordSerializer):
     class Meta:
-        model = Record
-        fields = [
-            "created",
-            "last_modified",
-            "suppressed",
-            "user",
-            "site",
+        model = ProjectRecord
+        fields = BaseRecordSerializer.Meta.fields + [
             "cid",
             "published_date",
+            "suppressed",
         ]

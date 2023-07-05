@@ -1,4 +1,4 @@
-#add_test
+#add.project.test
 add_test
 add_test__sample_id
 add_test__run_name
@@ -11,7 +11,7 @@ add_test__concern
 add_test__tests
 add_test__score
 
-#view_test
+#view.project.test
 view_test
 view_test__site
 view_test__cid
@@ -27,7 +27,7 @@ view_test__concern
 view_test__tests
 view_test__score
 
-#change_test
+#change.project.test
 change_test
 change_test__collection_month
 change_test__received_month
@@ -38,8 +38,8 @@ change_test__concern
 change_test__tests
 change_test__score
 
-#suppress_test
+#suppress.project.test
 suppress_test
 
-#delete_test
+#delete.project.test
 delete_test

@@ -1,13 +1,13 @@
 from django.db import models
-from .models import Record
+from .models import ProjectRecord
 from utils.fields import YearMonthField, StrippedCharField, ChoiceField
 from utils.constraints import unique_together, optional_value_group
 
 
-# TODO: Create a middle class between TestModel and Record, for sake of testing inheritance-related things
+# TODO: Create a middle class between TestModel and ProjectRecord, for sake of testing inheritance-related things
 
 
-class TestModel(Record):
+class TestModel(ProjectRecord):
     sample_id = StrippedCharField(max_length=24)
     run_name = StrippedCharField(max_length=96)
     collection_month = YearMonthField(null=True)

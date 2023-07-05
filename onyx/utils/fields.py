@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.conf import settings
 from datetime import date, datetime
+import hashlib
 
 
 class YearMonthField(models.DateField):
@@ -71,11 +72,10 @@ class StrippedCharField(models.CharField):
         if value is None:
             return value
 
-        if isinstance(value, str):
-            value = value.strip()
-        else:
-            value = str(value).strip()
+        if not isinstance(value, str):
+            value = str(value)
 
+        value = value.strip()
         return super().to_python(value)
 
 
@@ -84,11 +84,10 @@ class LowerCharField(StrippedCharField):
         if value is None:
             return value
 
-        if isinstance(value, str):
-            value = value.lower()
-        else:
-            value = str(value).lower()
+        if not isinstance(value, str):
+            value = str(value)
 
+        value = value.lower()
         return super().to_python(value)
 
 
@@ -101,9 +100,22 @@ class UpperCharField(StrippedCharField):
         if value is None:
             return value
 
-        if isinstance(value, str):
-            value = value.upper()
-        else:
-            value = str(value).upper()
+        if not isinstance(value, str):
+            value = str(value)
 
+        value = value.upper()
+        return super().to_python(value)
+
+
+class HashField(StrippedCharField):
+    def to_python(self, value):
+        if value is None:
+            return value
+
+        if not isinstance(value, str):
+            value = str(value)
+
+        hasher = hashlib.sha256()
+        hasher.update(value.encode("utf-8"))
+        value = hasher.hexdigest()
         return super().to_python(value)

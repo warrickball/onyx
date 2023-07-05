@@ -1,7 +1,13 @@
-from .models import Project, Scope, Signal, Choice, Record, RecordHistory
+from .models import (
+    Project,
+    Scope,
+    Choice,
+    BaseRecord,
+    ProjectRecord,
+)
 from .testmodels import TestModel
 
 try:
-    from . import projects
+    from .projects import *
 except (ImportError, ModuleNotFoundError):
     pass
