@@ -118,8 +118,8 @@ class TestCreateView(OnyxTestCase):
             "testuser",
             roles=["is_staff"],
             groups=[
-                "add.test",
-                "view.test",
+                "add.project.test",
+                "view.project.test",
             ],
         )
 
