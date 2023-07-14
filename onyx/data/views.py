@@ -52,7 +52,6 @@ class ProjectAPIView(APIView):
                 query_params.pop("scope")
 
 
-# TODO: Handle request.data = None ISE
 class CreateRecordView(ProjectAPIView):
     permission_classes = Admin + [IsInProjectGroup]
     action = "add"
