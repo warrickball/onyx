@@ -1,4 +1,6 @@
+from django.contrib.contenttypes.models import ContentType
 from datetime import datetime
+from data.models import Choice
 
 
 def enforce_optional_value_groups(errors, data, groups, instance=None):
@@ -78,3 +80,48 @@ def enforce_identifiers(errors, data, identifiers):
     for identifier in identifiers:
         if identifier not in data:
             errors.setdefault(identifier, []).append("This field is required.")
+
+
+def enforce_choice_restrictions(
+    errors, data, choice_restrictions, model, instance=None
+):
+    """
+    Ensure all choices are compatible with each other.
+    """
+    # Getting a little bit gnarly
+    # This is a mapping from tuples of (field_x, choice_x)
+    # to all (field_y, choice_y) tuples that are allowed to occur with said tuple
+    compatibility_map = {
+        (c.field, c.choice): {
+            (res_to.field, res_to.choice) for res_to in c.restricted_to.all()
+        }
+        for c in Choice.objects.prefetch_related("restricted_to")
+        .filter(content_type=ContentType.objects.get_for_model(model))
+        .filter(field__in=set(x for xs in choice_restrictions for x in xs))
+    }
+
+    for choice_x, choice_y in choice_restrictions:
+        if instance:
+            choice_x_value = data.get(choice_x, getattr(instance, choice_x, None))
+            choice_y_value = data.get(choice_y, getattr(instance, choice_y, None))
+        else:
+            choice_x_value = data.get(choice_x)
+            choice_y_value = data.get(choice_y)
+
+        if (
+            choice_x_value is not None
+            and choice_y_value is not None
+            and (
+                (
+                    (choice_y, choice_y_value)
+                    not in compatibility_map[(choice_x, choice_x_value)]
+                )
+                or (
+                    (choice_x, choice_x_value)
+                    not in compatibility_map[(choice_y, choice_y_value)]
+                )
+            )
+        ):
+            errors.setdefault("non_field_errors", []).append(
+                f"Choices for fields {choice_x}, {choice_y} are incompatible."
+            )
