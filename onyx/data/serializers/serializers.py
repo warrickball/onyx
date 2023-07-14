@@ -12,8 +12,8 @@ from utils.validation import (
 )
 
 
-# TODO: Need to handle all manner of malformed `data`
-# TODO: Also need to handle required FKs, not just optional many-to-one
+# TODO: Need to try out some nested FK data
+# TODO: Need to handle required FKs, not just optional many-to-one
 class SerializerNode:
     def __init__(self, serializer_class, data=None, context=None):
         self.serializer_class = serializer_class
@@ -24,35 +24,51 @@ class SerializerNode:
         self.nodes = {}
         self.data = {}
 
-        if isinstance(data, dict):
-            related_data = {}
+        if not isinstance(data, dict):
+            raise serializers.ValidationError(
+                {"detail": "Expected a dictionary when parsing the request data."}
+            )
 
-            for field, field_data in data.items():
-                if field in self.relations:
-                    related_data[field] = field_data
-                else:
-                    self.data[field] = field_data
+        related_data = {}
 
-            for field, field_data in related_data.items():
-                relation = self.relations[field]
+        for field, field_data in data.items():
+            if field in self.relations:
+                related_data[field] = field_data
+            else:
+                self.data[field] = field_data
 
-                if relation["kwargs"].get("many"):
-                    self.nodes[field] = []
+        for field, field_data in related_data.items():
+            relation = self.relations[field]
 
-                    for f_d in field_data:
-                        self.nodes[field].append(
-                            SerializerNode(
-                                serializer_class=relation["serializer"],
-                                data=f_d,
-                                context=context,
-                            )
-                        )
-                else:
-                    self.nodes[field] = SerializerNode(
-                        serializer_class=relation["serializer"],
-                        data=field_data,
-                        context=context,
+            if relation["kwargs"].get("many"):
+                self.nodes[field] = []
+
+                if not isinstance(field_data, list):
+                    raise serializers.ValidationError(
+                        {"detail": f"Expected a list when parsing the {field} data."}
                     )
+
+                for f_d in field_data:
+                    self.nodes[field].append(
+                        SerializerNode(
+                            serializer_class=relation["serializer"],
+                            data=f_d,
+                            context=context,
+                        )
+                    )
+            else:
+                if not isinstance(field_data, dict):
+                    raise serializers.ValidationError(
+                        {
+                            "detail": f"Expected a dictionary when parsing the {field} data."
+                        }
+                    )
+
+                self.nodes[field] = SerializerNode(
+                    serializer_class=relation["serializer"],
+                    data=field_data,
+                    context=context,
+                )
 
     def _validate_subnode_create(self, subnode):
         if not subnode.is_valid():
