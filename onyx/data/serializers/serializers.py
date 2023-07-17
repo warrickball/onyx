@@ -9,6 +9,7 @@ from utils.validation import (
     enforce_non_futures,
     enforce_identifiers,
     enforce_choice_constraints,
+    enforce_conditional_required,
 )
 
 
@@ -279,6 +280,13 @@ class BaseRecordSerializer(serializers.ModelSerializer):
                 non_futures=self.OnyxMeta.non_futures,
             )
 
+            enforce_conditional_required(
+                errors=errors,
+                data=data,
+                conditional_required=self.OnyxMeta.conditional_required,
+                instance=self.instance,
+            )
+
         if errors:
             raise serializers.ValidationError(errors)
 
@@ -300,6 +308,7 @@ class BaseRecordSerializer(serializers.ModelSerializer):
         orderings = []
         non_futures = []
         choice_constraints = []
+        conditional_required = {}
 
 
 class ProjectRecordSerializer(BaseRecordSerializer):

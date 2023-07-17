@@ -5,7 +5,7 @@ from data.models import Choice
 
 def enforce_optional_value_groups(errors, data, groups, instance=None):
     """
-    Ensure each of the provided groups of fields has at least one non-null field.
+    Ensure each group of fields has at least one non-null field.
     """
     if instance:
         for group in groups:
@@ -43,7 +43,7 @@ def enforce_optional_value_groups(errors, data, groups, instance=None):
 
 def enforce_orderings(errors, data, orderings, instance=None):
     """
-    Ensure the value of `lower` is not greater than `higher`.
+    Ensure all ordered fields have correctly ordered values.
     """
     for lower, higher in orderings:
         if instance:
@@ -65,7 +65,7 @@ def enforce_orderings(errors, data, orderings, instance=None):
 
 def enforce_non_futures(errors, data, non_futures):
     """
-    Ensure date is not from the future.
+    Ensure dates are not from the future.
     """
     for non_future in non_futures:
         if data.get(non_future) and data[non_future] > datetime.now().date():
@@ -73,6 +73,9 @@ def enforce_non_futures(errors, data, non_futures):
 
 
 def enforce_identifiers(errors, data, identifiers):
+    """
+    Ensure identifiers are provided.
+    """
     for identifier in identifiers:
         if identifier not in data:
             errors.setdefault(identifier, []).append("This field is required.")
@@ -126,3 +129,25 @@ def enforce_choice_constraints(errors, data, choice_constraints, model, instance
             errors.setdefault("non_field_errors", []).append(
                 f"Choices for fields {choice_x}, {choice_y} are incompatible."
             )
+
+
+def enforce_conditional_required(errors, data, conditional_required, instance=None):
+    """
+    Ensure all conditionally-required fields are provided.
+    """
+    for field, requirements in conditional_required.items():
+        if instance:
+            required_values = [
+                data.get(req, getattr(instance, req, None)) for req in requirements
+            ]
+            field_value = data.get(field, getattr(instance, field, None))
+        else:
+            required_values = [data.get(req) for req in requirements]
+            field_value = data.get(field)
+
+        if field_value is not None:
+            for i, req in enumerate(required_values):
+                if req is None:
+                    errors.setdefault(requirements[i], []).append(
+                        f"This field is required if {field} is provided."
+                    )
