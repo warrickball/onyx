@@ -1,6 +1,6 @@
 from rest_framework.validators import UniqueTogetherValidator
 from ..serializers import ProjectRecordSerializer
-from data.models import TestModel
+from data.models.projects.test import TestModel
 from utils.fieldserializers import ChoiceField, YearMonthField
 
 
@@ -44,3 +44,6 @@ class TestSerializer(ProjectRecordSerializer):
             "received_month",
             "submission_date",
         ]
+
+
+mapping = {TestModel: TestSerializer}

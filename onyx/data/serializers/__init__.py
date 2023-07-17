@@ -1,18 +1,8 @@
-from data.models import BaseRecord, ProjectRecord, TestModel
-from .serializers import (
-    BaseRecordSerializer,
-    ProjectRecordSerializer,
-    SerializerNode,
-)
-from .testserializers import TestSerializer
+from .serializers import SerializerNode
 
 
 class ModelSerializerMap:
-    MAPPING = {
-        BaseRecord: BaseRecordSerializer,
-        ProjectRecord: ProjectRecordSerializer,
-        TestModel: TestSerializer,
-    }
+    MAPPING = {}
 
     @classmethod
     def get(cls, model):
@@ -23,10 +13,11 @@ class ModelSerializerMap:
         cls.MAPPING = cls.MAPPING | mapping
 
 
-try:
-    from .projects import *
+import pkgutil
+import importlib
+from . import projects
 
-    if hasattr(projects, "mapping"):
-        ModelSerializerMap.update(projects.mapping)
-except (ImportError, ModuleNotFoundError):
-    pass
+for module in pkgutil.iter_modules(projects.__path__):
+    mod = importlib.import_module(f".projects.{module.name}", package=__package__)
+    if hasattr(mod, "mapping"):
+        ModelSerializerMap.update(mod.mapping)
