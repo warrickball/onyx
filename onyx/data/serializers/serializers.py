@@ -8,7 +8,7 @@ from utils.validation import (
     enforce_orderings,
     enforce_non_futures,
     enforce_identifiers,
-    enforce_choice_restrictions,
+    enforce_choice_constraints,
 )
 
 
@@ -265,10 +265,10 @@ class BaseRecordSerializer(serializers.ModelSerializer):
                 instance=self.instance,
             )
 
-            enforce_choice_restrictions(
+            enforce_choice_constraints(
                 errors=errors,
                 data=data,
-                choice_restrictions=self.OnyxMeta.choice_restrictions,
+                choice_constraints=self.OnyxMeta.choice_constraints,
                 model=self.Meta.model,
                 instance=self.instance,
             )
@@ -299,7 +299,7 @@ class BaseRecordSerializer(serializers.ModelSerializer):
         optional_value_groups = []
         orderings = []
         non_futures = []
-        choice_restrictions = []
+        choice_constraints = []
 
 
 class ProjectRecordSerializer(BaseRecordSerializer):

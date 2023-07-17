@@ -65,7 +65,7 @@ class Choice(models.Model):
     field = models.TextField()
     choice = LowerCharField(max_length=100)
     is_active = models.BooleanField(default=True)
-    restricted_to = models.ManyToManyField("Choice", related_name="restricted_from")
+    constraints = models.ManyToManyField("Choice", related_name="reverse_constraints")
 
     class Meta:
         indexes = [
