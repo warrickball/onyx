@@ -1,5 +1,5 @@
 from django.db import models
-from .models import ProjectRecord
+from ..models import ProjectRecord
 from utils.fields import YearMonthField, StrippedCharField, ChoiceField
 from utils.constraints import unique_together, optional_value_group
 

@@ -5,7 +5,7 @@ from data.models import Choice
 
 def enforce_optional_value_groups(errors, data, groups, instance=None):
     """
-    Ensure each of the provided groups of fields has at least one non-null field.
+    Ensure each group of fields has at least one non-null field.
     """
     if instance:
         for group in groups:
@@ -43,33 +43,29 @@ def enforce_optional_value_groups(errors, data, groups, instance=None):
 
 def enforce_orderings(errors, data, orderings, instance=None):
     """
-    Ensure the value of `lower` is not greater than `higher`.
+    Ensure all ordered fields have correctly ordered values.
     """
-    if instance:
-        for lower, higher in orderings:
+    for lower, higher in orderings:
+        if instance:
             lower_value = data.get(lower, getattr(instance, lower, None))
             higher_value = data.get(higher, getattr(instance, higher, None))
+        else:
+            lower_value = data.get(lower)
+            higher_value = data.get(higher)
 
-            if (
-                lower_value is not None
-                and higher_value is not None
-                and lower_value > higher_value
-            ):
-                errors.setdefault("non_field_errors", []).append(
-                    f"The field {lower} cannot be greater than {higher}"
-                )
-    else:
-        for lower, higher in orderings:
-            if data.get(lower) and data.get(higher):
-                if data[lower] > data[higher]:
-                    errors.setdefault("non_field_errors", []).append(
-                        f"The field {lower} cannot be greater than {higher}"
-                    )
+        if (
+            lower_value is not None
+            and higher_value is not None
+            and lower_value > higher_value
+        ):
+            errors.setdefault("non_field_errors", []).append(
+                f"The {lower} cannot be greater than the {higher}."
+            )
 
 
 def enforce_non_futures(errors, data, non_futures):
     """
-    Ensure date is not from the future.
+    Ensure dates are not from the future.
     """
     for non_future in non_futures:
         if data.get(non_future) and data[non_future] > datetime.now().date():
@@ -77,30 +73,38 @@ def enforce_non_futures(errors, data, non_futures):
 
 
 def enforce_identifiers(errors, data, identifiers):
+    """
+    Ensure identifiers are provided.
+    """
     for identifier in identifiers:
         if identifier not in data:
             errors.setdefault(identifier, []).append("This field is required.")
 
 
-def enforce_choice_restrictions(
-    errors, data, choice_restrictions, model, instance=None
-):
+def enforce_choice_constraints(errors, data, choice_constraints, model, instance=None):
     """
     Ensure all choices are compatible with each other.
     """
     # Getting a little bit gnarly
     # This is a mapping from tuples of (field_x, choice_x)
     # to all (field_y, choice_y) tuples that are allowed to occur with said tuple
-    compatibility_map = {
-        (c.field, c.choice): {
-            (res_to.field, res_to.choice) for res_to in c.restricted_to.all()
+    constraints = {
+        (choice.field, choice.choice): {
+            (constraint.field, constraint.choice)
+            for constraint in choice.constraints.all()
         }
-        for c in Choice.objects.prefetch_related("restricted_to")
+        for choice in Choice.objects.prefetch_related("constraints")
         .filter(content_type=ContentType.objects.get_for_model(model))
-        .filter(field__in=set(x for xs in choice_restrictions for x in xs))
+        .filter(
+            field__in=set(
+                field
+                for constraint_group in choice_constraints
+                for field in constraint_group
+            )
+        )
     }
 
-    for choice_x, choice_y in choice_restrictions:
+    for choice_x, choice_y in choice_constraints:
         if instance:
             choice_x_value = data.get(choice_x, getattr(instance, choice_x, None))
             choice_y_value = data.get(choice_y, getattr(instance, choice_y, None))
@@ -114,14 +118,36 @@ def enforce_choice_restrictions(
             and (
                 (
                     (choice_y, choice_y_value)
-                    not in compatibility_map[(choice_x, choice_x_value)]
+                    not in constraints[(choice_x, choice_x_value)]
                 )
                 or (
                     (choice_x, choice_x_value)
-                    not in compatibility_map[(choice_y, choice_y_value)]
+                    not in constraints[(choice_y, choice_y_value)]
                 )
             )
         ):
             errors.setdefault("non_field_errors", []).append(
                 f"Choices for fields {choice_x}, {choice_y} are incompatible."
             )
+
+
+def enforce_conditional_required(errors, data, conditional_required, instance=None):
+    """
+    Ensure all conditionally-required fields are provided.
+    """
+    for field, requirements in conditional_required.items():
+        if instance:
+            required_values = [
+                data.get(req, getattr(instance, req, None)) for req in requirements
+            ]
+            field_value = data.get(field, getattr(instance, field, None))
+        else:
+            required_values = [data.get(req) for req in requirements]
+            field_value = data.get(field)
+
+        if field_value is not None:
+            for i, req in enumerate(required_values):
+                if req is None:
+                    errors.setdefault(requirements[i], []).append(
+                        f"This field is required if {field} is provided."
+                    )

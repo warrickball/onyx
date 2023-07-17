@@ -68,27 +68,12 @@ class ModelChoiceField(serializers.RelatedField):
         return getattr(obj, "choice")  # type: ignore
 
 
-# TODO: Some silly hacks being considered here, which is best?
 class ChoiceField(serializers.ChoiceField):
     default_error_messages = {
         "invalid_choice": "Select a valid choice. That choice is not one of the available choices."
     }
 
     def __init__(self, model, field, **kwargs):
-        # try:
-        #     content_type = ContentType.objects.get_for_model(model)
-        #     choices = list(
-        #         Choice.objects.filter(
-        #             content_type=content_type,
-        #             field=field,
-        #         ).values_list(
-        #             "choice",
-        #             flat=True,
-        #         )
-        #     )
-        # except OperationalError:
-        #     print("OperationalError due to ContentType table not existing yet.")
-        #     choices = []
         self.model = model
         self.field = field
         super().__init__([], **kwargs)
