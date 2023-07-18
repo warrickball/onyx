@@ -38,6 +38,7 @@ view_test__tests
 view_test__score
 view_test__start
 view_test__end
+view_test__records
 view_test__records__test_id
 view_test__records__test_pass
 view_test__records__test_start
@@ -58,6 +59,7 @@ change_test__tests
 change_test__score
 change_test__start
 change_test__end
+change_test__records
 change_test__records__test_id
 change_test__records__test_pass
 change_test__records__test_start

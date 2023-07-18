@@ -1,4 +1,5 @@
 import os
+import random
 import logging
 from django.core.management import call_command
 from django.contrib.auth.models import Group
@@ -64,3 +65,49 @@ class OnyxTestCase(APITestCase):
 
         self.client.force_authenticate(user)  # type: ignore
         return user
+
+
+def test_data(n=50):
+    data = []
+    for i in range(n):
+        country_region_group = random.randint(0, 4)
+        records = random.randint(0, 1)
+        x = {
+            "sample_id": f"sample-{i}",
+            "run_name": f"run-{random.randint(1, 3)}",
+            "collection_month": f"2022-{random.randint(1, 12)}",
+            "received_month": f"2023-{random.randint(1, 6)}",
+            "submission_date": f"2023-{random.randint(1, 6)}-{random.randint(1, 25)}",
+            "country": ["eng", "scot", "wales", "ni", None][country_region_group],
+            "region": [
+                random.choice(["ne", "se", "nw", "sw"]),
+                "other",
+                "other",
+                "other",
+                None,
+            ][country_region_group],
+            "concern": random.choice([True, False]),
+            "tests": 2,
+            "score": random.random() * 42,
+            "start": random.randint(1, 5),
+            "end": random.randint(6, 10),
+        }
+        if records:
+            x["records"] = [
+                {
+                    "test_id": 1,
+                    "test_pass": random.choice([True, False]),
+                    "test_start": f"2022-{random.randint(1, 12)}",
+                    "test_end": f"2023-{random.randint(1, 6)}",
+                    "score_a": random.random() * 42,
+                },
+                {
+                    "test_id": 2,
+                    "test_pass": random.choice([True, False]),
+                    "test_start": f"2022-{random.randint(1, 12)}",
+                    "test_end": f"2023-{random.randint(1, 6)}",
+                    "score_b": random.random() * 42,
+                },
+            ]
+        data.append(x)
+    return data
