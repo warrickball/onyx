@@ -4,10 +4,7 @@ from utils.fields import YearMonthField, StrippedCharField, ChoiceField
 from utils.constraints import unique_together, optional_value_group
 
 
-# TODO: Create a middle class between TestModel and ProjectRecord, for sake of testing inheritance-related things
-
-
-class TestModel(ProjectRecord):
+class BaseTestModel(ProjectRecord):
     sample_id = StrippedCharField(max_length=24)
     run_name = StrippedCharField(max_length=96)
     collection_month = YearMonthField(null=True)
@@ -18,6 +15,8 @@ class TestModel(ProjectRecord):
     concern = models.BooleanField()
     tests = models.IntegerField()
     score = models.FloatField()
+    start = models.IntegerField()
+    end = models.IntegerField()
 
     class Meta:
         default_permissions = []
@@ -30,11 +29,16 @@ class TestModel(ProjectRecord):
         ]
         constraints = [
             unique_together(
-                model_name="testmodel",
+                model_name="basetestmodel",
                 fields=["sample_id", "run_name"],
             ),
             optional_value_group(
-                model_name="testmodel",
+                model_name="basetestmodel",
                 fields=["collection_month", "received_month"],
             ),
         ]
+
+
+class TestModel(BaseTestModel):
+    class Meta:
+        default_permissions = []

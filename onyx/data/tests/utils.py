@@ -27,6 +27,11 @@ class OnyxTestCase(APITestCase):
             os.path.join(directory, "choices.txt"),
             quiet=True,
         )
+        call_command(
+            "choiceconstraints",
+            os.path.join(directory, "constraints.txt"),
+            quiet=True,
+        )
         self.site = Site.objects.create(
             code="TEST",
             description="Department of Testing",

@@ -156,11 +156,11 @@ def isnull(field):
 
 
 def get_filter(
+    project,
     field_type,
     field_path,
     field_name,
     lookup,
-    content_type=None,
 ):
     # Text
     if field_type in TEXT_FIELDS:
@@ -253,7 +253,7 @@ def get_filter(
     # ModelChoice (will probably be removed soon)
     elif field_type == ModelChoiceField:
         qs = Choice.objects.filter(
-            content_type=content_type,
+            project_id=project,
             field=field_name,
         )
         if not lookup:
@@ -276,7 +276,7 @@ def get_filter(
     elif field_type == ChoiceField:
         choices = format_choices(
             Choice.objects.filter(
-                content_type=content_type,
+                project_id=project,
                 field=field_name,
             ).values_list(
                 "choice",
@@ -317,11 +317,11 @@ class OnyxFilter(filters.FilterSet):
             mfield = fields[field]
 
             name, filter = get_filter(
+                project=mfield.project,
                 field_type=mfield.field_type,
                 field_path=mfield.field_path,
                 field_name=mfield.field_name,
                 lookup=mfield.lookup,
-                content_type=mfield.content_type,
             )
             if name:
                 self.filters[name] = filter

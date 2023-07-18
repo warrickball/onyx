@@ -61,7 +61,7 @@ class Scope(models.Model):
 
 
 class Choice(models.Model):
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, to_field="code", on_delete=models.CASCADE)
     field = models.TextField()
     choice = LowerCharField(max_length=100)
     is_active = models.BooleanField(default=True)
@@ -69,12 +69,12 @@ class Choice(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["content_type", "field"]),
+            models.Index(fields=["project", "field"]),
         ]
         constraints = [
             unique_together(
                 model_name="choice",
-                fields=["content_type", "field", "choice"],
+                fields=["project", "field", "choice"],
             ),
         ]
 

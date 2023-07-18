@@ -17,6 +17,8 @@ default_payload = {
     "concern": False,
     "tests": 5,
     "score": 42.832,
+    "start": 1,
+    "end": 2,
 }
 
 bad_yearmonths = [
@@ -167,9 +169,6 @@ class TestCreateView(OnyxTestCase):
     def test_unique_together_fail(self):
         pass  # TODO
 
-    def test_inherited_unique_together_fail(self):
-        pass  # TODO
-
     def test_nested_unique_together_fail(self):
         pass  # TODO
 
@@ -181,14 +180,11 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         assert TestModel.objects.count() == 0
 
-    def test_inherited_optional_value_group_fail(self):
-        pass  # TODO
-
     def test_nested_optional_value_group_fail(self):
         pass  # TODO
 
     def test_ordering_fail(self):
-        # TODO: Test integers as well?
+        # Testing ordering with yearmonths
         payload = copy.deepcopy(default_payload)
         payload["collection_month"] = "2023-02"
         payload["received_month"] = "2023-01"
@@ -196,8 +192,15 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         assert TestModel.objects.count() == 0
 
-    def test_inherited_ordering_fail(self):
-        pass  # TODO
+        # Testing ordering with integers
+        payload = copy.deepcopy(default_payload)
+        start = payload.pop("start")
+        end = payload.pop("end")
+        payload["end"] = start
+        payload["start"] = end
+        response = self.client.post(self.endpoint, data=payload)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        assert TestModel.objects.count() == 0
 
     def test_nested_ordering_fail(self):
         pass  # TODO
@@ -262,6 +265,13 @@ class TestCreateView(OnyxTestCase):
             response = self.client.post(self.endpoint, data=payload)
             self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
             assert TestModel.objects.count() == 0
+
+    def test_choice_constraint_fail(self):
+        payload = copy.deepcopy(default_payload)
+        payload["country"] = "wales"
+        response = self.client.post(self.endpoint, data=payload)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        assert TestModel.objects.count() == 0
 
     def test_good_bool_ok(self):
         for good_bool, expected in good_bools:

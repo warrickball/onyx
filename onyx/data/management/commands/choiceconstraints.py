@@ -1,5 +1,4 @@
 from django.core.management import base
-from django.contrib.contenttypes.models import ContentType
 from data.models import Choice
 import csv
 
@@ -28,10 +27,7 @@ class Command(base.BaseCommand):
                     choice.constraints.clear()
 
                 for row in reader:
-                    app_label, model = row["content_type"].strip().split(".")
-                    content_type = ContentType.objects.get(
-                        app_label=app_label, model=model
-                    )
+                    project = row["project"].strip()
                     field = row["field"].strip()
                     choice = row["choice"].strip()
                     constraint_field = row["constraint_field"].strip()
@@ -39,11 +35,11 @@ class Command(base.BaseCommand):
                         x.strip() for x in row["constraint_choices"].split(":")
                     ]
                     choice_instance = Choice.objects.get(
-                        content_type=content_type, field=field, choice=choice
+                        project_id=project, field=field, choice=choice
                     )
                     constraint_instances = [
                         Choice.objects.get(
-                            content_type=content_type,
+                            project_id=project,
                             field=constraint_field,
                             choice=constraint_choice,
                         )
@@ -54,7 +50,7 @@ class Command(base.BaseCommand):
                         choice_instance.constraints.add(constraint_instance)
                         constraint_instance.constraints.add(choice_instance)
                         _print(
-                            f"Set constraint: {content_type.app_label} | {content_type.model_class()} | ({choice_instance.field}, {choice_instance.choice}) | ({constraint_instance.field}, {constraint_instance.choice})",
+                            f"Set constraint: {project} | ({choice_instance.field}, {choice_instance.choice}) | ({constraint_instance.field}, {constraint_instance.choice})",
                             quiet=options["quiet"],
                         )
         else:

@@ -1,0 +1,5 @@
+project,field,choice,constraint_field,constraint_choices
+test,country,eng,region,ne:nw:se:sw
+test,country,wales,region,other
+test,country,scot,region,other
+test,country,ni,region,other

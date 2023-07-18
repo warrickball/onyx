@@ -1,24 +1,19 @@
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import ForeignKey, ManyToOneRel
 from django.contrib.auth.models import Group
 from data.filters import ALL_LOOKUPS
 from utils.fields import ModelChoiceField
 
 
-# TODO: This still needs work. It is barely readable
-
-
 class OnyxField:
-    def __init__(self, field_model, field_path, field_name, lookup):
+    def __init__(self, project, field_model, field_path, field_name, lookup):
+        self.project = project
         self.field_model = field_model
         self.field_instance = self.field_model._meta.get_field(field_name)
         self.field_type = type(self.field_instance)
         self.field_path = field_path
         self.field_name = field_name
         self.lookup = lookup
-        # TODO: Needs to be inheritance-aware for Choices
-        self.content_type = ContentType.objects.get_for_model(field_model)
 
 
 def _get_fields_from_permissions(fields_dict, permissions, exclude):
@@ -101,6 +96,7 @@ def resolve_fields(project, model, user, action, fields):
                     # The field is determined, and the lookup is recognised
                     # So we instantiate the resolved field instance
                     resolved[field] = OnyxField(
+                        project=project.code,
                         field_model=current_model,
                         field_path=field_path,
                         field_name=field_name,
@@ -128,6 +124,7 @@ def resolve_fields(project, model, user, action, fields):
                     # The field is determined, and the lookup is recognised
                     # So we instantiate the resolved field instance
                     resolved[field] = OnyxField(
+                        project=project.code,
                         field_model=current_model,
                         field_path=field_path,
                         field_name=field_name,
@@ -150,6 +147,7 @@ def resolve_fields(project, model, user, action, fields):
                     # The field is determined, and the lookup is recognised
                     # So we instantiate the resolved field instance
                     resolved[field] = OnyxField(
+                        project=project.code,
                         field_model=current_model,
                         field_path=field_path,
                         field_name=field_name,

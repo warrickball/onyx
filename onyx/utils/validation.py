@@ -1,4 +1,3 @@
-from django.contrib.contenttypes.models import ContentType
 from datetime import datetime
 from data.models import Choice
 
@@ -81,7 +80,9 @@ def enforce_identifiers(errors, data, identifiers):
             errors.setdefault(identifier, []).append("This field is required.")
 
 
-def enforce_choice_constraints(errors, data, choice_constraints, model, instance=None):
+def enforce_choice_constraints(
+    errors, data, choice_constraints, project, instance=None
+):
     """
     Ensure all choices are compatible with each other.
     """
@@ -94,7 +95,7 @@ def enforce_choice_constraints(errors, data, choice_constraints, model, instance
             for constraint in choice.constraints.all()
         }
         for choice in Choice.objects.prefetch_related("constraints")
-        .filter(content_type=ContentType.objects.get_for_model(model))
+        .filter(project_id=project)
         .filter(
             field__in=set(
                 field

@@ -10,6 +10,8 @@ add_test__region
 add_test__concern
 add_test__tests
 add_test__score
+add_test__start
+add_test__end
 
 #view.project.test
 view_test
@@ -26,6 +28,8 @@ view_test__region
 view_test__concern
 view_test__tests
 view_test__score
+view_test__start
+view_test__end
 
 #change.project.test
 change_test
@@ -37,6 +41,8 @@ change_test__region
 change_test__concern
 change_test__tests
 change_test__score
+change_test__start
+change_test__end
 
 #suppress.project.test
 suppress_test

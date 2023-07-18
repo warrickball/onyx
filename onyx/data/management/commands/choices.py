@@ -1,5 +1,4 @@
 from django.core.management import base
-from django.contrib.contenttypes.models import ContentType
 from data.models import Choice
 import csv
 
@@ -21,40 +20,39 @@ class Command(base.BaseCommand):
             reader = csv.DictReader(scheme, skipinitialspace=True)
 
             for row in reader:
-                app_label, model = row["content_type"].strip().split(".")
-                content_type = ContentType.objects.get(app_label=app_label, model=model)
+                project = row["project"].strip()
                 field = row["field"].strip()
                 choices = [x.strip() for x in row["choices"].split(":")]
 
                 # Create new choices if required
                 for choice in choices:
                     db_choice, created = Choice.objects.get_or_create(
-                        content_type=content_type,
+                        project_id=project,
                         field=field,
                         choice=choice,
                     )
 
                     if created:
                         _print(
-                            f"Created choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            f"Created choice: {project} | {db_choice.field} | {db_choice.choice}",
                             quiet=options["quiet"],
                         )
                     elif not db_choice.is_active:
                         db_choice.is_active = True
                         db_choice.save()
                         _print(
-                            f"Reactivated choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            f"Reactivated choice: {project} | {db_choice.field} | {db_choice.choice}",
                             quiet=options["quiet"],
                         )
                     else:
                         _print(
-                            f"Active choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            f"Active choice: {project} | {db_choice.field} | {db_choice.choice}",
                             quiet=options["quiet"],
                         )
 
                 # Deactivate choices no longer in the set
                 db_choices = Choice.objects.filter(
-                    content_type=content_type,
+                    project_id=project,
                     field=field,
                     is_active=True,
                 )
@@ -64,6 +62,6 @@ class Command(base.BaseCommand):
                         db_choice.is_active = False
                         db_choice.save()
                         _print(
-                            f"Deactivated choice: {db_choice.content_type.app_label} | {db_choice.content_type.model_class()} | {db_choice.field} | {db_choice.choice}",
+                            f"Deactivated choice: {project} | {db_choice.field} | {db_choice.choice}",
                             quiet=options["quiet"],
                         )

@@ -3,7 +3,6 @@ from rest_framework.validators import ValidationError
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.encoding import smart_str
 from django.utils.translation import gettext_lazy as _
-from django.contrib.contenttypes.models import ContentType
 from datetime import date
 from data.models import Choice
 
@@ -43,18 +42,17 @@ class ModelChoiceField(serializers.RelatedField):
         "invalid": _("Invalid value."),
     }
 
-    def __init__(self, model, **kwargs):
-        self.model = model
+    def __init__(self, project, **kwargs):
+        self.project = project
         super().__init__(queryset=Choice.objects.all(), **kwargs)
 
     def to_internal_value(self, data):
         queryset = self.get_queryset()
-        content_type = ContentType.objects.get_for_model(self.model)
 
         try:
             return queryset.get(  # type: ignore
                 **{
-                    "content_type": content_type,
+                    "project_id": self.project,
                     "field": self.source,
                     "choice": data,
                 }
@@ -73,16 +71,15 @@ class ChoiceField(serializers.ChoiceField):
         "invalid_choice": "Select a valid choice. That choice is not one of the available choices."
     }
 
-    def __init__(self, model, field, **kwargs):
-        self.model = model
+    def __init__(self, project, field, **kwargs):
+        self.project = project
         self.field = field
         super().__init__([], **kwargs)
 
     def to_internal_value(self, data):
-        content_type = ContentType.objects.get_for_model(self.model)
         self.choices = list(
             Choice.objects.filter(
-                content_type=content_type,
+                project_id=self.project,
                 field=self.field,
                 is_active=True,
             ).values_list(

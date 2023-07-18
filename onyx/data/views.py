@@ -76,7 +76,7 @@ class CreateRecordView(ProjectAPIView):
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
-            context={"request": self.request},
+            context={"project": self.project.code, "request": self.request},
         )
 
         if not node.is_valid():
@@ -314,6 +314,7 @@ class UpdateRecordView(ProjectAPIView):
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
+            context={"project": self.project.code, "request": self.request},
         )
 
         if not node.is_valid(instance=instance):
@@ -412,7 +413,7 @@ class ChoicesView(ProjectAPIView):
         field = self.fields[field.lower()]
 
         choices = Choice.objects.filter(
-            content_type=field.content_type,
+            project_id=self.project.code,
             field=field.field_name,
             is_active=True,
         ).values_list(
