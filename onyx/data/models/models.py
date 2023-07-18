@@ -1,3 +1,5 @@
+import uuid
+from secrets import token_hex
 from django.db import models
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
@@ -6,8 +8,6 @@ from utils.fields import LowerCharField, UpperCharField
 from utils.choices import format_choices
 from utils.constraints import unique_together
 from simple_history.models import HistoricalRecords
-from secrets import token_hex
-import uuid
 
 
 # TODO: Don't actually need half the stuff being recorded in Project and Scope models

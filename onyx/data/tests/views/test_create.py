@@ -1,9 +1,9 @@
+import copy
+from datetime import datetime, timedelta
 from rest_framework import status
 from rest_framework.reverse import reverse
 from ..utils import OnyxTestCase
 from ...models.projects.test import TestModel
-from datetime import datetime, timedelta
-import copy
 
 
 default_payload = {

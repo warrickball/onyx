@@ -1,3 +1,6 @@
+import pkgutil
+import importlib
+from . import projects
 from .serializers import SerializerNode
 
 
@@ -12,10 +15,6 @@ class ModelSerializerMap:
     def update(cls, mapping):
         cls.MAPPING = cls.MAPPING | mapping
 
-
-import pkgutil
-import importlib
-from . import projects
 
 for module in pkgutil.iter_modules(projects.__path__):
     mod = importlib.import_module(f".projects.{module.name}", package=__package__)

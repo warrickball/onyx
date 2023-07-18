@@ -1,5 +1,5 @@
-from django.http import HttpResponse
 import json
+from django.http import HttpResponse
 
 
 def custom_page_not_found_view(request, exception):

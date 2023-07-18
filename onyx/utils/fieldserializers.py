@@ -1,9 +1,9 @@
+from datetime import date
 from rest_framework import serializers
 from rest_framework.validators import ValidationError
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.encoding import smart_str
 from django.utils.translation import gettext_lazy as _
-from datetime import date
 from data.models import Choice
 
 

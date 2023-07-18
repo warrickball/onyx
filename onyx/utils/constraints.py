@@ -1,7 +1,7 @@
-from django.db import models
-from django.db.models import Q
 import functools
 import operator
+from django.db import models
+from django.db.models import Q
 
 
 def unique_together(model_name, fields):

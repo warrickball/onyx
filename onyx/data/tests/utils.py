@@ -1,10 +1,10 @@
+import os
+import logging
 from django.core.management import call_command
 from django.contrib.auth.models import Group
 from rest_framework.test import APITestCase
 from rest_framework import status
 from accounts.models import User, Site
-import logging
-import os
 
 
 directory = os.path.dirname(os.path.abspath(__file__))
