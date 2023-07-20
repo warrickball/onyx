@@ -1,6 +1,6 @@
 from rest_framework.validators import UniqueTogetherValidator
 from ..serializers import BaseRecordSerializer, ProjectRecordSerializer
-from data.models.projects.test import BaseTestModel, TestModel, TestModelRecord
+from ...models.projects.test import BaseTestModel, TestModel, TestModelRecord
 from utils.fieldserializers import ChoiceField, YearMonthField
 
 

@@ -1,4 +1,3 @@
-from data.models import BaseRecord, ProjectRecord
 from django.db import transaction, IntegrityError, DatabaseError
 from rest_framework import serializers
 from accounts.models import User, Site
@@ -11,6 +10,7 @@ from utils.validation import (
     enforce_choice_constraints,
     enforce_conditional_required,
 )
+from ..models import BaseRecord, ProjectRecord
 
 
 # TODO: Need to try out some nested FK data

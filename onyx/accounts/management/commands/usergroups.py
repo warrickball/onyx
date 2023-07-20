@@ -1,6 +1,6 @@
 from django.core.management import base
 from django.contrib.auth.models import Group
-from accounts.models import User
+from ...models import User
 
 
 class Command(base.BaseCommand):

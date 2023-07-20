@@ -1,5 +1,5 @@
 from django.core.management import base
-from data.models import Choice
+from ...models import Choice
 import csv
 
 
