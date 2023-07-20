@@ -72,7 +72,7 @@ class CreateRecordView(ProjectAPIView):
             return handle_exception(e)
 
         # Validate the data
-        # If data is valid, save to the database. Otherwise, return 400
+        # If data is valid, save to the database. Otherwise, return 422
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
@@ -309,8 +309,7 @@ class UpdateRecordView(ProjectAPIView):
             return OnyxResponse.not_found("CID")
 
         # Validate the data using the serializer
-        # If data is valid, update existing record in the database.
-        # Otherwise, return 400
+        # If data is valid, update in the database. Otherwise, return 422
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
