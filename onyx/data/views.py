@@ -5,10 +5,10 @@ from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGroups
-from utils.response import OnyxResponse
+from internal.response import OnyxResponse
 from utils.projectfields import resolve_fields, view_fields
 from utils.mutable import mutable
-from utils.exceptionhandler import handle_exception
+from internal.exceptions import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
 from .models import Project, Choice
 from .filters import OnyxFilter

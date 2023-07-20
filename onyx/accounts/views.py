@@ -5,7 +5,7 @@ from rest_framework.authentication import BasicAuthentication
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView
 from knox.views import LoginView as KnoxLoginView
-from utils.response import OnyxResponse
+from internal.response import OnyxResponse
 from .models import User
 from .serializers import (
     CreateUserSerializer,

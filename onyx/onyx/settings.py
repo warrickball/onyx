@@ -158,7 +158,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.BasicAuthentication",
         "knox.auth.TokenAuthentication",
     ],
-    "DEFAULT_RENDERER_CLASSES": ("utils.renderers.OnyxJSONRenderer",),
+    "DEFAULT_RENDERER_CLASSES": ("internal.renderers.OnyxJSONRenderer",),
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
 

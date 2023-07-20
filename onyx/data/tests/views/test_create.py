@@ -488,3 +488,28 @@ class TestCreateView(OnyxTestCase):
             self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
+
+    def test_empty_request_fail(self):
+        for payload in [None, {}]:
+            response = self.client.post(self.endpoint, data=payload)
+            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            assert TestModel.objects.count() == 0
+            assert TestModelRecord.objects.count() == 0
+
+    def test_bad_request_fail(self):
+        for payload in [
+            "",
+            "hi",
+            0,
+            [],
+            {"records": ""},
+            {"records": "hi"},
+            {"records": 0},
+            {"records": {}},
+            # {"sample_id": []},  # TODO: Should these all be lumped together?
+            # {None: {}},
+        ]:
+            response = self.client.post(self.endpoint, data=payload)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            assert TestModel.objects.count() == 0
+            assert TestModelRecord.objects.count() == 0

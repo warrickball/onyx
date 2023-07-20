@@ -1,7 +1,8 @@
+from django import forms
 from django.db import models
 from django.db.models import ForeignKey, ManyToOneRel
 from django_filters import rest_framework as filters
-from data.models import Choice
+from .models import Choice
 from utils.choices import format_choices
 from utils.fields import (
     StrippedCharField,
@@ -12,20 +13,66 @@ from utils.fields import (
     ModelChoiceField,
     ChoiceField,
 )
-from utils.filters import (
-    CharInFilter,
-    CharRangeFilter,
-    NumberInFilter,
-    NumberRangeFilter,
-    DateInFilter,
-    DateRangeFilter,
-    DateTimeInFilter,
-    DateTimeRangeFilter,
-    TypedChoiceInFilter,
-    ModelChoiceInFilter,
-    ChoiceFilter,
-    ChoiceInFilter,
-)
+
+
+class CharInFilter(filters.BaseInFilter, filters.CharFilter):
+    pass
+
+
+class CharRangeFilter(filters.BaseRangeFilter, filters.CharFilter):
+    pass
+
+
+class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
+    pass
+
+
+class NumberRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
+    pass
+
+
+class DateInFilter(filters.BaseInFilter, filters.DateFilter):
+    pass
+
+
+class DateRangeFilter(filters.BaseRangeFilter, filters.DateFilter):
+    pass
+
+
+class DateTimeInFilter(filters.BaseInFilter, filters.DateTimeFilter):
+    pass
+
+
+class DateTimeRangeFilter(filters.BaseRangeFilter, filters.DateTimeFilter):
+    pass
+
+
+class TypedChoiceInFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
+    pass
+
+
+class ModelChoiceInFilter(filters.BaseInFilter, filters.ModelChoiceFilter):
+    pass
+
+
+class ChoiceFieldForm(forms.ChoiceField):
+    default_error_messages = {
+        "invalid_choice": [
+            "Select a valid choice. That choice is not one of the available choices."
+        ]
+    }
+
+    def clean(self, value):
+        return super().clean(value.lower())
+
+
+class ChoiceFilter(filters.Filter):
+    field_class = ChoiceFieldForm
+
+
+class ChoiceInFilter(filters.BaseInFilter, ChoiceFilter):
+    pass
+
 
 # Lookups shared by all fields
 BASE_LOOKUPS = [
