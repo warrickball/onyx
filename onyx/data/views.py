@@ -41,6 +41,11 @@ class ProjectAPIView(APIView):
             if self.cursor:
                 query_params.pop("cursor")
 
+            # Used for including fields in output of get/filter/query
+            self.include = query_params.getlist("include")
+            if self.include:
+                query_params.pop("include")
+
             # Used for excluding fields in output of get/filter/query
             self.exclude = query_params.getlist("exclude")
             if self.exclude:
@@ -120,6 +125,7 @@ class GetRecordView(ProjectAPIView):
             fields=view_fields(
                 code=self.project.code,
                 scopes=self.scopes,
+                include=self.include,
                 exclude=self.exclude,
             ),
         )
@@ -199,6 +205,7 @@ def filter_query(self, request, code):
     fields = view_fields(
         self.project.code,
         scopes=self.scopes,
+        include=self.include,
         exclude=self.exclude,
     )
 
