@@ -1,5 +1,5 @@
 from rest_framework import permissions, exceptions
-from utils.response import OnyxResponse
+from internal.response import OnyxResponse
 
 
 class AllowAny(permissions.AllowAny):

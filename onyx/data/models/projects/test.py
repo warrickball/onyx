@@ -1,23 +1,26 @@
 from django.db import models
-from ..models import ProjectRecord
+from ..models import BaseRecord, ProjectRecord
 from utils.fields import YearMonthField, StrippedCharField, ChoiceField
-from utils.constraints import unique_together, optional_value_group
+from utils.constraints import (
+    unique_together,
+    optional_value_group,
+    conditional_required,
+)
 
 
-# TODO: Create a middle class between TestModel and ProjectRecord, for sake of testing inheritance-related things
-
-
-class TestModel(ProjectRecord):
+class BaseTestModel(ProjectRecord):
     sample_id = StrippedCharField(max_length=24)
     run_name = StrippedCharField(max_length=96)
     collection_month = YearMonthField(null=True)
     received_month = YearMonthField(null=True)
     submission_date = models.DateField()
-    country = ChoiceField(max_length=20)
+    country = ChoiceField(max_length=20, null=True)
     region = ChoiceField(max_length=20, null=True)
     concern = models.BooleanField()
     tests = models.IntegerField()
     score = models.FloatField()
+    start = models.IntegerField()
+    end = models.IntegerField()
 
     class Meta:
         default_permissions = []
@@ -30,11 +33,50 @@ class TestModel(ProjectRecord):
         ]
         constraints = [
             unique_together(
-                model_name="testmodel",
+                model_name="basetestmodel",
                 fields=["sample_id", "run_name"],
             ),
             optional_value_group(
-                model_name="testmodel",
+                model_name="basetestmodel",
                 fields=["collection_month", "received_month"],
+            ),
+            conditional_required(
+                model_name="basetestmodel", field="region", required=["country"]
+            ),
+        ]
+
+
+class TestModel(BaseTestModel):
+    class Meta:
+        default_permissions = []
+
+
+class TestModelRecord(BaseRecord):
+    link = models.ForeignKey(
+        TestModel, on_delete=models.CASCADE, related_name="records"
+    )
+    test_id = models.IntegerField()
+    test_pass = models.BooleanField()
+    test_start = YearMonthField()
+    test_end = YearMonthField()
+    score_a = models.FloatField(null=True)
+    score_b = models.FloatField(null=True)
+    score_c = models.FloatField(null=True)
+
+    class Meta:
+        default_permissions = []
+        constraints = [
+            unique_together(
+                model_name="testmodelrecords",
+                fields=["link", "test_id"],
+            ),
+            optional_value_group(
+                model_name="testmodelrecords",
+                fields=["score_a", "score_b"],
+            ),
+            conditional_required(
+                model_name="testmodelrecords",
+                field="score_c",
+                required=["score_a", "score_b"],
             ),
         ]

@@ -5,10 +5,10 @@ from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGroups
-from utils.response import OnyxResponse
+from internal.response import OnyxResponse
 from utils.projectfields import resolve_fields, view_fields
 from utils.mutable import mutable
-from utils.exceptionhandler import handle_exception
+from internal.exceptions import handle_exception
 from utils.nested import parse_dunders, prefetch_nested
 from .models import Project, Choice
 from .filters import OnyxFilter
@@ -41,6 +41,11 @@ class ProjectAPIView(APIView):
             if self.cursor:
                 query_params.pop("cursor")
 
+            # Used for including fields in output of get/filter/query
+            self.include = query_params.getlist("include")
+            if self.include:
+                query_params.pop("include")
+
             # Used for excluding fields in output of get/filter/query
             self.exclude = query_params.getlist("exclude")
             if self.exclude:
@@ -72,11 +77,11 @@ class CreateRecordView(ProjectAPIView):
             return handle_exception(e)
 
         # Validate the data
-        # If data is valid, save to the database. Otherwise, return 400
+        # If data is valid, save to the database. Otherwise, return 422
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
-            context={"request": self.request},
+            context={"project": self.project.code, "request": self.request},
         )
 
         if not node.is_valid():
@@ -120,6 +125,7 @@ class GetRecordView(ProjectAPIView):
             fields=view_fields(
                 code=self.project.code,
                 scopes=self.scopes,
+                include=self.include,
                 exclude=self.exclude,
             ),
         )
@@ -199,6 +205,7 @@ def filter_query(self, request, code):
     fields = view_fields(
         self.project.code,
         scopes=self.scopes,
+        include=self.include,
         exclude=self.exclude,
     )
 
@@ -309,11 +316,11 @@ class UpdateRecordView(ProjectAPIView):
             return OnyxResponse.not_found("CID")
 
         # Validate the data using the serializer
-        # If data is valid, update existing record in the database.
-        # Otherwise, return 400
+        # If data is valid, update in the database. Otherwise, return 422
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
+            context={"project": self.project.code, "request": self.request},
         )
 
         if not node.is_valid(instance=instance):
@@ -412,7 +419,7 @@ class ChoicesView(ProjectAPIView):
         field = self.fields[field.lower()]
 
         choices = Choice.objects.filter(
-            content_type=field.content_type,
+            project_id=self.project.code,
             field=field.field_name,
             is_active=True,
         ).values_list(

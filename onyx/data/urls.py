@@ -21,11 +21,12 @@ urlpatterns = [
     path(
         "filter/<code>/",
         views.FilterRecordView.as_view(),
+        name="data.filter",
     ),
     path(
         "query/<code>/",
         views.QueryRecordView.as_view(),
-        name="data.filter",
+        name="data.query",
     ),
     path(
         "update/<code>/<cid>/",

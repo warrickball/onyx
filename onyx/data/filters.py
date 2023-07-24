@@ -1,7 +1,8 @@
+from django import forms
 from django.db import models
 from django.db.models import ForeignKey, ManyToOneRel
 from django_filters import rest_framework as filters
-from data.models import Choice
+from .models import Choice
 from utils.choices import format_choices
 from utils.fields import (
     StrippedCharField,
@@ -12,20 +13,66 @@ from utils.fields import (
     ModelChoiceField,
     ChoiceField,
 )
-from utils.filters import (
-    CharInFilter,
-    CharRangeFilter,
-    NumberInFilter,
-    NumberRangeFilter,
-    DateInFilter,
-    DateRangeFilter,
-    DateTimeInFilter,
-    DateTimeRangeFilter,
-    TypedChoiceInFilter,
-    ModelChoiceInFilter,
-    ChoiceFilter,
-    ChoiceInFilter,
-)
+
+
+class CharInFilter(filters.BaseInFilter, filters.CharFilter):
+    pass
+
+
+class CharRangeFilter(filters.BaseRangeFilter, filters.CharFilter):
+    pass
+
+
+class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
+    pass
+
+
+class NumberRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
+    pass
+
+
+class DateInFilter(filters.BaseInFilter, filters.DateFilter):
+    pass
+
+
+class DateRangeFilter(filters.BaseRangeFilter, filters.DateFilter):
+    pass
+
+
+class DateTimeInFilter(filters.BaseInFilter, filters.DateTimeFilter):
+    pass
+
+
+class DateTimeRangeFilter(filters.BaseRangeFilter, filters.DateTimeFilter):
+    pass
+
+
+class TypedChoiceInFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
+    pass
+
+
+class ModelChoiceInFilter(filters.BaseInFilter, filters.ModelChoiceFilter):
+    pass
+
+
+class ChoiceFieldForm(forms.ChoiceField):
+    default_error_messages = {
+        "invalid_choice": [
+            "Select a valid choice. That choice is not one of the available choices."
+        ]
+    }
+
+    def clean(self, value):
+        return super().clean(value.lower())
+
+
+class ChoiceFilter(filters.Filter):
+    field_class = ChoiceFieldForm
+
+
+class ChoiceInFilter(filters.BaseInFilter, ChoiceFilter):
+    pass
+
 
 # Lookups shared by all fields
 BASE_LOOKUPS = [
@@ -156,11 +203,11 @@ def isnull(field):
 
 
 def get_filter(
+    project,
     field_type,
     field_path,
     field_name,
     lookup,
-    content_type=None,
 ):
     # Text
     if field_type in TEXT_FIELDS:
@@ -253,7 +300,7 @@ def get_filter(
     # ModelChoice (will probably be removed soon)
     elif field_type == ModelChoiceField:
         qs = Choice.objects.filter(
-            content_type=content_type,
+            project_id=project,
             field=field_name,
         )
         if not lookup:
@@ -276,7 +323,7 @@ def get_filter(
     elif field_type == ChoiceField:
         choices = format_choices(
             Choice.objects.filter(
-                content_type=content_type,
+                project_id=project,
                 field=field_name,
             ).values_list(
                 "choice",
@@ -317,11 +364,11 @@ class OnyxFilter(filters.FilterSet):
             mfield = fields[field]
 
             name, filter = get_filter(
+                project=mfield.project,
                 field_type=mfield.field_type,
                 field_path=mfield.field_path,
                 field_name=mfield.field_name,
                 lookup=mfield.lookup,
-                content_type=mfield.content_type,
             )
             if name:
                 self.filters[name] = filter

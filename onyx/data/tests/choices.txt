@@ -1,3 +1,0 @@
-content_type,field,choices
-data.testmodel,country,eng:wales:scot:ni
-data.testmodel,region,ne:nw:se:sw

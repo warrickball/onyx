@@ -1,16 +1,16 @@
-from data.models import BaseRecord, ProjectRecord
 from django.db import transaction, IntegrityError, DatabaseError
 from rest_framework import serializers
 from accounts.models import User, Site
 from utils.defaults import CurrentUserSiteDefault
-from utils.validation import (
-    enforce_optional_value_groups,
-    enforce_orderings,
-    enforce_non_futures,
-    enforce_identifiers,
-    enforce_choice_constraints,
-    enforce_conditional_required,
+from ..validators import (
+    validate_optional_value_groups,
+    validate_orderings,
+    validate_non_futures,
+    validate_identifiers,
+    validate_choice_constraints,
+    validate_conditional_required,
 )
+from ..models import BaseRecord, ProjectRecord
 
 
 # TODO: Need to try out some nested FK data
@@ -240,7 +240,7 @@ class BaseRecordSerializer(serializers.ModelSerializer):
         """
         errors = {}
 
-        enforce_identifiers(
+        validate_identifiers(
             errors=errors,
             data=data,
             identifiers=self.OnyxMeta.identifiers,
@@ -252,35 +252,35 @@ class BaseRecordSerializer(serializers.ModelSerializer):
             # In this case, we don't want to apply the other object-level validation.
             pass
         else:
-            enforce_optional_value_groups(
+            validate_optional_value_groups(
                 errors=errors,
                 data=data,
                 groups=self.OnyxMeta.optional_value_groups,
                 instance=self.instance,
             )
 
-            enforce_orderings(
+            validate_orderings(
                 errors=errors,
                 data=data,
                 orderings=self.OnyxMeta.orderings,
                 instance=self.instance,
             )
 
-            enforce_choice_constraints(
+            validate_choice_constraints(
                 errors=errors,
                 data=data,
                 choice_constraints=self.OnyxMeta.choice_constraints,
-                model=self.Meta.model,
+                project=self.context["project"],
                 instance=self.instance,
             )
 
-            enforce_non_futures(
+            validate_non_futures(
                 errors=errors,
                 data=data,
                 non_futures=self.OnyxMeta.non_futures,
             )
 
-            enforce_conditional_required(
+            validate_conditional_required(
                 errors=errors,
                 data=data,
                 conditional_required=self.OnyxMeta.conditional_required,

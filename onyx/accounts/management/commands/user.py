@@ -1,5 +1,5 @@
 from django.core.management import base
-from accounts.models import User, Site
+from ...models import User, Site
 import os
 
 

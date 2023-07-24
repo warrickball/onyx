@@ -1,5 +1,5 @@
 from django.core.exceptions import FieldDoesNotExist, ValidationError, PermissionDenied
-from utils.response import OnyxResponse
+from .response import OnyxResponse
 
 
 def handle_exception(e):

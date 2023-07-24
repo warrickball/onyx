@@ -1,9 +1,8 @@
-from django.contrib.contenttypes.models import ContentType
 from datetime import datetime
-from data.models import Choice
+from .models import Choice
 
 
-def enforce_optional_value_groups(errors, data, groups, instance=None):
+def validate_optional_value_groups(errors, data, groups, instance=None):
     """
     Ensure each group of fields has at least one non-null field.
     """
@@ -41,7 +40,7 @@ def enforce_optional_value_groups(errors, data, groups, instance=None):
                 )
 
 
-def enforce_orderings(errors, data, orderings, instance=None):
+def validate_orderings(errors, data, orderings, instance=None):
     """
     Ensure all ordered fields have correctly ordered values.
     """
@@ -63,7 +62,7 @@ def enforce_orderings(errors, data, orderings, instance=None):
             )
 
 
-def enforce_non_futures(errors, data, non_futures):
+def validate_non_futures(errors, data, non_futures):
     """
     Ensure dates are not from the future.
     """
@@ -72,7 +71,7 @@ def enforce_non_futures(errors, data, non_futures):
             errors.setdefault(non_future, []).append("Value cannot be from the future.")
 
 
-def enforce_identifiers(errors, data, identifiers):
+def validate_identifiers(errors, data, identifiers):
     """
     Ensure identifiers are provided.
     """
@@ -81,7 +80,9 @@ def enforce_identifiers(errors, data, identifiers):
             errors.setdefault(identifier, []).append("This field is required.")
 
 
-def enforce_choice_constraints(errors, data, choice_constraints, model, instance=None):
+def validate_choice_constraints(
+    errors, data, choice_constraints, project, instance=None
+):
     """
     Ensure all choices are compatible with each other.
     """
@@ -94,7 +95,7 @@ def enforce_choice_constraints(errors, data, choice_constraints, model, instance
             for constraint in choice.constraints.all()
         }
         for choice in Choice.objects.prefetch_related("constraints")
-        .filter(content_type=ContentType.objects.get_for_model(model))
+        .filter(project_id=project)
         .filter(
             field__in=set(
                 field
@@ -131,7 +132,7 @@ def enforce_choice_constraints(errors, data, choice_constraints, model, instance
             )
 
 
-def enforce_conditional_required(errors, data, conditional_required, instance=None):
+def validate_conditional_required(errors, data, conditional_required, instance=None):
     """
     Ensure all conditionally-required fields are provided.
     """

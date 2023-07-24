@@ -1,59 +1,19 @@
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import ForeignKey, ManyToOneRel
 from django.contrib.auth.models import Group
 from data.filters import ALL_LOOKUPS
-from utils.fields import ModelChoiceField
-
-
-# TODO: This still needs work. It is barely readable
+from .fields import ModelChoiceField
 
 
 class OnyxField:
-    def __init__(self, field_model, field_path, field_name, lookup):
+    def __init__(self, project, field_model, field_path, field_name, lookup):
+        self.project = project
         self.field_model = field_model
         self.field_instance = self.field_model._meta.get_field(field_name)
         self.field_type = type(self.field_instance)
         self.field_path = field_path
         self.field_name = field_name
         self.lookup = lookup
-        # TODO: Needs to be inheritance-aware for Choices
-        self.content_type = ContentType.objects.get_for_model(field_model)
-
-
-def _get_fields_from_permissions(fields_dict, permissions, exclude):
-    for permission in permissions:
-        _, _, field = permission.codename.partition("__")
-        field_path = field.split("__")
-
-        if field_path:
-            current_dict = fields_dict
-
-            for p in field_path:
-                if not p:
-                    # Ignore empty strings
-                    # These come from permissions where there is no field attached
-                    # So there is no __ to split on
-                    break
-
-                current_dict.setdefault(p, {})
-                current_dict = current_dict[p]
-
-    for field in exclude:
-        fs = field.split("__")
-        level = fields_dict
-        last_index = len(fs) - 1
-
-        for i, f in enumerate(fs):
-            if f not in level:
-                break
-
-            if i == last_index:
-                level.pop(f)
-            else:
-                level = level[f]
-
-    return fields_dict
 
 
 def resolve_fields(project, model, user, action, fields):
@@ -101,6 +61,7 @@ def resolve_fields(project, model, user, action, fields):
                     # The field is determined, and the lookup is recognised
                     # So we instantiate the resolved field instance
                     resolved[field] = OnyxField(
+                        project=project.code,
                         field_model=current_model,
                         field_path=field_path,
                         field_name=field_name,
@@ -128,6 +89,7 @@ def resolve_fields(project, model, user, action, fields):
                     # The field is determined, and the lookup is recognised
                     # So we instantiate the resolved field instance
                     resolved[field] = OnyxField(
+                        project=project.code,
                         field_model=current_model,
                         field_path=field_path,
                         field_name=field_name,
@@ -150,6 +112,7 @@ def resolve_fields(project, model, user, action, fields):
                     # The field is determined, and the lookup is recognised
                     # So we instantiate the resolved field instance
                     resolved[field] = OnyxField(
+                        project=project.code,
                         field_model=current_model,
                         field_path=field_path,
                         field_name=field_name,
@@ -194,7 +157,35 @@ def resolve_fields(project, model, user, action, fields):
     return resolved
 
 
-def view_fields(code, scopes=None, exclude=None):
+def get_fields_from_permissions(fields_dict, permissions, include=None, exclude=None):
+    for permission in permissions:
+        _, _, field = permission.codename.partition("__")
+
+        if include and not any(field.startswith(inc) for inc in include):
+            continue
+
+        if exclude and any(field.startswith(exc) for exc in exclude):
+            continue
+
+        field_path = field.split("__")
+
+        if field_path:
+            current_dict = fields_dict
+
+            for p in field_path:
+                if not p:
+                    # Ignore empty strings
+                    # These come from permissions where there is no field attached
+                    # So there is no __ to split on
+                    break
+
+                current_dict.setdefault(p, {})
+                current_dict = current_dict[p]
+
+    return fields_dict
+
+
+def view_fields(code, scopes=None, include=None, exclude=None):
     project_view_group = Group.objects.get(name=f"view.project.{code}")
 
     if scopes:
@@ -204,27 +195,26 @@ def view_fields(code, scopes=None, exclude=None):
     else:
         scope_view_groups = []
 
-    if not exclude:
-        exclude = []
-
     # Dictionary structure detailing all viewable fields based on
     # the project code and the scopes provided
     fields_dict = {}
 
     # Update the fields dict with all viewable fields in the base project
-    fields_dict = _get_fields_from_permissions(
+    fields_dict = get_fields_from_permissions(
         fields_dict,
         project_view_group.permissions.all(),
-        exclude,
+        include=include,
+        exclude=exclude,
     )
 
     # For each scope
     # Update the fields dict with any additional viewable fields
     for scope_view_group in scope_view_groups:
-        fields_dict = _get_fields_from_permissions(
+        fields_dict = get_fields_from_permissions(
             fields_dict,
             scope_view_group.permissions.all(),
-            exclude,
+            include=include,
+            exclude=exclude,
         )
 
     return fields_dict

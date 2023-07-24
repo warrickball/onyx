@@ -1,11 +1,11 @@
+import hashlib
+from datetime import date, datetime
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils.dateparse import parse_date
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.conf import settings
-from datetime import date, datetime
-import hashlib
 
 
 class YearMonthField(models.DateField):
