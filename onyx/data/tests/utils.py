@@ -18,19 +18,17 @@ class OnyxTestCase(APITestCase):
         # Set up test project, choices, and site
         call_command(
             "project",
-            "test",
-            content_type="data.testmodel",
-            groups=os.path.join(directory, "groups.txt"),
+            os.path.join(directory, "project.json"),
             quiet=True,
         )
         call_command(
             "choices",
-            os.path.join(directory, "choices.txt"),
+            os.path.join(directory, "choices.json"),
             quiet=True,
         )
         call_command(
             "choiceconstraints",
-            os.path.join(directory, "constraints.txt"),
+            os.path.join(directory, "constraints.json"),
             quiet=True,
         )
         self.site = Site.objects.create(

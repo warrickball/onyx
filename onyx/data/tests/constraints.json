@@ -1,0 +1,29 @@
+{
+    "test": {
+        "country": {
+            "eng": {
+                "region": [
+                    "ne",
+                    "nw",
+                    "se",
+                    "sw"
+                ]
+            },
+            "wales": {
+                "region": [
+                    "other"
+                ]
+            },
+            "scot": {
+                "region": [
+                    "other"
+                ]
+            },
+            "ni": {
+                "region": [
+                    "other"
+                ]
+            }
+        }
+    }
+}

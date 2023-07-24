@@ -1,3 +1,0 @@
-project,field,choices
-test,country,eng:wales:scot:ni
-test,region,ne:nw:se:sw:other
