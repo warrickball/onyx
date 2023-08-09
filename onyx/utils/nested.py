@@ -1,3 +1,7 @@
+from .fields import ChoiceField
+from data.filters import TEXT_FIELDS, NUMBER_FIELDS
+
+
 def parse_dunders(obj):
     """
     Flatten a JSON object into a set of dunderised keys.
@@ -54,3 +58,22 @@ def lowercase_keys(obj):
 
     else:
         return obj
+
+
+def assign_field_types(fields, field_types, prefix=None):
+    for field, nested in fields.items():
+        if prefix:
+            field_path = f"{prefix}__{field}"
+        else:
+            field_path = field
+
+        if nested:
+            assign_field_types(nested, field_types, prefix=field_path)
+        else:
+            field_type = field_types[field_path].field_type
+            if field_type in TEXT_FIELDS:
+                fields[field] = "text"
+            elif field_type == ChoiceField:
+                fields[field] = "choice"
+            elif field_type in NUMBER_FIELDS:
+                fields[field] = "number"

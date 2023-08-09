@@ -1,5 +1,4 @@
 from rest_framework import permissions, exceptions
-from internal.response import OnyxResponse
 
 
 class AllowAny(permissions.AllowAny):
@@ -113,7 +112,7 @@ class IsInProjectGroup(permissions.BasePermission):
         # Check the user's permission to view the project
         # If the project isn't found, or the user doesn't have permission, tell them it doesn't exist
         if not request.user.groups.filter(name=view_group).exists():
-            raise exceptions.NotFound(OnyxResponse._not_found("Project"))
+            raise exceptions.NotFound("Project not found.")
 
         # Check the user's permission to perform action on the project
         # If the user is missing permissions, tell them
@@ -143,7 +142,7 @@ class IsInScopeGroups(permissions.BasePermission):
             # Check the user's permission to view the scope
             # If the scope isn't found, or the user doesn't have permission, tell them it doesn't exist
             if not request.user.groups.filter(name=view_group).exists():
-                raise exceptions.NotFound(OnyxResponse._not_found("Scope"))
+                raise exceptions.NotFound("Scope not found.")
 
             # Check the user's permission to perform action on the scope
             # If the user is missing permissions, tell them

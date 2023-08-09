@@ -62,6 +62,11 @@ urlpatterns = [
         name="data.testdelete",
     ),
     path(
+        "fields/<code>/",
+        views.FieldsView.as_view(),
+        name="data.fields",
+    ),
+    path(
         "choices/<code>/<field>/",
         views.ChoicesView.as_view(),
         name="data.choices",

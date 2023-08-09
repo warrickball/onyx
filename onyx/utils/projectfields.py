@@ -1,8 +1,9 @@
-from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db.models import ForeignKey, ManyToOneRel
 from django.contrib.auth.models import Group
+from rest_framework import exceptions
 from data.filters import ALL_LOOKUPS
 from .fields import ModelChoiceField
+from internal.exceptions import UnprocessableEntityError
 
 
 class OnyxField:
@@ -149,10 +150,12 @@ def resolve_fields(project, model, user, action, fields):
                 continue
 
     if unknown:
-        raise FieldDoesNotExist(unknown)
+        raise UnprocessableEntityError({"unknown_fields": unknown})
 
     if required:
-        raise PermissionDenied(required)
+        raise exceptions.PermissionDenied(
+            {"required_permissions": sorted(set(required))}
+        )
 
     return resolved
 

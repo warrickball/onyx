@@ -1,19 +1,23 @@
 from django.conf import settings
-from django.core.exceptions import FieldDoesNotExist, ValidationError, PermissionDenied
-from rest_framework import status
+from django.core.exceptions import FieldDoesNotExist, ValidationError
+from rest_framework import status, exceptions
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGroups
-from internal.response import OnyxResponse
 from utils.projectfields import resolve_fields, view_fields
 from utils.mutable import mutable
-from internal.exceptions import handle_exception
-from utils.nested import parse_dunders, prefetch_nested
+from internal.exceptions import UnprocessableEntityError
+from utils.nested import parse_dunders, prefetch_nested, assign_field_types
 from .models import Project, Choice
 from .filters import OnyxFilter
 from .serializers import ModelSerializerMap, SerializerNode
-from django_query_tools.server import make_atoms, validate_atoms, make_query
+from django_query_tools.server import (
+    make_atoms,
+    validate_atoms,
+    make_query,
+    QueryException,
+)
 
 
 class ProjectAPIView(APIView):
@@ -65,16 +69,13 @@ class CreateRecordView(ProjectAPIView):
         """
         Create an instance for the given project.
         """
-        try:
-            resolve_fields(
-                project=self.project,
-                model=self.model,
-                user=request.user,
-                action=self.action,
-                fields=parse_dunders(request.data),
-            )
-        except (PermissionDenied, FieldDoesNotExist) as e:
-            return handle_exception(e)
+        resolve_fields(
+            project=self.project,
+            model=self.model,
+            user=request.user,
+            action=self.action,
+            fields=parse_dunders(request.data),
+        )
 
         # Validate the data
         # If data is valid, save to the database. Otherwise, return 422
@@ -85,7 +86,7 @@ class CreateRecordView(ProjectAPIView):
         )
 
         if not node.is_valid():
-            return OnyxResponse.validation_error(node.errors)
+            raise UnprocessableEntityError(node.errors)
 
         # Create the instance
         if not test:
@@ -95,9 +96,7 @@ class CreateRecordView(ProjectAPIView):
             cid = None
 
         # Return response indicating creation
-        return OnyxResponse.action_success(
-            self.action, cid, test=test, status=status.HTTP_201_CREATED
-        )
+        return Response({"cid": cid}, status=status.HTTP_201_CREATED)
 
 
 class GetRecordView(ProjectAPIView):
@@ -117,7 +116,7 @@ class GetRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            return OnyxResponse.not_found("CID")
+            raise exceptions.NotFound("CID not found.")
 
         # Serialize the result
         serializer = self.serializer_cls(
@@ -131,13 +130,7 @@ class GetRecordView(ProjectAPIView):
         )
 
         # Return response with data
-        return Response(
-            {
-                "action": "view",
-                "record": serializer.data,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response(serializer.data)
 
 
 def filter_query(self, request, code):
@@ -145,9 +138,9 @@ def filter_query(self, request, code):
     Handles the logic for both the `filter` and `query` endpoints.
     """
     # Prepare paginator
-    paginator = CursorPagination()
-    paginator.ordering = "created"
-    paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
+    self.paginator = CursorPagination()
+    self.paginator.ordering = "created"
+    self.paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
 
     # If method == GET, then parameters were provided in the query_params
     # Convert these into the same format as the JSON provided when method == POST
@@ -171,22 +164,19 @@ def filter_query(self, request, code):
             # This is what the filterset is built to handle; it attempts to decode these strs and returns errors if it fails.
             # If we don't turn these values into strs, the filterset can crash
             # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
-            atoms = make_atoms(query, to_str=True)
-        except Exception:
-            return OnyxResponse.invalid_query()
+            atoms = make_atoms(query, to_str=True)  #  type: ignore
+        except QueryException as e:
+            raise exceptions.ParseError(f"Error while parsing query: {e.args[0]}")
     else:
         atoms = []
 
-    try:
-        self.fields = resolve_fields(
-            project=self.project,
-            model=self.model,
-            user=request.user,
-            action=self.action,
-            fields=[x.key for x in atoms],
-        )
-    except (PermissionDenied, FieldDoesNotExist) as e:
-        return handle_exception(e)
+    self.fields = resolve_fields(
+        project=self.project,
+        model=self.model,
+        user=request.user,
+        action=self.action,
+        fields=[x.key for x in atoms],
+    )
 
     # Validate and clean the provided key-value pairs
     # This is done by first building a FilterSet
@@ -198,8 +188,10 @@ def filter_query(self, request, code):
             filterset_args=[self.fields],
             filterset_model=self.model,
         )
-    except (FieldDoesNotExist, ValidationError) as e:
-        return handle_exception(e)
+    except FieldDoesNotExist as e:
+        raise UnprocessableEntityError({"unknown_fields": e.args[0]})
+    except ValidationError as e:
+        raise UnprocessableEntityError(e.args[0])
 
     # View fields
     fields = view_fields(
@@ -223,9 +215,9 @@ def filter_query(self, request, code):
     # So we form the Q object, and filter the queryset with it
     if query:
         try:
-            q_object = make_query(query)
-        except Exception:
-            return OnyxResponse.invalid_query()
+            q_object = make_query(query)  #  type: ignore
+        except QueryException as e:
+            raise exceptions.ParseError(f"Error while parsing query: {e.args[0]}")
 
         # A queryset is not guaranteed to return unique objects
         # Especially as a result of complex nested queries
@@ -238,11 +230,11 @@ def filter_query(self, request, code):
     # Add the pagination cursor param back into the request
     if self.cursor:
         with mutable(request.query_params) as query_params:
-            query_params[paginator.cursor_query_param] = self.cursor
+            query_params[self.paginator.cursor_query_param] = self.cursor
 
     # Paginate the response
     instances = qs.order_by("id")
-    result_page = paginator.paginate_queryset(instances, request)
+    result_page = self.paginator.paginate_queryset(instances, request)
 
     # Serialize the results
     serializer = self.serializer_cls(
@@ -252,14 +244,7 @@ def filter_query(self, request, code):
     )
 
     # Return paginated response
-    return Response(
-        {
-            "action": "view",
-            "next": paginator.get_next_link(),
-            "previous": paginator.get_previous_link(),
-            "records": serializer.data,
-        }
-    )
+    return Response(serializer.data)
 
 
 class FilterRecordView(ProjectAPIView):
@@ -292,17 +277,15 @@ class UpdateRecordView(ProjectAPIView):
         """
         Update an instance for the given project.
         """
-        try:
-            # TODO: separate identifiers into 'add' permission
-            resolve_fields(
-                project=self.project,
-                model=self.model,
-                user=request.user,
-                action=self.action,
-                fields=parse_dunders(request.data),
-            )
-        except (PermissionDenied, FieldDoesNotExist) as e:
-            return handle_exception(e)
+
+        # TODO: separate identifiers into 'add' permission
+        resolve_fields(
+            project=self.project,
+            model=self.model,
+            user=request.user,
+            action=self.action,
+            fields=parse_dunders(request.data),
+        )
 
         # Get the instance to be updated
         # If the instance does not exist, return 404
@@ -313,7 +296,7 @@ class UpdateRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            return OnyxResponse.not_found("CID")
+            raise exceptions.NotFound("CID not found.")
 
         # Validate the data using the serializer
         # If data is valid, update in the database. Otherwise, return 422
@@ -324,14 +307,14 @@ class UpdateRecordView(ProjectAPIView):
         )
 
         if not node.is_valid(instance=instance):
-            return OnyxResponse.validation_error(node.errors)
+            raise UnprocessableEntityError(node.errors)
 
         # Update the instance
         if not test:
             instance = node.save()
 
         # Return response indicating update
-        return OnyxResponse.action_success("change", cid, test=test)
+        return Response({"cid": cid})
 
 
 class SuppressRecordView(ProjectAPIView):
@@ -351,7 +334,7 @@ class SuppressRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            return OnyxResponse.not_found("CID")
+            raise exceptions.NotFound("CID not found.")
 
         # Suppress the instance
         if not test:
@@ -359,7 +342,7 @@ class SuppressRecordView(ProjectAPIView):
             instance.save(update_fields=["suppressed", "last_modified"])
 
         # Return response indicating suppression
-        return OnyxResponse.action_success(self.action, cid, test=test)
+        return Response({"cid": cid})
 
 
 class DeleteRecordView(ProjectAPIView):
@@ -375,14 +358,14 @@ class DeleteRecordView(ProjectAPIView):
         try:
             instance = self.model.objects.select_related().get(cid=cid)
         except self.model.DoesNotExist:
-            return OnyxResponse.not_found("CID")
+            raise exceptions.NotFound("CID not found.")
 
         # Delete the instance
         if not test:
             instance.delete()
 
         # Return response indicating deletion
-        return OnyxResponse.action_success(self.action, cid, test=test)
+        return Response({"cid": cid})
 
 
 class ProjectView(APIView):
@@ -393,8 +376,28 @@ class ScopesView(APIView):
     pass  # TODO
 
 
-class FieldsView(APIView):
-    pass  # TODO
+class FieldsView(ProjectAPIView):
+    permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
+    action = "view"
+
+    def get(self, request, code):
+        """
+        List all fields for a given project.
+        """
+        fields = view_fields(code, scopes=self.scopes)
+        fields.pop("site")  # TODO: sort it
+
+        self.fields = resolve_fields(
+            project=self.project,
+            model=self.model,
+            user=request.user,
+            action=self.action,
+            fields=parse_dunders(fields),
+        )
+
+        assign_field_types(fields, self.fields)
+
+        return Response(fields)
 
 
 class ChoicesView(ProjectAPIView):
@@ -405,16 +408,14 @@ class ChoicesView(ProjectAPIView):
         """
         List all choices for a given field.
         """
-        try:
-            self.fields = resolve_fields(
-                project=self.project,
-                model=self.model,
-                user=request.user,
-                action=self.action,
-                fields=[field],
-            )
-        except (PermissionDenied, FieldDoesNotExist) as e:
-            return handle_exception(e)
+
+        self.fields = resolve_fields(
+            project=self.project,
+            model=self.model,
+            user=request.user,
+            action=self.action,
+            fields=[field],
+        )
 
         field = self.fields[field.lower()]
 
@@ -427,4 +428,4 @@ class ChoicesView(ProjectAPIView):
             flat=True,
         )
 
-        return Response({"action": "view", "choices": choices})
+        return Response(choices)

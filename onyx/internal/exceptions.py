@@ -1,16 +1,5 @@
-from django.core.exceptions import FieldDoesNotExist, ValidationError, PermissionDenied
-from .response import OnyxResponse
+from rest_framework import status, exceptions
 
 
-def handle_exception(e):
-    if isinstance(e, PermissionDenied):
-        return OnyxResponse.forbidden(e.args[0])
-
-    elif isinstance(e, FieldDoesNotExist):
-        return OnyxResponse.unknown_aspect("fields", e.args[0])
-
-    elif isinstance(e, ValidationError):
-        return OnyxResponse.validation_error(e.args[0])
-
-    else:
-        raise e
+class UnprocessableEntityError(exceptions.ValidationError):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY

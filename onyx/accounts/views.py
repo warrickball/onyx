@@ -1,11 +1,11 @@
 from datetime import datetime
-from rest_framework import status
+from django.contrib.auth.models import Group
+from rest_framework import exceptions
 from rest_framework.response import Response
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView
 from knox.views import LoginView as KnoxLoginView
-from internal.response import OnyxResponse
 from .models import User
 from .serializers import (
     CreateUserSerializer,
@@ -14,6 +14,7 @@ from .serializers import (
     AdminWaitingSerializer,
 )
 from .permissions import Any, Approved, SiteAuthority, Admin
+from internal.exceptions import UnprocessableEntityError
 
 
 class LoginView(KnoxLoginView):
@@ -52,7 +53,7 @@ class SiteApproveView(APIView):
                     username=username
                 )
         except User.DoesNotExist:
-            return OnyxResponse.not_found("User")
+            raise exceptions.NotFound("User not found.")
 
         # Approve user
         user.is_site_approved = True
@@ -64,7 +65,6 @@ class SiteApproveView(APIView):
                 "username": username,
                 "is_site_approved": user.is_site_approved,
             },
-            status=status.HTTP_200_OK,
         )
 
 
@@ -80,7 +80,7 @@ class AdminApproveView(APIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return OnyxResponse.not_found("User")
+            raise exceptions.NotFound("User not found.")
 
         # Approve user
         user.is_admin_approved = True
@@ -92,7 +92,6 @@ class AdminApproveView(APIView):
                 "username": username,
                 "is_admin_approved": user.is_admin_approved,
             },
-            status=status.HTTP_200_OK,
         )
 
 
@@ -160,3 +159,52 @@ class AdminUsersView(ListAPIView):
 
     def get_queryset(self):
         return User.objects.order_by("-date_joined")
+
+
+class AdminUserProjectsView(APIView):
+    """
+    Set projects that can be viewed by a user.
+    """
+
+    permission_classes = Admin
+
+    def post(self, request, username):
+        # Get user to be approved
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise exceptions.NotFound("User not found.")
+
+        if not isinstance(request.data, list):
+            raise UnprocessableEntityError(
+                {"detail": f"Expected a list but received type: {type(request.data)}"}
+            )
+
+        existing_groups = user.groups.filter(name__startswith="view.project.")
+
+        groups = []
+        for project in request.data:
+            try:
+                group = Group.objects.get(name=f"view.project.{project}")
+            except Group.DoesNotExist:
+                raise exceptions.NotFound("Project not found.")
+            groups.append(group)
+
+        removed = []
+        for group in existing_groups:
+            if group not in groups:
+                user.groups.remove(group)
+                removed.append(group.name)
+
+        added = []
+        for group in groups:
+            user.groups.add(group)
+            added.append(group.name)
+
+        return Response(
+            {
+                "username": username,
+                "added": added,
+                "removed": removed,
+            },
+        )
