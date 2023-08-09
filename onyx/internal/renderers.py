@@ -8,16 +8,25 @@ class OnyxJSONRenderer(renderers.JSONRenderer):
         """
         render_data = {}
         if renderer_context:
+            view = renderer_context["view"]
             status_code = renderer_context["response"].status_code
 
             if status.is_client_error(status_code):
                 render_data["status"] = "fail"
                 render_data["messages"] = data
+
             elif status.is_server_error(status_code):
                 render_data["status"] = "error"
                 render_data["messages"] = data
+
             else:
                 render_data["status"] = "success"
+
+                paginator = getattr(view, "paginator", None)
+                if paginator:
+                    render_data["next"] = view.paginator.get_next_link()
+                    render_data["previous"] = view.paginator.get_previous_link()
+
                 render_data["data"] = data
 
         return super().render(
