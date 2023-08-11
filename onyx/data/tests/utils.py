@@ -65,7 +65,7 @@ class OnyxTestCase(APITestCase):
         return user
 
 
-def test_data(n=50):
+def test_data(n=100):
     data = []
     for i in range(n):
         country_region_group = random.randint(0, 4)
@@ -76,13 +76,13 @@ def test_data(n=50):
             "collection_month": f"2022-{random.randint(1, 12)}",
             "received_month": f"2023-{random.randint(1, 6)}",
             "submission_date": f"2023-{random.randint(1, 6)}-{random.randint(1, 25)}",
-            "country": ["eng", "scot", "wales", "ni", None][country_region_group],
+            "country": ["eng", "scot", "wales", "ni", ""][country_region_group],
             "region": [
-                random.choice(["ne", "se", "nw", "sw"]),
+                random.choice(["ne", "se", "nw", "sw", ""]),
                 "other",
                 "other",
                 "other",
-                None,
+                "",
             ][country_region_group],
             "concern": random.choice([True, False]),
             "tests": 2,
