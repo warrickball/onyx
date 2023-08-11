@@ -293,7 +293,6 @@ class BaseRecordSerializer(serializers.ModelSerializer):
         return data
 
     class Meta:
-        model = BaseRecord
         fields = [
             "created",
             "last_modified",
@@ -312,8 +311,9 @@ class BaseRecordSerializer(serializers.ModelSerializer):
 
 
 class ProjectRecordSerializer(BaseRecordSerializer):
+    cid = serializers.CharField(required=False)
+
     class Meta:
-        model = ProjectRecord
         fields = BaseRecordSerializer.Meta.fields + [
             "cid",
             "published_date",
