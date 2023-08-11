@@ -79,6 +79,32 @@ class Choice(models.Model):
         ]
 
 
+# TODO: Separate dedicated system for country + county -> latitude/longitude?
+# Where to store this?
+# We also probably want a validate_country_county function
+# Just needs to check these match correctly
+# and then if they do, we can just add the corresponding latitude + longitude
+class Country(models.Model):
+    country = LowerCharField(max_length=100, unique=True)
+    latitude = models.FloatField()  # str better?
+    longitude = models.FloatField()
+
+
+class County(models.Model):
+    country = LowerCharField(max_length=100)
+    county = LowerCharField(max_length=100)
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+
+    class Meta:
+        constraints = [
+            unique_together(
+                model_name="county",
+                fields=["country", "county"],
+            ),
+        ]
+
+
 def generate_cid():
     """
     Simple function that generates a random new CID.
@@ -89,32 +115,48 @@ def generate_cid():
     """
     cid = "C-" + "".join(token_hex(5).upper())
 
-    if ProjectRecord.objects.filter(cid=cid).exists():
+    if CID.objects.filter(cid=cid).exists():
         cid = generate_cid()
 
     return cid
 
 
+class CID(models.Model):
+    cid = UpperCharField(default=generate_cid, max_length=12, unique=True)
+
+
 class BaseRecord(models.Model):
+    # TODO: Make uuid primary key?
+    # Stop worrying about collisions. its not going to happen m8
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     history = HistoricalRecords(inherit=True)
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # TODO: Display sites again
     # site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
 
     class Meta:
         default_permissions = []
+        abstract = True
 
 
 class ProjectRecord(BaseRecord):
-    cid = UpperCharField(default=generate_cid, max_length=12, unique=True)
+    cid = UpperCharField(max_length=12, unique=True)
     published_date = models.DateField(auto_now_add=True)
     suppressed = models.BooleanField(default=False)
 
     class Meta:
         default_permissions = []
+        abstract = True
         indexes = [
             models.Index(fields=["published_date"]),
             models.Index(fields=["suppressed"]),
         ]
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            cid = CID.objects.create()
+            self.cid = cid.cid
+
+        super().save(*args, **kwargs)

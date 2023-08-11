@@ -23,6 +23,7 @@ class IsNull(BuiltinLookup):
     prepare_rhs = False
 
     def as_sql(self, compiler, connection):
+        # TODO: Understand why did I do this ?? With 0 and 1?
         if str(self.rhs).lower() in ["0", "false"]:
             self.rhs = False
 
@@ -46,10 +47,10 @@ class IsNullRelated(RelatedLookupMixin, IsNull):
 
 
 class Request(models.Model):
-    endpoint = models.CharField(max_length=100, null=True)
-    method = models.CharField(max_length=10, null=True)
+    endpoint = models.CharField(max_length=100, blank=True)
+    method = models.CharField(max_length=10, blank=True)
     status = models.PositiveSmallIntegerField()
     user = models.ForeignKey(User, on_delete=models.PROTECT, null=True)
-    address = models.CharField(max_length=20, null=True)
+    address = models.CharField(max_length=20, blank=True)
     exec_time = models.IntegerField(null=True)
     date = models.DateTimeField(auto_now=True)

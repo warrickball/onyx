@@ -104,8 +104,8 @@ bad_floats = [
 
 
 def _test_record(self, payload, instance):
-    self.assertEqual(payload.get("sample_id"), instance.sample_id)
-    self.assertEqual(payload.get("run_name"), instance.run_name)
+    self.assertEqual(payload.get("sample_id", ""), instance.sample_id)
+    self.assertEqual(payload.get("run_name", ""), instance.run_name)
     self.assertEqual(
         payload.get("collection_month"),
         instance.collection_month.strftime("%Y-%m")
@@ -122,8 +122,8 @@ def _test_record(self, payload, instance):
         if instance.submission_date
         else None,
     )
-    self.assertEqual(payload.get("country"), instance.country)
-    self.assertEqual(payload.get("region"), instance.region)
+    self.assertEqual(payload.get("country", ""), instance.country)
+    self.assertEqual(payload.get("region", ""), instance.region)
     self.assertEqual(payload.get("concern"), instance.concern)
     self.assertEqual(payload.get("tests"), instance.tests)
     self.assertEqual(payload.get("score"), instance.score)

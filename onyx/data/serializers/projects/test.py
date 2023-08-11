@@ -36,8 +36,8 @@ class TestModelRecordSerializer(BaseRecordSerializer):
 class BaseTestModelSerializer(ProjectRecordSerializer):
     collection_month = YearMonthField(required=False, allow_null=True)
     received_month = YearMonthField(required=False, allow_null=True)
-    country = ChoiceField("test", "country", required=False, allow_null=True)
-    region = ChoiceField("test", "region", required=False, allow_null=True)
+    country = ChoiceField("test", "country", required=False, allow_blank=True)
+    region = ChoiceField("test", "region", required=False, allow_blank=True)
 
     class Meta:
         model = BaseTestModel

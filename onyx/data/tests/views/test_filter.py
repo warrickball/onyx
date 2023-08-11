@@ -25,16 +25,20 @@ class TestFilterView(OnyxTestCase):
         self.user.groups.remove(Group.objects.get(name="add.project.test"))
 
     def assertEqualCids(self, records, qs):
+        record_values = sorted(record["cid"] for record in records)
+        qs_values = sorted(qs.distinct().values_list("cid", flat=True))
+        self.assertTrue(record_values)
+        self.assertTrue(qs_values)
         self.assertEqual(
-            sorted(record["cid"] for record in records),
-            sorted(qs.distinct().values_list("cid", flat=True)),
+            record_values,
+            qs_values,
         )
 
     def test_all_ok(self):
         response = self.client.get(self.endpoint)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.all(),
         )
 
@@ -46,14 +50,14 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"country": "eng"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(country="eng"),
         )
 
         response = self.client.get(self.endpoint, data={"country": "ENG"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(country="eng"),
         )
 
@@ -61,7 +65,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"country__ne": "eng"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(country__ne="eng"),
         )
 
@@ -69,16 +73,16 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"country__in": "eng,wales"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(country__in=["eng", "wales"]),
         )
 
-    def test_choicefield_isnull_ok(self):
-        response = self.client.get(self.endpoint, data={"country__isnull": True})
+    def test_choicefield_empty_ok(self):
+        response = self.client.get(self.endpoint, data={"country": ""})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
-            TestModel.objects.filter(country__isnull=True),
+            response.json()["data"],
+            TestModel.objects.filter(country=""),
         )
 
     def test_choicefield_wronglookup_fail(self):
@@ -93,14 +97,14 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"records__isnull": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(records__isnull=True),
         )
 
         response = self.client.get(self.endpoint, data={"records__isnull": False})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(records__isnull=False),
         )
 
@@ -112,7 +116,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"run_name": "run-1"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(run_name="run-1"),
         )
 
@@ -120,7 +124,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"run_name__ne": "run-1"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(run_name__ne="run-1"),
         )
 
@@ -130,7 +134,7 @@ class TestFilterView(OnyxTestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"],
+            response.json()["data"],
             TestModel.objects.filter(run_name__in=["run-1", "run-2", "run-3"]),
         )
 
@@ -139,33 +143,34 @@ class TestFilterView(OnyxTestCase):
             self.endpoint, data={"run_name__range": "run-0,run-9"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"]["records"], TestModel.objects.all()
-        )
+        self.assertEqualCids(response.json()["data"], TestModel.objects.all())
 
-    def test_charfield_isnull_ok(self):
-        response = self.client.get(self.endpoint, data={"run_name__isnull": True})
+    def test_charfield_blank_ok(self):
+        response = self.client.get(self.endpoint, data={"region": ""})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"], TestModel.objects.none()
+            response.json()["data"], TestModel.objects.filter(region="")
         )
 
-        response = self.client.get(self.endpoint, data={"run_name__isnull": False})
+        response = self.client.get(self.endpoint, data={"region__ne": ""})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
-            response.json()["data"]["records"], TestModel.objects.all()
+            response.json()["data"], TestModel.objects.filter(region__ne="")
         )
 
     def test_charfield_contains_ok(self):
         response = self.client.get(self.endpoint, data={"run_name__contains": "run"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"]["records"], TestModel.objects.all()
-        )
+        self.assertEqualCids(response.json()["data"], TestModel.objects.all())
 
     def test_charfield_badlookup_fail(self):
         response = self.client.get(self.endpoint, data={"run_name__year": "2022"})
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_number_ok(self):
-        pass  # TODO
+        response = self.client.get(self.endpoint, data={"start": 5})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqualCids(
+            response.json()["data"],
+            TestModel.objects.filter(start=5),
+        )

@@ -221,8 +221,7 @@ def get_filter(
                 field_name=field_path,
                 lookup_expr=lookup,
             )
-        elif lookup == "isnull":
-            return f"{field_path}__isnull", isnull(field_path)
+
     # Number
     elif field_type in NUMBER_FIELDS:
         if not lookup:
@@ -237,6 +236,7 @@ def get_filter(
             )
         elif lookup == "isnull":
             return f"{field_path}__isnull", isnull(field_path)
+
     # Date
     elif field_type in DATE_FIELDS:
         if field_type == YearMonthField:
@@ -279,6 +279,7 @@ def get_filter(
             )
         elif lookup == "isnull":
             return f"{field_path}__isnull", isnull(field_path)
+
     # True/false
     elif field_type == models.BooleanField:
         if not lookup:
@@ -297,7 +298,8 @@ def get_filter(
             )
         elif lookup == "isnull":
             return f"{field_path}__isnull", isnull(field_path)
-    # ModelChoice (will probably be removed soon)
+
+    # ModelChoice (TODO: remove as I think its redundant? Or not?)
     elif field_type == ModelChoiceField:
         qs = Choice.objects.filter(
             project_id=project,
@@ -319,6 +321,7 @@ def get_filter(
             )
         elif lookup == "isnull":
             return f"{field_path}__isnull", isnull(field_path)
+
     # Choice
     elif field_type == ChoiceField:
         choices = format_choices(
@@ -342,8 +345,7 @@ def get_filter(
                 choices=choices,
                 lookup_expr=lookup,
             )
-        elif lookup == "isnull":
-            return f"{field_path}__isnull", isnull(field_path)
+
     # Relations
     elif field_type in RELATIONS:
         if lookup == "isnull":
