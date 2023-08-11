@@ -2,33 +2,45 @@ from datetime import datetime
 from .models import Choice
 
 
+EMPTY_VALUES = [None, ""]
+
+
 def validate_optional_value_groups(errors, data, groups, instance=None):
     """
     Ensure each group of fields has at least one non-null field.
     """
     if instance:
         for group in groups:
-            # List of non-null fields from the group
-            instance_group_fields = [
-                field for field in group if getattr(instance, field) is not None
+            # List of existing fields from the group
+            instance_fields = [
+                field for field in group if getattr(instance, field) not in EMPTY_VALUES
             ]
 
-            # List of fields specified by the request data that are going to be nullified
-            fields_to_nullify = [
-                field for field in group if field in data and data[field] is None
+            # List of fields specified by the request data that are going to be provided
+            fields_to_add = [
+                field
+                for field in group
+                if field in data and data[field] not in EMPTY_VALUES
+            ]
+
+            # List of fields specified by the request data that are going to be removed
+            fields_to_remove = [
+                field
+                for field in group
+                if field in data and data[field] in EMPTY_VALUES
             ]
 
             # If the resulting set is empty, it means one of two not-good things:
-            # The request contains enough fields from the group being nullified that there will be no non-null fields left from the group
-            # There were (somehow) no non-null fields in the group to begin with
-            if set(instance_group_fields) - set(fields_to_nullify) == set():
+            # The request contains enough fields from the group being emptied that there will be no non-empty fields left from the group
+            # There were (somehow) no non-empty fields in the group to begin with
+            if not (set(instance_fields) | set(fields_to_add) - set(fields_to_remove)):
                 errors.setdefault("non_field_errors", []).append(
                     f"At least one of {', '.join(group)} is required."
                 )
     else:
         for group in groups:
             for field in group:
-                if field in data and data[field] is not None:
+                if field in data and data[field] not in EMPTY_VALUES:
                     break
             else:
                 # If you're reading this I'm sorry
@@ -46,15 +58,15 @@ def validate_orderings(errors, data, orderings, instance=None):
     """
     for lower, higher in orderings:
         if instance:
-            lower_value = data.get(lower, getattr(instance, lower, None))
-            higher_value = data.get(higher, getattr(instance, higher, None))
+            lower_value = data.get(lower, getattr(instance, lower))
+            higher_value = data.get(higher, getattr(instance, higher))
         else:
             lower_value = data.get(lower)
             higher_value = data.get(higher)
 
         if (
-            lower_value is not None
-            and higher_value is not None
+            lower_value not in EMPTY_VALUES
+            and higher_value not in EMPTY_VALUES
             and lower_value > higher_value
         ):
             errors.setdefault("non_field_errors", []).append(
@@ -107,15 +119,15 @@ def validate_choice_constraints(
 
     for choice_x, choice_y in choice_constraints:
         if instance:
-            choice_x_value = data.get(choice_x, getattr(instance, choice_x, None))
-            choice_y_value = data.get(choice_y, getattr(instance, choice_y, None))
+            choice_x_value = data.get(choice_x, getattr(instance, choice_x))
+            choice_y_value = data.get(choice_y, getattr(instance, choice_y))
         else:
             choice_x_value = data.get(choice_x)
             choice_y_value = data.get(choice_y)
 
         if (
-            choice_x_value is not None
-            and choice_y_value is not None
+            choice_x_value not in EMPTY_VALUES
+            and choice_y_value not in EMPTY_VALUES
             and (
                 (
                     (choice_y, choice_y_value)
@@ -139,16 +151,16 @@ def validate_conditional_required(errors, data, conditional_required, instance=N
     for field, requirements in conditional_required.items():
         if instance:
             required_values = [
-                data.get(req, getattr(instance, req, None)) for req in requirements
+                data.get(req, getattr(instance, req)) for req in requirements
             ]
-            field_value = data.get(field, getattr(instance, field, None))
+            field_value = data.get(field, getattr(instance, field))
         else:
             required_values = [data.get(req) for req in requirements]
             field_value = data.get(field)
 
-        if field_value is not None:
+        if field_value not in EMPTY_VALUES:
             for i, req in enumerate(required_values):
-                if req is None:
+                if req in EMPTY_VALUES:
                     errors.setdefault(requirements[i], []).append(
                         f"This field is required if {field} is provided."
                     )
