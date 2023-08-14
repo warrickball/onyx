@@ -1,5 +1,5 @@
 from django.db import transaction, IntegrityError, DatabaseError
-from rest_framework import serializers
+from rest_framework import serializers, exceptions
 from accounts.models import User, Site
 from utils.defaults import CurrentUserSiteDefault
 from ..validators import (
@@ -10,7 +10,6 @@ from ..validators import (
     validate_choice_constraints,
     validate_conditional_required,
 )
-from ..models import BaseRecord, ProjectRecord
 
 
 # TODO: Need to try out some nested FK data
@@ -26,8 +25,8 @@ class SerializerNode:
         self.data = {}
 
         if not isinstance(data, dict):
-            raise serializers.ValidationError(
-                {"detail": "Expected a dictionary when parsing the request data."}
+            raise exceptions.ValidationError(
+                "Expected a dictionary when parsing the request data."
             )
 
         related_data = {}
@@ -45,8 +44,8 @@ class SerializerNode:
                 self.nodes[field] = []
 
                 if not isinstance(field_data, list):
-                    raise serializers.ValidationError(
-                        {"detail": f"Expected a list when parsing the {field} data."}
+                    raise exceptions.ValidationError(
+                        f"Expected a list when parsing the {field} data."
                     )
 
                 for f_d in field_data:
@@ -59,10 +58,8 @@ class SerializerNode:
                     )
             else:
                 if not isinstance(field_data, dict):
-                    raise serializers.ValidationError(
-                        {
-                            "detail": f"Expected a dictionary when parsing the {field} data."
-                        }
+                    raise exceptions.ValidationError(
+                        f"Expected a dictionary when parsing the {field} data."
                     )
 
                 self.nodes[field] = SerializerNode(
@@ -182,9 +179,7 @@ class SerializerNode:
             # Inform the user of any details regarding an IntegrityError
             # Otherwise, they will just see the generic 'Internal Server Error' message
             if isinstance(e.__cause__, IntegrityError):
-                raise serializers.ValidationError(
-                    {"detail": f"IntegrityError: {e.__cause__}"}
-                )
+                raise exceptions.ValidationError(f"IntegrityError: {e.__cause__}")
             else:
                 raise e.__cause__  #  type: ignore
 
@@ -288,7 +283,7 @@ class BaseRecordSerializer(serializers.ModelSerializer):
             )
 
         if errors:
-            raise serializers.ValidationError(errors)
+            raise exceptions.ValidationError(errors)
 
         return data
 

@@ -99,6 +99,7 @@ class IsSameSiteAsObject(permissions.BasePermission):
         )
 
 
+# TODO: Maybe split this up, and not require view group on everything
 class IsInProjectGroup(permissions.BasePermission):
     """
     Allows access only to users who are in the view group and the given action group for the given project.

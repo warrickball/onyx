@@ -176,7 +176,7 @@ class AdminUserProjectsView(APIView):
 
         if not isinstance(request.data, list):
             raise exceptions.ValidationError(
-                {"detail": f"Expected a list but received type: {type(request.data)}"}
+                f"Expected a list but received type: {type(request.data)}"
             )
 
         existing_groups = user.groups.filter(name__startswith="view.project.")

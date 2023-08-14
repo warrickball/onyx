@@ -1,6 +1,5 @@
 from datetime import date
-from rest_framework import serializers
-from rest_framework.validators import ValidationError
+from rest_framework import serializers, exceptions
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.encoding import smart_str
 from django.utils.translation import gettext_lazy as _
@@ -21,7 +20,7 @@ class YearMonthField(serializers.Field):
                 raise ValueError
             value = date(int(year), int(month), 1)
         except ValueError:
-            raise ValidationError("Enter a valid date in YYYY-MM format.")
+            raise exceptions.ValidationError("Enter a valid date in YYYY-MM format.")
 
         return value
 
@@ -29,7 +28,7 @@ class YearMonthField(serializers.Field):
         try:
             year, month, _ = str(value).split("-")
         except ValueError:
-            raise ValidationError("Must be in YYYY-MM-DD format.")
+            raise exceptions.ValidationError("Must be in YYYY-MM-DD format.")
 
         return year + "-" + month
 

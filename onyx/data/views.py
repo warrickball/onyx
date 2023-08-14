@@ -162,7 +162,7 @@ def filter_query(self, request, code):
             # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
             atoms = make_atoms(query, to_str=True)  #  type: ignore
         except QueryException as e:
-            raise exceptions.ParseError(f"Error while parsing query: {e.args[0]}")
+            raise exceptions.ValidationError(e.args[0])
     else:
         atoms = []
 
@@ -213,7 +213,7 @@ def filter_query(self, request, code):
         try:
             q_object = make_query(query)  #  type: ignore
         except QueryException as e:
-            raise exceptions.ParseError(f"Error while parsing query: {e.args[0]}")
+            raise exceptions.ValidationError(e.args[0])
 
         # A queryset is not guaranteed to return unique objects
         # Especially as a result of complex nested queries
