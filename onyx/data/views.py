@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ValidationError
 from rest_framework import status, exceptions
 from rest_framework.response import Response
@@ -140,7 +139,6 @@ def filter_query(self, request, code):
     # Prepare paginator
     self.paginator = CursorPagination()
     self.paginator.ordering = "created"
-    self.paginator.page_size = settings.CURSOR_PAGINATION_PAGE_SIZE
 
     # If method == GET, then parameters were provided in the query_params
     # Convert these into the same format as the JSON provided when method == POST

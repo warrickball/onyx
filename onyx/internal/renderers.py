@@ -22,8 +22,7 @@ class OnyxJSONRenderer(renderers.JSONRenderer):
             else:
                 render_data["status"] = "success"
 
-                paginator = getattr(view, "paginator", None)
-                if paginator:
+                if getattr(view, "paginator", None):
                     render_data["next"] = view.paginator.get_next_link()
                     render_data["previous"] = view.paginator.get_previous_link()
 

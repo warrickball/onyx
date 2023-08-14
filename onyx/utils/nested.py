@@ -1,5 +1,6 @@
+from django.db import models
 from .fields import ChoiceField
-from data.filters import TEXT_FIELDS, NUMBER_FIELDS
+from data.filters import TEXT_FIELDS, NUMBER_FIELDS, YearMonthField, DATE_FIELDS
 
 
 def parse_dunders(obj):
@@ -77,3 +78,9 @@ def assign_field_types(fields, field_types, prefix=None):
                 fields[field] = "choice"
             elif field_type in NUMBER_FIELDS:
                 fields[field] = "number"
+            elif field_type in DATE_FIELDS:
+                fields[field] = "date (YYYY-MM-DD)"
+            elif field_type == YearMonthField:
+                fields[field] = "date (YYYY-MM)"
+            elif field_type == models.BooleanField:
+                fields[field] = "bool"

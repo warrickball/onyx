@@ -153,6 +153,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
 
+# TODO: Put default paginator class into here? Can set page size etc in here? And use generic views?
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.BasicAuthentication",
@@ -160,6 +161,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_RENDERER_CLASSES": ("internal.renderers.OnyxJSONRenderer",),
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_PAGINATION_CLASS": None,
+    "PAGE_SIZE": 1000,
 }
 
 REST_KNOX = {
@@ -185,5 +188,3 @@ LOGGING = {
         "level": "DEBUG",
     },
 }
-
-CURSOR_PAGINATION_PAGE_SIZE = 1000
