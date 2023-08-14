@@ -161,6 +161,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_RENDERER_CLASSES": ("internal.renderers.OnyxJSONRenderer",),
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_PAGINATION_CLASS": None,
     "PAGE_SIZE": 1000,
 }
 
