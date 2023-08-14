@@ -14,6 +14,7 @@ from ..validators import (
 
 # TODO: Need to try out some nested FK data
 # TODO: Need to handle required FKs, not just optional many-to-one
+# TODO: Catch parse-errors within the keys that they occured?
 class SerializerNode:
     def __init__(self, serializer_class, data=None, context=None):
         self.serializer_class = serializer_class
@@ -26,7 +27,7 @@ class SerializerNode:
 
         if not isinstance(data, dict):
             raise exceptions.ValidationError(
-                "Expected a dictionary when parsing the request data."
+                {"detail": "Expected a dictionary when parsing the request data."}
             )
 
         related_data = {}
@@ -45,7 +46,7 @@ class SerializerNode:
 
                 if not isinstance(field_data, list):
                     raise exceptions.ValidationError(
-                        f"Expected a list when parsing the {field} data."
+                        {"detail": f"Expected a list when parsing the {field} data."}
                     )
 
                 for f_d in field_data:
@@ -59,7 +60,9 @@ class SerializerNode:
             else:
                 if not isinstance(field_data, dict):
                     raise exceptions.ValidationError(
-                        f"Expected a dictionary when parsing the {field} data."
+                        {
+                            "detail": f"Expected a dictionary when parsing the {field} data."
+                        }
                     )
 
                 self.nodes[field] = SerializerNode(
@@ -179,7 +182,9 @@ class SerializerNode:
             # Inform the user of any details regarding an IntegrityError
             # Otherwise, they will just see the generic 'Internal Server Error' message
             if isinstance(e.__cause__, IntegrityError):
-                raise exceptions.ValidationError(f"IntegrityError: {e.__cause__}")
+                raise exceptions.ValidationError(
+                    {"detail": f"IntegrityError: {e.__cause__}"}
+                )
             else:
                 raise e.__cause__  #  type: ignore
 

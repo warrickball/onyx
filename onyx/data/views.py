@@ -113,7 +113,7 @@ class GetRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            raise exceptions.NotFound("CID not found.")
+            raise exceptions.NotFound({"detail": "CID not found."})
 
         # Serialize the result
         serializer = self.serializer_cls(
@@ -162,7 +162,7 @@ def filter_query(self, request, code):
             # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
             atoms = make_atoms(query, to_str=True)  #  type: ignore
         except QueryException as e:
-            raise exceptions.ValidationError(e.args[0])
+            raise exceptions.ValidationError({"detail": e.args[0]})
     else:
         atoms = []
 
@@ -187,7 +187,7 @@ def filter_query(self, request, code):
     except FieldDoesNotExist as e:
         raise exceptions.ValidationError({"unknown_fields": e.args[0]})
     except ValidationError as e:
-        raise exceptions.ValidationError(e.args[0])
+        raise exceptions.ValidationError({"detail": e.args[0]})
 
     # View fields
     fields = view_fields(
@@ -213,7 +213,7 @@ def filter_query(self, request, code):
         try:
             q_object = make_query(query)  #  type: ignore
         except QueryException as e:
-            raise exceptions.ValidationError(e.args[0])
+            raise exceptions.ValidationError({"detail": e.args[0]})
 
         # A queryset is not guaranteed to return unique objects
         # Especially as a result of complex nested queries
@@ -292,7 +292,7 @@ class UpdateRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            raise exceptions.NotFound("CID not found.")
+            raise exceptions.NotFound({"detail": "CID not found."})
 
         # Validate the data
         node = SerializerNode(
@@ -329,7 +329,7 @@ class SuppressRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            raise exceptions.NotFound("CID not found.")
+            raise exceptions.NotFound({"detail": "CID not found."})
 
         # Suppress the instance
         if not test:
@@ -353,7 +353,7 @@ class DeleteRecordView(ProjectAPIView):
         try:
             instance = self.model.objects.select_related().get(cid=cid)
         except self.model.DoesNotExist:
-            raise exceptions.NotFound("CID not found.")
+            raise exceptions.NotFound({"detail": "CID not found."})
 
         # Delete the instance
         if not test:
