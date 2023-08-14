@@ -14,7 +14,6 @@ from .serializers import (
     AdminWaitingSerializer,
 )
 from .permissions import Any, Approved, SiteAuthority, Admin
-from internal.exceptions import UnprocessableEntityError
 
 
 class LoginView(KnoxLoginView):
@@ -176,7 +175,7 @@ class AdminUserProjectsView(APIView):
             raise exceptions.NotFound("User not found.")
 
         if not isinstance(request.data, list):
-            raise UnprocessableEntityError(
+            raise exceptions.ValidationError(
                 {"detail": f"Expected a list but received type: {type(request.data)}"}
             )
 
@@ -208,3 +207,10 @@ class AdminUserProjectsView(APIView):
                 "removed": removed,
             },
         )
+
+
+class CreateProjectUserView(APIView):
+    permission_classes = Admin
+
+    def post(self, request, code, username):
+        pass

@@ -3,7 +3,6 @@ from django.contrib.auth.models import Group
 from rest_framework import exceptions
 from data.filters import ALL_LOOKUPS
 from .fields import ModelChoiceField
-from internal.exceptions import UnprocessableEntityError
 
 
 class OnyxField:
@@ -150,7 +149,7 @@ def resolve_fields(project, model, user, action, fields):
                 continue
 
     if unknown:
-        raise UnprocessableEntityError({"unknown_fields": unknown})
+        raise exceptions.ValidationError({"unknown_fields": unknown})
 
     if required:
         raise exceptions.PermissionDenied(
