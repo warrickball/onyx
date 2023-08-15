@@ -187,7 +187,7 @@ def filter_query(self, request, code):
     except FieldDoesNotExist as e:
         raise exceptions.ValidationError({"unknown_fields": e.args[0]})
     except ValidationError as e:
-        raise exceptions.ValidationError({"detail": e.args[0]})
+        raise exceptions.ValidationError(e.args[0])
 
     # View fields
     fields = view_fields(
