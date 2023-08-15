@@ -99,6 +99,7 @@ class IsSameSiteAsObject(permissions.BasePermission):
         )
 
 
+# TODO: Maybe split this up, and not require view group on everything
 class IsInProjectGroup(permissions.BasePermission):
     """
     Allows access only to users who are in the view group and the given action group for the given project.
@@ -112,7 +113,7 @@ class IsInProjectGroup(permissions.BasePermission):
         # Check the user's permission to view the project
         # If the project isn't found, or the user doesn't have permission, tell them it doesn't exist
         if not request.user.groups.filter(name=view_group).exists():
-            raise exceptions.NotFound("Project not found.")
+            raise exceptions.NotFound({"detail": "Project not found."})
 
         # Check the user's permission to perform action on the project
         # If the user is missing permissions, tell them
@@ -142,7 +143,7 @@ class IsInScopeGroups(permissions.BasePermission):
             # Check the user's permission to view the scope
             # If the scope isn't found, or the user doesn't have permission, tell them it doesn't exist
             if not request.user.groups.filter(name=view_group).exists():
-                raise exceptions.NotFound("Scope not found.")
+                raise exceptions.NotFound({"detail": "Scope not found."})
 
             # Check the user's permission to perform action on the scope
             # If the user is missing permissions, tell them

@@ -44,7 +44,7 @@ class TestFilterView(OnyxTestCase):
 
     def test_unknown_field_fail(self):
         response = self.client.get(self.endpoint, data={"hello": ":)"})
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_choicefield_ok(self):
         response = self.client.get(self.endpoint, data={"country": "eng"})
@@ -87,11 +87,11 @@ class TestFilterView(OnyxTestCase):
 
     def test_choicefield_wronglookup_fail(self):
         response = self.client.get(self.endpoint, data={"country__range": "eng,wales"})
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_choicefield_wrongchoice_fail(self):
         response = self.client.get(self.endpoint, data={"country": "ing"})
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_relation_isnull_ok(self):
         response = self.client.get(self.endpoint, data={"records__isnull": True})
@@ -110,7 +110,7 @@ class TestFilterView(OnyxTestCase):
 
     def test_relation_wronglookup_fail(self):
         response = self.client.get(self.endpoint, data={"records": 1})
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_charfield_ok(self):
         response = self.client.get(self.endpoint, data={"run_name": "run-1"})
@@ -165,7 +165,7 @@ class TestFilterView(OnyxTestCase):
 
     def test_charfield_badlookup_fail(self):
         response = self.client.get(self.endpoint, data={"run_name__year": "2022"})
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_number_ok(self):
         response = self.client.get(self.endpoint, data={"start": 5})

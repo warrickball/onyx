@@ -195,7 +195,7 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload["suppressed"] = "helloooo"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -204,7 +204,7 @@ class TestCreateView(OnyxTestCase):
         payload["hello"] = "hi"
         payload["goodbye"] = "bye"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -212,7 +212,7 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload.pop("sample_id")
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -220,7 +220,7 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload["records"][0].pop("test_id")
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -228,7 +228,7 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload.pop("country")
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -236,7 +236,7 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload["records"][0]["score_c"] = 42.3
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -277,7 +277,7 @@ class TestCreateView(OnyxTestCase):
 
         payload = copy.deepcopy(default_payload)
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 3
         assert (
             TestModel.objects.filter(sample_id=default_payload["sample_id"]).count()
@@ -301,7 +301,7 @@ class TestCreateView(OnyxTestCase):
         payload.pop("collection_month")
         payload.pop("received_month")
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -310,7 +310,7 @@ class TestCreateView(OnyxTestCase):
         payload["records"][0].pop("score_a", None)
         payload["records"][0].pop("score_b", None)
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -320,7 +320,7 @@ class TestCreateView(OnyxTestCase):
         payload["collection_month"] = "2023-02"
         payload["received_month"] = "2023-01"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -331,7 +331,7 @@ class TestCreateView(OnyxTestCase):
         payload["end"] = start
         payload["start"] = end
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -340,7 +340,7 @@ class TestCreateView(OnyxTestCase):
         payload["records"][1]["test_start"] = "2023-04"
         payload["records"][1]["test_end"] = "2023-03"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -348,7 +348,7 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload["sample_id"] = "A" * 1000 + "H"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -357,7 +357,7 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["collection_month"] = bad_yearmonth
             response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
@@ -367,7 +367,7 @@ class TestCreateView(OnyxTestCase):
             "%Y-%m"
         )
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -376,7 +376,7 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["submission_date"] = bad_date
             response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
@@ -386,7 +386,7 @@ class TestCreateView(OnyxTestCase):
             "%Y-%m-%d"
         )
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -407,7 +407,7 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["region"] = bad_choice
             response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
@@ -415,14 +415,14 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload["country"] = "wales"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
         payload = copy.deepcopy(default_payload)
         payload["region"] = "other"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
@@ -443,7 +443,7 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["concern"] = bad_bool
             response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
@@ -464,7 +464,7 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["tests"] = bad_int
             response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
@@ -485,14 +485,14 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["score"] = bad_float
             response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
     def test_empty_request_fail(self):
         for payload in [None, {}]:
             response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 

@@ -1,4 +1,4 @@
-from rest_framework import serializers
+from rest_framework import serializers, exceptions
 from .models import User
 from django.core.exceptions import ValidationError
 import django.contrib.auth.password_validation as validators
@@ -34,14 +34,14 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
     def validate_first_name(self, value):
         if not value.isalpha():
-            raise serializers.ValidationError(
+            raise exceptions.ValidationError(
                 "This field must only contain alphabetic characters."
             )
         return value
 
     def validate_last_name(self, value):
         if not value.isalpha():
-            raise serializers.ValidationError(
+            raise exceptions.ValidationError(
                 "This field must only contain alphabetic characters."
             )
         return value
@@ -58,7 +58,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             errors["password"] = list(e.messages)
 
         if errors:
-            raise serializers.ValidationError(errors)
+            raise exceptions.ValidationError(errors)
 
         return data
 
