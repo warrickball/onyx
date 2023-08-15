@@ -86,6 +86,13 @@ BASE_LOOKUPS = [
     "range",
 ]
 
+# Lookups available for hash fields
+HASH_LOOKUPS = [
+    "exact",
+    "ne",
+    "in",
+]
+
 # Lookups available for choice fields
 CHOICE_LOOKUPS = [
     "exact",
@@ -128,6 +135,7 @@ DATE_LOOKUPS = [
 
 ALL_LOOKUPS = set(
     BASE_LOOKUPS
+    + HASH_LOOKUPS
     + CHOICE_LOOKUPS
     + TEXT_LOOKUPS
     + YEARMONTH_LOOKUPS
@@ -215,6 +223,10 @@ def get_filter(
             return f"{field_path}", filters.CharFilter(
                 field_name=field_path,
             )
+        elif field_type == HashField and lookup not in HASH_LOOKUPS:
+            # Hash fields have a more restricted set of lookups
+            # So if the lookup doesn't match this set, we pass
+            pass
         elif lookup in BASE_LOOKUPS or lookup in TEXT_LOOKUPS:
             filter = FILTERS.get(("text", lookup), filters.CharFilter)
             return f"{field_path}__{lookup}", filter(
