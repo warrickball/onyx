@@ -10,6 +10,7 @@ from utils.nested import parse_dunders, prefetch_nested, assign_field_types
 from .models import Project, Choice
 from .filters import OnyxFilter
 from .serializers import ModelSerializerMap, SerializerNode
+from .exceptions import CIDNotFound
 from django_query_tools.server import (
     make_atoms,
     validate_atoms,
@@ -113,7 +114,7 @@ class GetRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            raise exceptions.NotFound({"detail": "CID not found."})
+            raise CIDNotFound
 
         # Serialize the result
         serializer = self.serializer_cls(
@@ -292,7 +293,7 @@ class UpdateRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            raise exceptions.NotFound({"detail": "CID not found."})
+            raise CIDNotFound
 
         # Validate the data
         node = SerializerNode(
@@ -329,7 +330,7 @@ class SuppressRecordView(ProjectAPIView):
                 .get(cid=cid)
             )
         except self.model.DoesNotExist:
-            raise exceptions.NotFound({"detail": "CID not found."})
+            raise CIDNotFound
 
         # Suppress the instance
         if not test:
@@ -353,7 +354,7 @@ class DeleteRecordView(ProjectAPIView):
         try:
             instance = self.model.objects.select_related().get(cid=cid)
         except self.model.DoesNotExist:
-            raise exceptions.NotFound({"detail": "CID not found."})
+            raise CIDNotFound
 
         # Delete the instance
         if not test:

@@ -1,4 +1,5 @@
 from rest_framework import permissions, exceptions
+from .exceptions import ProjectNotFound, ScopeNotFound
 
 
 class AllowAny(permissions.AllowAny):
@@ -113,7 +114,7 @@ class IsInProjectGroup(permissions.BasePermission):
         # Check the user's permission to view the project
         # If the project isn't found, or the user doesn't have permission, tell them it doesn't exist
         if not request.user.groups.filter(name=view_group).exists():
-            raise exceptions.NotFound({"detail": "Project not found."})
+            raise ProjectNotFound
 
         # Check the user's permission to perform action on the project
         # If the user is missing permissions, tell them
@@ -143,7 +144,7 @@ class IsInScopeGroups(permissions.BasePermission):
             # Check the user's permission to view the scope
             # If the scope isn't found, or the user doesn't have permission, tell them it doesn't exist
             if not request.user.groups.filter(name=view_group).exists():
-                raise exceptions.NotFound({"detail": "Scope not found."})
+                raise ScopeNotFound
 
             # Check the user's permission to perform action on the scope
             # If the user is missing permissions, tell them

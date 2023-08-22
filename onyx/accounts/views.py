@@ -14,6 +14,7 @@ from .serializers import (
     AdminWaitingSerializer,
 )
 from .permissions import Any, Approved, SiteAuthority, Admin
+from .exceptions import ProjectNotFound, UserNotFound
 
 
 class LoginView(KnoxLoginView):
@@ -52,7 +53,7 @@ class SiteApproveView(APIView):
                     username=username
                 )
         except User.DoesNotExist:
-            raise exceptions.NotFound({"detail": "User not found."})
+            raise UserNotFound
 
         # Approve user
         user.is_site_approved = True
@@ -79,7 +80,7 @@ class AdminApproveView(APIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise exceptions.NotFound({"detail": "User not found."})
+            raise UserNotFound
 
         # Approve user
         user.is_admin_approved = True
@@ -172,7 +173,7 @@ class AdminUserProjectsView(APIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise exceptions.NotFound({"detail": "User not found."})
+            raise UserNotFound
 
         if not isinstance(request.data, list):
             raise exceptions.ValidationError(
@@ -186,7 +187,7 @@ class AdminUserProjectsView(APIView):
             try:
                 group = Group.objects.get(name=f"view.project.{project}")
             except Group.DoesNotExist:
-                raise exceptions.NotFound({"detail": "Project not found."})
+                raise ProjectNotFound
             groups.append(group)
 
         removed = []
