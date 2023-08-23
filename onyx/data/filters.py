@@ -2,8 +2,6 @@ from django import forms
 from django.db import models
 from django.db.models import ForeignKey, ManyToOneRel
 from django_filters import rest_framework as filters
-from .models import Choice
-from utils.choices import format_choices
 from utils.fields import (
     StrippedCharField,
     HashField,
@@ -13,6 +11,7 @@ from utils.fields import (
     ModelChoiceField,
     ChoiceField,
 )
+from .models import Choice
 
 
 class CharInFilter(filters.BaseInFilter, filters.CharFilter):
@@ -173,7 +172,7 @@ RELATIONS = [
 ]
 
 # Accepted strings for True and False when validating BooleanField
-BOOLEAN_CHOICES = format_choices(["true", "True", "false", "False"])
+BOOLEAN_CHOICES = [(x, x) for x in ["true", "True", "false", "False"]]
 
 # Mappings from field type + lookup to filter
 FILTERS = {
@@ -336,15 +335,16 @@ def get_filter(
 
     # Choice
     elif field_type == ChoiceField:
-        choices = format_choices(
-            Choice.objects.filter(
+        choices = [
+            (x, x)
+            for x in Choice.objects.filter(
                 project_id=project,
                 field=field_name,
             ).values_list(
                 "choice",
                 flat=True,
             )
-        )
+        ]
         if not lookup:
             return f"{field_path}", ChoiceFilter(
                 field_name=field_path,

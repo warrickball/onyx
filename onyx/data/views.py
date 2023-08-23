@@ -5,12 +5,11 @@ from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGroups
 from utils.projectfields import resolve_fields, view_fields
-from utils.mutable import mutable
-from utils.nested import parse_dunders, prefetch_nested, assign_field_types
 from .models import Project, Choice
 from .filters import OnyxFilter
 from .serializers import ModelSerializerMap, SerializerNode
 from .exceptions import CIDNotFound
+from .utils import mutable, parse_dunders, prefetch_nested, assign_field_types
 from django_query_tools.server import (
     make_atoms,
     validate_atoms,
@@ -105,6 +104,14 @@ class GetRecordView(ProjectAPIView):
         """
         Get an instance for the given project.
         """
+        resolve_fields(
+            project=self.project,
+            model=self.model,
+            user=request.user,
+            action=self.action,
+            fields=list(self.include) + list(self.exclude),
+        )
+
         # Get the instance
         # If the instance does not exist, return 404
         try:
@@ -172,7 +179,7 @@ def filter_query(self, request, code):
         model=self.model,
         user=request.user,
         action=self.action,
-        fields=[x.key for x in atoms],
+        fields=[x.key for x in atoms] + list(self.include) + list(self.exclude),
     )
 
     # Validate and clean the provided key-value pairs

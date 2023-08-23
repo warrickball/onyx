@@ -5,7 +5,6 @@ from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from accounts.models import Site, User
 from utils.fields import LowerCharField, UpperCharField
-from utils.choices import format_choices
 from utils.constraints import unique_together
 from simple_history.models import HistoricalRecords
 
@@ -47,7 +46,7 @@ class Scope(models.Model):
     code = LowerCharField(max_length=50)
     action = LowerCharField(
         max_length=10,
-        choices=format_choices(["add", "view", "change", "suppress", "delete"]),
+        choices=[(x, x) for x in ["add", "view", "change", "suppress", "delete"]],
     )
     group = models.OneToOneField(Group, on_delete=models.CASCADE)
 

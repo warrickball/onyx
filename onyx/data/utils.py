@@ -1,6 +1,24 @@
+from contextlib import contextmanager
 from django.db import models
-from .fields import ChoiceField, YearMonthField
-from data.filters import TEXT_FIELDS
+from utils.fields import ChoiceField, YearMonthField
+from .filters import TEXT_FIELDS
+
+
+@contextmanager
+def mutable(obj):
+    """
+    If the provided `obj` has a `_mutable` property, this context manager temporarily sets it to `True`
+    """
+    _mutable = getattr(obj, "_mutable", None)
+    if _mutable is not None:
+        obj._mutable = True
+
+    try:
+        yield obj
+    finally:
+        # Reset object's mutability
+        if _mutable is not None:
+            obj._mutable = _mutable
 
 
 def parse_dunders(obj):
