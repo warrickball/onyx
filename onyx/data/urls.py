@@ -1,65 +1,17 @@
 from django.urls import path
 from . import views
 
+
 urlpatterns = [
     path(
-        "create/<code>/",
-        views.CreateRecordView.as_view(),
-        name="data.create",
+        "projects/",
+        views.ProjectsView.as_view(),
+        name="data.projects",
     ),
     path(
-        "testcreate/<code>/",
-        views.CreateRecordView.as_view(),
-        kwargs={"test": True},
-        name="data.testcreate",
-    ),
-    path(
-        "get/<code>/<cid>/",
-        views.GetRecordView.as_view(),
-        name="data.get",
-    ),
-    path(
-        "filter/<code>/",
-        views.FilterRecordView.as_view(),
-        name="data.filter",
-    ),
-    path(
-        "query/<code>/",
-        views.QueryRecordView.as_view(),
-        name="data.query",
-    ),
-    path(
-        "update/<code>/<cid>/",
-        views.UpdateRecordView.as_view(),
-        name="data.update",
-    ),
-    path(
-        "testupdate/<code>/<cid>/",
-        views.UpdateRecordView.as_view(),
-        kwargs={"test": True},
-        name="data.testupdate",
-    ),
-    path(
-        "suppress/<code>/<cid>/",
-        views.SuppressRecordView.as_view(),
-        name="data.suppress",
-    ),
-    path(
-        "testsuppress/<code>/<cid>/",
-        views.SuppressRecordView.as_view(),
-        kwargs={"test": True},
-        name="data.testsuppress",
-    ),
-    path(
-        "delete/<code>/<cid>/",
-        views.DeleteRecordView.as_view(),
-        name="data.delete",
-    ),
-    path(
-        "testdelete/<code>/<cid>/",
-        views.DeleteRecordView.as_view(),
-        kwargs={"test": True},
-        name="data.testdelete",
+        "scopes/<code>/",
+        views.ScopesView.as_view(),
+        name="data.scopes",
     ),
     path(
         "fields/<code>/",
@@ -70,5 +22,36 @@ urlpatterns = [
         "choices/<code>/<field>/",
         views.ChoicesView.as_view(),
         name="data.choices",
+    ),
+    path(
+        "projects/test/<code>/",
+        views.ProjectRecordsViewSet.as_view({"post": "create"}),
+        name="data.projects.test.records",
+        kwargs={"test": True},
+    ),
+    path(
+        "projects/test/<code>/<cid>/",
+        views.ProjectRecordsViewSet.as_view(
+            {"patch": "partial_update", "delete": "destroy"}
+        ),
+        name="data.projects.test.records.cid",
+        kwargs={"test": True},
+    ),
+    path(
+        "projects/<code>/",
+        views.ProjectRecordsViewSet.as_view({"post": "create", "get": "list"}),
+        name="data.projects.records",
+    ),
+    path(
+        "projects/<code>/query/",
+        views.QueryProjectRecordsView.as_view(),
+        name="data.projects.records.query",
+    ),
+    path(
+        "projects/<code>/<cid>/",
+        views.ProjectRecordsViewSet.as_view(
+            {"get": "retrieve", "patch": "partial_update", "delete": "destroy"}
+        ),
+        name="data.projects.records.cid",
     ),
 ]
