@@ -2,7 +2,7 @@
 
 API for storing pathogen metadata. 
 
-### Server control
+### Server control
 Start the server:
 ```
 $ cd onyx/
