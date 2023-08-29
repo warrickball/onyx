@@ -13,14 +13,14 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
+# from django.contrib import admin
 from django.urls import path, include
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
-    path("data/", include("data.urls")),
+    path("projects/", include("data.urls")),
 ]
 
 handler404 = "internal.views.custom_page_not_found_view"
