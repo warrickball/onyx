@@ -9,52 +9,33 @@ from utils.constraints import unique_together
 from simple_history.models import HistoricalRecords
 
 
-# TODO: Don't actually need half the stuff being recorded in Project and Scope models
 class Project(models.Model):
     code = LowerCharField(max_length=50, unique=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
 
-    add_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_add",
-    )
-    view_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_view",
-    )
-    change_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_change",
-    )
-    suppress_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_suppress",
-    )
-    delete_group = models.OneToOneField(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_delete",
-    )
 
-
-class Scope(models.Model):
+# TODO: Finalise and test
+# This is just on the brink of exactly what I was after: a singular model for linking project, action, scope, group.
+# Assuming speed not a problem, from this we can search groups by scope, action, project, without needing a group naming convention
+# We do have the issue though that deleting a project will not cascade delete the groups, but I guess this is not an issue (?)
+class ProjectGroup(models.Model):
+    group = models.OneToOneField(
+        Group,
+        on_delete=models.CASCADE,
+        primary_key=True,
+    )
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    code = LowerCharField(max_length=50)
     action = LowerCharField(
         max_length=10,
-        choices=[(x, x) for x in ["add", "view", "change", "suppress", "delete"]],
+        choices=[(x, x) for x in ["add", "view", "change", "delete"]],
     )
-    group = models.OneToOneField(Group, on_delete=models.CASCADE)
+    scope = LowerCharField(max_length=50, default="base")
 
     class Meta:
         constraints = [
             unique_together(
-                model_name="scope",
-                fields=["project", "code", "action"],
+                model_name="projectgroup",
+                fields=["project", "scope", "action"],
             ),
         ]
 

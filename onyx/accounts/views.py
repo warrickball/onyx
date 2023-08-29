@@ -180,12 +180,19 @@ class AdminUserProjectsView(APIView):
                 {"detail": f"Expected a list but received type: {type(request.data)}"}
             )
 
-        existing_groups = user.groups.filter(name__startswith="view.project.")
+        # TODO: Currently doesn't deal with granting/revoking non-base view groups
+        existing_groups = user.groups.filter(
+            projectgroup__action="view", projectgroup__scope="base"
+        )
 
         groups = []
         for project in request.data:
             try:
-                group = Group.objects.get(name=f"view.project.{project}")
+                group = Group.objects.get(
+                    projectgroup__project__code=project,
+                    projectgroup__action="view",
+                    projectgroup__scope="base",
+                )
             except Group.DoesNotExist:
                 raise ProjectNotFound
             groups.append(group)

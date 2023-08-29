@@ -1,6 +1,6 @@
 from .models import (
     Project,
-    Scope,
+    ProjectGroup,
     Choice,
     BaseRecord,
     ProjectRecord,
