@@ -37,7 +37,7 @@ ALLOWED_HOSTS = [os.environ["ONYX_DOMAIN"]]
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -91,21 +91,11 @@ WSGI_APPLICATION = "onyx.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": os.environ["ONYX_POSTGRES_DB"],
-#         "USER": os.environ["ONYX_POSTGRES_USER"],
-#         "PASSWORD": os.environ["ONYX_POSTGRES_PASSWORD"],
-#         "HOST": os.environ["ONYX_POSTGRES_HOST"],
-#         "PORT": os.environ["ONYX_POSTGRES_PORT"],
-#     }
-# }
-
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.path.join(BASE_DIR, "onyx.sqlite3"),
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ["ONYX_POSTGRES_DB"],
+        "USER": os.environ["ONYX_POSTGRES_USER"],
     }
 }
 
@@ -153,7 +143,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
 
-# TODO: Put default paginator class into here? Can set page size etc in here? And use generic views?
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.BasicAuthentication",
@@ -188,3 +177,7 @@ LOGGING = {
         "level": "DEBUG",
     },
 }
+
+SILENCED_SYSTEM_CHECKS = [
+    "rest_framework.W001",  # REST Framework Paginator page size is set but no default paginator
+]
