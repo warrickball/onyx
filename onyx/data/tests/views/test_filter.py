@@ -2,27 +2,26 @@ from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.reverse import reverse
 from ..utils import OnyxTestCase, test_data
-from ...models.projects.test import TestModel, TestModelRecord
+from ...models.projects.test import TestModel
 
 
 class TestFilterView(OnyxTestCase):
     def setUp(self):
         super().setUp()
-        self.endpoint = reverse("data.create", kwargs={"code": "test"})
+        self.endpoint = reverse("data.project", kwargs={"code": "test"})
         self.user = self.setup_user(
             "testuser",
             roles=["is_staff"],
             groups=[
-                "add.project.test",
-                "view.project.test",
+                "test.add.base",
+                "test.view.base",
             ],
         )
         for payload in test_data():
             response = self.client.post(self.endpoint, data=payload)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        self.endpoint = reverse("data.filter", kwargs={"code": "test"})
-        self.user.groups.remove(Group.objects.get(name="add.project.test"))
+        self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
     def assertEqualCids(self, records, qs):
         record_values = sorted(record["cid"] for record in records)

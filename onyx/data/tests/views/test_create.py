@@ -155,13 +155,13 @@ def _test_record(self, payload, instance):
 class TestCreateView(OnyxTestCase):
     def setUp(self):
         super().setUp()
-        self.endpoint = reverse("data.create", kwargs={"code": "test"})
+        self.endpoint = reverse("data.project", kwargs={"code": "test"})
         self.user = self.setup_user(
             "testuser",
             roles=["is_staff"],
             groups=[
-                "add.project.test",
-                "view.project.test",
+                "test.add.base",
+                "test.view.base",
             ],
         )
 
