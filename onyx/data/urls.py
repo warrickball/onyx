@@ -1,57 +1,50 @@
-from django.urls import path
+from django.urls import path, re_path
 from . import views
 
 
 urlpatterns = [
     path(
-        "projects/",
+        "",
         views.ProjectsView.as_view(),
-        name="data.projects",
+        name="data.project.list",
     ),
     path(
-        "scopes/<code>/",
-        views.ScopesView.as_view(),
-        name="data.scopes",
-    ),
-    path(
-        "fields/<code>/",
+        "<code>/fields/",
         views.FieldsView.as_view(),
-        name="data.fields",
+        name="data.project.fields",
     ),
     path(
-        "choices/<code>/<field>/",
+        "<code>/choices/<field>/",
         views.ChoicesView.as_view(),
-        name="data.choices",
+        name="data.project.choices",
     ),
     path(
-        "projects/test/<code>/",
-        views.ProjectRecordsViewSet.as_view({"post": "create"}),
-        name="data.projects.test.records",
-        kwargs={"test": True},
-    ),
-    path(
-        "projects/test/<code>/<cid>/",
-        views.ProjectRecordsViewSet.as_view(
-            {"patch": "partial_update", "delete": "destroy"}
-        ),
-        name="data.projects.test.records.cid",
-        kwargs={"test": True},
-    ),
-    path(
-        "projects/<code>/",
+        "<code>/",
         views.ProjectRecordsViewSet.as_view({"post": "create", "get": "list"}),
-        name="data.projects.records",
+        name="data.project",
     ),
-    path(
-        "projects/<code>/query/",
-        views.QueryProjectRecordsView.as_view(),
-        name="data.projects.records.query",
-    ),
-    path(
-        "projects/<code>/<cid>/",
+    re_path(
+        r"^(?P<code>[A-z]*)/(?P<cid>[cC]-[A-z0-9]{10})/$",
         views.ProjectRecordsViewSet.as_view(
             {"get": "retrieve", "patch": "partial_update", "delete": "destroy"}
         ),
-        name="data.projects.records.cid",
+        name="data.project.cid",
+    ),
+    path(
+        "<code>/query/",
+        views.ProjectRecordsViewSet.as_view({"post": "query"}),
+        name="data.project.query",
+    ),
+    path(
+        "<code>/test/",
+        views.ProjectRecordsViewSet.as_view({"post": "create"}),
+        name="data.project.test",
+        kwargs={"test": True},
+    ),
+    re_path(
+        r"^(?P<code>[A-z]*)/test/(?P<cid>[cC]-[A-z0-9]{10})/$",
+        views.ProjectRecordsViewSet.as_view({"patch": "partial_update"}),
+        name="data.project.test.cid",
+        kwargs={"test": True},
     ),
 ]

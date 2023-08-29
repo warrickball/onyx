@@ -3,15 +3,20 @@ from rest_framework import status, exceptions
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
-
 from rest_framework.viewsets import ViewSetMixin
-from accounts.permissions import Approved, Admin, IsInProjectGroup, IsInScopeGroups
-from utils.projectfields import resolve_fields, view_fields
+from accounts.permissions import Approved, ProjectApproved, ProjectAdmin
 from .models import Project, Choice
 from .filters import OnyxFilter
 from .serializers import ModelSerializerMap, SerializerNode
 from .exceptions import CIDNotFound
-from .utils import mutable, parse_dunders, prefetch_nested, assign_field_types
+from .utils import (
+    mutable,
+    parse_dunders,
+    prefetch_nested,
+    assign_field_types,
+    resolve_fields,
+    view_fields,
+)
 from django_query_tools.server import (
     make_atoms,
     validate_atoms,
@@ -62,16 +67,25 @@ class ProjectAPIView(APIView):
 
 
 class ProjectsView(APIView):
-    pass  # TODO
+    def get_permissions(self):
+        permission_classes = Approved
 
+        return [permission() for permission in permission_classes]
 
-class ScopesView(ProjectAPIView):
-    pass  # TODO
+    def get(self, request):
+        """
+        List all projects.
+        """
+
+        return Response({"detail": "Endpoint under construction..."})
 
 
 class FieldsView(ProjectAPIView):
-    permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
-    action = "view"
+    def get_permissions(self):
+        permission_classes = ProjectApproved
+        self.action = "view"
+
+        return [permission() for permission in permission_classes]
 
     def get(self, request, code):
         """
@@ -82,7 +96,6 @@ class FieldsView(ProjectAPIView):
 
         self.fields = resolve_fields(
             project=self.project,
-            model=self.model,
             user=request.user,
             action=self.action,
             fields=parse_dunders(fields),
@@ -94,8 +107,11 @@ class FieldsView(ProjectAPIView):
 
 
 class ChoicesView(ProjectAPIView):
-    permission_classes = Approved + [IsInProjectGroup]
-    action = "view"
+    def get_permissions(self):
+        permission_classes = ProjectApproved
+        self.action = "view"
+
+        return [permission() for permission in permission_classes]
 
     def get(self, request, code, field):
         """
@@ -104,7 +120,6 @@ class ChoicesView(ProjectAPIView):
 
         self.fields = resolve_fields(
             project=self.project,
-            model=self.model,
             user=request.user,
             action=self.action,
             fields=[field],
@@ -124,154 +139,30 @@ class ChoicesView(ProjectAPIView):
         return Response(choices)
 
 
-def filter_query(self, request, code):
-    """
-    Handles the logic for both the `filter` and `query` endpoints.
-    """
-    # If method == GET, then parameters were provided in the query_params
-    # Convert these into the same format as the JSON provided when method == POST
-    if request.method == "GET":
-        query = [
-            {field: value}
-            for field in request.query_params
-            for value in request.query_params.getlist(field)
-        ]
-        if query:
-            query = {"&": query}
-    else:
-        query = request.data
-
-    # Prepare paginator
-    self.paginator = CursorPagination()
-    self.paginator.ordering = "created"
-
-    # If a query was provided
-    # Turn the value of each key-value pair in query into a 'QueryAtom' object
-    # A list of QueryAtoms is returned by make_atoms
-    if query:
-        try:
-            # The value is turned into a str for the filterset form.
-            # This is what the filterset is built to handle; it attempts to decode these strs and returns errors if it fails.
-            # If we don't turn these values into strs, the filterset can crash
-            # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
-            atoms = make_atoms(query, to_str=True)  #  type: ignore
-        except QueryException as e:
-            raise exceptions.ValidationError({"detail": e.args[0]})
-    else:
-        atoms = []
-
-    self.fields = resolve_fields(
-        project=self.project,
-        model=self.model,
-        user=request.user,
-        action=self.action,
-        fields=[x.key for x in atoms] + list(self.include) + list(self.exclude),
-    )
-
-    # Validate and clean the provided key-value pairs
-    # This is done by first building a FilterSet
-    # And then checking the underlying form is valid
-    try:
-        validate_atoms(
-            atoms,
-            filterset=OnyxFilter,
-            filterset_args=[self.fields],
-            filterset_model=self.model,
-        )
-    except FieldDoesNotExist as e:
-        raise exceptions.ValidationError({"unknown_fields": e.args[0]})
-    except ValidationError as e:
-        raise exceptions.ValidationError(e.args[0])
-
-    # View fields
-    fields = view_fields(
-        self.project.code,
-        scopes=self.scopes,
-        include=self.include,
-        exclude=self.exclude,
-    )
-
-    # Initial queryset
-    qs = self.model.objects.select_related()
-
-    # If the user is not a member of staff, ignore suppressed
-    if not request.user.is_staff:
-        qs = qs.filter(suppressed=False)
-
-    # If the suppressed field is not being viewed, ignore suppressed
-    if "suppressed" not in fields:
-        qs = qs.filter(suppressed=False)
-
-    # Prefetch any nested fields within scope
-    qs = prefetch_nested(qs, fields)
-
-    # If data was provided, then it has now been validated
-    # So we form the Q object, and filter the queryset with it
-    if query:
-        try:
-            q_object = make_query(query)  #  type: ignore
-        except QueryException as e:
-            raise exceptions.ValidationError({"detail": e.args[0]})
-
-        # A queryset is not guaranteed to return unique objects
-        # Especially as a result of complex nested queries
-        # So a call to distinct is necessary.
-        # This (should) not affect the cursor pagination
-        # as removing duplicates is not changing any order in the result set
-        # TODO: Tests will be needed to confirm all of this
-        qs = qs.filter(q_object).distinct()
-
-    # Add the pagination cursor param back into the request
-    if self.cursor:
-        with mutable(request.query_params) as query_params:
-            query_params[self.paginator.cursor_query_param] = self.cursor
-
-    # Paginate the response
-    instances = qs.order_by("id")
-    result_page = self.paginator.paginate_queryset(instances, request)
-
-    # Serialize the results
-    serializer = self.serializer_cls(
-        result_page,
-        many=True,
-        fields=fields,
-    )
-
-    # Return paginated response
-    return Response(serializer.data)
-
-
-class QueryProjectRecordsView(ProjectAPIView):
-    def get_permissions(self):
-        permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
-        self.action = "view"
-
-        return [permission() for permission in permission_classes]
-
-    def post(self, request, code):
-        """
-        Filter and return instances for the given project.
-        """
-        return filter_query(self, request, code)
-
-
 class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
     def get_permissions(self):
         if self.request.method == "POST":
-            permission_classes = Admin + [IsInProjectGroup]
-            self.action = "add"
+            if self.action == "query":
+                permission_classes = ProjectApproved
+                self.action = "view"
+            else:
+                permission_classes = ProjectAdmin
+                self.action = "add"
 
         elif self.request.method == "GET":
-            permission_classes = Approved + [IsInProjectGroup, IsInScopeGroups]
+            permission_classes = ProjectApproved
             self.action = "view"
 
         elif self.request.method == "PATCH":
-            permission_classes = Admin + [IsInProjectGroup]
+            permission_classes = ProjectAdmin
             self.action = "change"
 
-        else:
-            permission_classes = Admin + [IsInProjectGroup]
+        elif self.request.method == "DELETE":
+            permission_classes = ProjectAdmin
             self.action = "delete"
+
+        else:
+            raise exceptions.MethodNotAllowed(self.request.method)
 
         return [permission() for permission in permission_classes]
 
@@ -281,7 +172,6 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         """
         resolve_fields(
             project=self.project,
-            model=self.model,
             user=request.user,
             action=self.action,
             fields=parse_dunders(request.data),
@@ -313,7 +203,6 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         """
         resolve_fields(
             project=self.project,
-            model=self.model,
             user=request.user,
             action=self.action,
             fields=list(self.include) + list(self.exclude),
@@ -354,11 +243,132 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return response with data
         return Response(serializer.data)
 
+    def _query(self, request, code, query):
+        """
+        Handles the logic for both the `filter` and `query` endpoints.
+        """
+        # Prepare paginator
+        self.paginator = CursorPagination()
+        self.paginator.ordering = "created"
+
+        # If a query was provided
+        # Turn the value of each key-value pair in query into a 'QueryAtom' object
+        # A list of QueryAtoms is returned by make_atoms
+        if query:
+            try:
+                # The value is turned into a str for the filterset form.
+                # This is what the filterset is built to handle; it attempts to decode these strs and returns errors if it fails.
+                # If we don't turn these values into strs, the filterset can crash
+                # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
+                atoms = make_atoms(query, to_str=True)  #  type: ignore
+            except QueryException as e:
+                raise exceptions.ValidationError({"detail": e.args[0]})
+        else:
+            atoms = []
+
+        self.fields = resolve_fields(
+            project=self.project,
+            user=request.user,
+            action=self.action,
+            fields=[x.key for x in atoms] + list(self.include) + list(self.exclude),
+        )
+
+        # Validate and clean the provided key-value pairs
+        # This is done by first building a FilterSet
+        # And then checking the underlying form is valid
+        try:
+            validate_atoms(
+                atoms,
+                filterset=OnyxFilter,
+                filterset_args=[self.fields],
+                filterset_model=self.model,
+            )
+        except FieldDoesNotExist as e:
+            raise exceptions.ValidationError({"unknown_fields": e.args[0]})
+        except ValidationError as e:
+            raise exceptions.ValidationError(e.args[0])
+
+        # View fields
+        fields = view_fields(
+            self.project.code,
+            scopes=self.scopes,
+            include=self.include,
+            exclude=self.exclude,
+        )
+
+        # Initial queryset
+        qs = self.model.objects.select_related()
+
+        # If the user is not a member of staff, ignore suppressed
+        if not request.user.is_staff:
+            qs = qs.filter(suppressed=False)
+
+        # If the suppressed field is not being viewed, ignore suppressed
+        if "suppressed" not in fields:
+            qs = qs.filter(suppressed=False)
+
+        # Prefetch any nested fields within scope
+        qs = prefetch_nested(qs, fields)
+
+        # If data was provided, then it has now been validated
+        # So we form the Q object, and filter the queryset with it
+        if query:
+            try:
+                q_object = make_query(query)  #  type: ignore
+            except QueryException as e:
+                raise exceptions.ValidationError({"detail": e.args[0]})
+
+            # A queryset is not guaranteed to return unique objects
+            # Especially as a result of complex nested queries
+            # So a call to distinct is necessary.
+            # This (should) not affect the cursor pagination
+            # as removing duplicates is not changing any order in the result set
+            # TODO: Tests will be needed to confirm all of this
+            qs = qs.filter(q_object).distinct()
+
+        # Add the pagination cursor param back into the request
+        if self.cursor:
+            with mutable(request.query_params) as query_params:
+                query_params[self.paginator.cursor_query_param] = self.cursor
+
+        # Paginate the response
+        instances = qs.order_by("id")
+        result_page = self.paginator.paginate_queryset(instances, request)
+
+        # Serialize the results
+        serializer = self.serializer_cls(
+            result_page,
+            many=True,
+            fields=fields,
+        )
+
+        # Return paginated response
+        return Response(serializer.data)
+
     def list(self, request, code):
         """
         Filter and return instances for the given project.
         """
-        return filter_query(self, request, code)
+
+        # Parameters were provided in the query_params
+        # Convert these into the same format as the JSON provided on the query method
+        query = [
+            {field: value}
+            for field in request.query_params
+            for value in request.query_params.getlist(field)
+        ]
+        if query:
+            query = {"&": query}
+
+        return self._query(request, code, query)
+
+    def query(self, request, code):
+        """
+        Filter and return instances for the given project.
+        """
+
+        # Request body contains the JSON query
+        return self._query(request, code, request.data)
 
     def partial_update(self, request, code, cid, test=False):
         """
@@ -368,7 +378,6 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # TODO: separate identifiers into 'add' permission
         resolve_fields(
             project=self.project,
-            model=self.model,
             user=request.user,
             action=self.action,
             fields=parse_dunders(request.data),
@@ -405,7 +414,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return response indicating update
         return Response({"cid": cid})
 
-    def destroy(self, request, code, cid, test=False):
+    def destroy(self, request, code, cid):
         """
         Permanently delete an instance of the given project.
         """
@@ -424,8 +433,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             raise CIDNotFound
 
         # Delete the instance
-        if not test:
-            instance.delete()
+        instance.delete()
 
         # Return response indicating deletion
         return Response({"cid": cid})
