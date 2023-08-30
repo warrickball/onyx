@@ -184,7 +184,7 @@ def resolve_fields(project, user, action, fields):
                 current_model = component_instance.related_model
 
                 model_fields = {
-                    x.name: x for x in current_model._meta.get_fields()  #  type: ignore
+                    x.name: x for x in current_model._meta.get_fields()  # type: ignore
                 }
                 continue
 
@@ -207,7 +207,7 @@ def resolve_fields(project, user, action, fields):
                 current_model = component_instance.related_model
 
                 model_fields = {
-                    x.name: x for x in current_model._meta.get_fields()  #  type: ignore
+                    x.name: x for x in current_model._meta.get_fields()  # type: ignore
                 }
                 continue
 

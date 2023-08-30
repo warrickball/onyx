@@ -186,7 +186,7 @@ class SerializerNode:
                     {"detail": f"IntegrityError: {e.__cause__}"}
                 )
             else:
-                raise e.__cause__  #  type: ignore
+                raise e.__cause__  # type: ignore
 
         return instance
 

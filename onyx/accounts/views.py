@@ -105,7 +105,7 @@ class SiteWaitingView(ListAPIView):
 
     def get_queryset(self):
         # Admins can view users from any site
-        if self.request.user.is_staff:  #  type: ignore
+        if self.request.user.is_staff:  # type: ignore
             return (
                 User.objects.filter(is_active=True)
                 .filter(is_site_approved=False)

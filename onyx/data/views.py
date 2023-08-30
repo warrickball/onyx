@@ -260,7 +260,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
                 # This is what the filterset is built to handle; it attempts to decode these strs and returns errors if it fails.
                 # If we don't turn these values into strs, the filterset can crash
                 # e.g. If you pass a list, it assumes it is as a str, and tries to split by a comma
-                atoms = make_atoms(query, to_str=True)  #  type: ignore
+                atoms = make_atoms(query, to_str=True)  # type: ignore
             except QueryException as e:
                 raise exceptions.ValidationError({"detail": e.args[0]})
         else:
@@ -314,7 +314,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # So we form the Q object, and filter the queryset with it
         if query:
             try:
-                q_object = make_query(query)  #  type: ignore
+                q_object = make_query(query)  # type: ignore
             except QueryException as e:
                 raise exceptions.ValidationError({"detail": e.args[0]})
 

@@ -18,7 +18,7 @@ def create_user(
         print(f"User with email '{email}' already exists.")
         exit()
 
-    user = User.objects.create_user(  #  type: ignore
+    user = User.objects.create_user(  # type: ignore
         username=username,
         email=email,
         password=password,
