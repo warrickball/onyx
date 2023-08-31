@@ -8,41 +8,41 @@ urlpatterns = [
         views.ProjectsView.as_view(),
         name="data.project.list",
     ),
-    path(
-        "<code>/fields/",
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/fields/$",
         views.FieldsView.as_view(),
         name="data.project.fields",
     ),
-    path(
-        "<code>/choices/<field>/",
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/choices/(?P<field>[a-zA-Z_]*)/$",
         views.ChoicesView.as_view(),
         name="data.project.choices",
     ),
-    path(
-        "<code>/",
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/$",
         views.ProjectRecordsViewSet.as_view({"post": "create", "get": "list"}),
         name="data.project",
     ),
     re_path(
-        r"^(?P<code>[A-z]*)/(?P<cid>[cC]-[A-z0-9]{10})/$",
+        r"^(?P<code>[a-zA-Z_]*)/(?P<cid>[cC]-[a-zA-Z0-9]{10})/$",
         views.ProjectRecordsViewSet.as_view(
             {"get": "retrieve", "patch": "partial_update", "delete": "destroy"}
         ),
         name="data.project.cid",
     ),
-    path(
-        "<code>/query/",
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/query/$",
         views.ProjectRecordsViewSet.as_view({"post": "query"}),
         name="data.project.query",
     ),
-    path(
-        "<code>/test/",
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/test/$",
         views.ProjectRecordsViewSet.as_view({"post": "create"}),
         name="data.project.test",
         kwargs={"test": True},
     ),
     re_path(
-        r"^(?P<code>[A-z]*)/test/(?P<cid>[cC]-[A-z0-9]{10})/$",
+        r"^(?P<code>[a-zA-Z_]*)/test/(?P<cid>[cC]-[a-zA-Z0-9]{10})/$",
         views.ProjectRecordsViewSet.as_view({"patch": "partial_update"}),
         name="data.project.test.cid",
         kwargs={"test": True},
