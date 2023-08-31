@@ -169,7 +169,7 @@ class AdminUserProjectsView(APIView):
     permission_classes = Admin
 
     def post(self, request, username):
-        # Get user to be approved
+        # Get user
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
@@ -180,12 +180,15 @@ class AdminUserProjectsView(APIView):
                 {"detail": f"Expected a list but received type: {type(request.data)}"}
             )
 
-        # TODO: Currently doesn't deal with granting/revoking non-base view groups
-        existing_groups = user.groups.filter(
-            projectgroup__action="view", projectgroup__scope="base"
-        )
+        # Remove any project groups with a code not in the request data
+        removed = []
+        for group in user.groups.filter(projectgroup__isnull=False):
+            if group.projectgroup.project.code not in request.data:  # type: ignore
+                user.groups.remove(group)
+                removed.append(group.name)
 
-        groups = []
+        # Add the base view group for any new project groups
+        added = []
         for project in request.data:
             try:
                 group = Group.objects.get(
@@ -195,18 +198,9 @@ class AdminUserProjectsView(APIView):
                 )
             except Group.DoesNotExist:
                 raise ProjectNotFound
-            groups.append(group)
-
-        removed = []
-        for group in existing_groups:
-            if group not in groups:
-                user.groups.remove(group)
-                removed.append(group.name)
-
-        added = []
-        for group in groups:
-            user.groups.add(group)
-            added.append(group.name)
+            if group not in user.groups.all():
+                user.groups.add(group)
+                added.append(group.name)
 
         return Response(
             {
@@ -218,6 +212,10 @@ class AdminUserProjectsView(APIView):
 
 
 class CreateProjectUserView(APIView):
+    """
+    Create a user with permission to view a specific project.
+    """
+
     permission_classes = Admin
 
     def post(self, request, code, username):
