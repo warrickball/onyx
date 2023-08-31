@@ -1,7 +1,7 @@
 from django.core.management import base
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from ...models import Project
+from ...models import Project, ProjectGroup
 import json
 
 
@@ -34,47 +34,40 @@ class Command(base.BaseCommand):
 
                 # Create / update each group for the project
                 groups = {}
-                for action, fields in project_info.get("groups").items():
-                    name = f"{action}.project.{project_code}"
-                    group, g_created = Group.objects.get_or_create(name=name)
-                    permissions = []
+                for action, scopes in project_info.get("groups").items():
+                    for scope, fields in scopes.items():
+                        name = f"{project_code}.{action}.{scope}"
+                        group, g_created = Group.objects.get_or_create(name=name)
+                        permissions = []
 
-                    for field in fields:
-                        codename = f"{action}_{project_code}__{field}"
-                        permission, p_created = Permission.objects.get_or_create(
-                            content_type=content_type,
-                            codename=codename,
-                            name=f"Can {action} {project_code}{' ' + field if field else ''}",
-                        )
-                        if p_created:
-                            self.print("Created permission:", permission)
+                        for field in fields:
+                            codename = f"{action}_{project_code}__{field}"
+                            permission, p_created = Permission.objects.get_or_create(
+                                content_type=content_type,
+                                codename=codename,
+                                name=f"Can {action} {project_code}{' ' + field if field else ''}",
+                            )
+                            if p_created:
+                                self.print("Created permission:", permission)
 
-                        permissions.append(permission)
+                            permissions.append(permission)
 
-                    group.permissions.set(permissions)
+                        group.permissions.set(permissions)
 
-                    if g_created:
-                        self.print(f"Created group: {name}")
-                    else:
-                        self.print(f"Updated group: {name}")
+                        if g_created:
+                            self.print(f"Created group: {name}")
+                        else:
+                            self.print(f"Updated group: {name}")
 
-                    self.print("Permissions:")
-                    for perm in group.permissions.all():
-                        self.print(f"\t{perm}")
-                    self.print("")
+                        self.print("Permissions:")
+                        for perm in group.permissions.all():
+                            self.print(f"\t{perm}")
+                        self.print("")
 
-                    groups[action] = group
+                        groups[(action, scope)] = group
 
                 project, p_created = Project.objects.update_or_create(
-                    code=project_code,
-                    defaults={
-                        "content_type": content_type,
-                        "add_group": groups["add"],
-                        "view_group": groups["view"],
-                        "change_group": groups["change"],
-                        "suppress_group": groups["suppress"],
-                        "delete_group": groups["delete"],
-                    },
+                    code=project_code, defaults={"content_type": content_type}
                 )
 
                 if p_created:
@@ -83,3 +76,17 @@ class Command(base.BaseCommand):
                     self.print(f"Updated project: {project.code}")
 
                 self.print("\tmodel:", project.content_type.model_class())
+
+                for (action, scope), group in groups.items():
+                    projectgroup, pg_created = ProjectGroup.objects.update_or_create(
+                        group=group,
+                        defaults={"project": project, "action": action, "scope": scope},
+                    )
+                    if pg_created:
+                        self.print(
+                            f"Created project group: {project.code} | {projectgroup.action} | {projectgroup.scope}"
+                        )
+                    else:
+                        self.print(
+                            f"Updated project group: {project.code} | {projectgroup.action} | {projectgroup.scope}"
+                        )

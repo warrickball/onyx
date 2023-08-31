@@ -14,6 +14,7 @@ from .serializers import (
     AdminWaitingSerializer,
 )
 from .permissions import Any, Approved, SiteAuthority, Admin
+from .exceptions import ProjectNotFound, UserNotFound
 
 
 class LoginView(KnoxLoginView):
@@ -52,7 +53,7 @@ class SiteApproveView(APIView):
                     username=username
                 )
         except User.DoesNotExist:
-            raise exceptions.NotFound({"detail": "User not found."})
+            raise UserNotFound
 
         # Approve user
         user.is_site_approved = True
@@ -79,7 +80,7 @@ class AdminApproveView(APIView):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise exceptions.NotFound({"detail": "User not found."})
+            raise UserNotFound
 
         # Approve user
         user.is_admin_approved = True
@@ -104,7 +105,7 @@ class SiteWaitingView(ListAPIView):
 
     def get_queryset(self):
         # Admins can view users from any site
-        if self.request.user.is_staff:  #  type: ignore
+        if self.request.user.is_staff:  # type: ignore
             return (
                 User.objects.filter(is_active=True)
                 .filter(is_site_approved=False)
@@ -168,37 +169,38 @@ class AdminUserProjectsView(APIView):
     permission_classes = Admin
 
     def post(self, request, username):
-        # Get user to be approved
+        # Get user
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise exceptions.NotFound({"detail": "User not found."})
+            raise UserNotFound
 
         if not isinstance(request.data, list):
             raise exceptions.ValidationError(
                 {"detail": f"Expected a list but received type: {type(request.data)}"}
             )
 
-        existing_groups = user.groups.filter(name__startswith="view.project.")
-
-        groups = []
-        for project in request.data:
-            try:
-                group = Group.objects.get(name=f"view.project.{project}")
-            except Group.DoesNotExist:
-                raise exceptions.NotFound({"detail": "Project not found."})
-            groups.append(group)
-
+        # Remove any project groups with a code not in the request data
         removed = []
-        for group in existing_groups:
-            if group not in groups:
+        for group in user.groups.filter(projectgroup__isnull=False):
+            if group.projectgroup.project.code not in request.data:  # type: ignore
                 user.groups.remove(group)
                 removed.append(group.name)
 
+        # Add the base view group for any new project groups
         added = []
-        for group in groups:
-            user.groups.add(group)
-            added.append(group.name)
+        for project in request.data:
+            try:
+                group = Group.objects.get(
+                    projectgroup__project__code=project,
+                    projectgroup__action="view",
+                    projectgroup__scope="base",
+                )
+            except Group.DoesNotExist:
+                raise ProjectNotFound
+            if group not in user.groups.all():
+                user.groups.add(group)
+                added.append(group.name)
 
         return Response(
             {
@@ -210,6 +212,10 @@ class AdminUserProjectsView(APIView):
 
 
 class CreateProjectUserView(APIView):
+    """
+    Create a user with permission to view a specific project.
+    """
+
     permission_classes = Admin
 
     def post(self, request, code, username):

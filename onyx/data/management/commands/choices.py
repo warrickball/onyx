@@ -3,6 +3,7 @@ from ...models import Choice
 import json
 
 
+# TODO: Issue with reactivate/deactivate choices if you provide them in uppercase in the json
 class Command(base.BaseCommand):
     help = "Set choice groups in the database."
 

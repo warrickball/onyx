@@ -1,8 +1,12 @@
 # `onyx`
 
+API for storing pathogen metadata. 
+
+### Server control
 Start the server:
 ```
-$ gunicorn -c onyx/onyx.gunicorn.py
+$ cd onyx/
+$ gunicorn -c onyx.gunicorn.py
 ```
 
 Stop the server:
@@ -10,13 +14,20 @@ Stop the server:
 $ pkill -f onyx.gunicorn.py
 ```
 
-View server access/error logs:
+### Viewing logs
+View access logs:
 ```
 $ tail -f logs/access.log
+```
+
+View error logs:
+```
 $ tail -f logs/error.log
 ```
 
-Run the tests:
+### Running tests
+To run the tests:
 ```
+$ cd onyx/
 $ python manage.py test -v 2
 ```

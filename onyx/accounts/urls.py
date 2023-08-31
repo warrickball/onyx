@@ -14,4 +14,5 @@ urlpatterns = [
     path("admin/waiting/", views.AdminWaitingView.as_view()),
     path("admin/users/", views.AdminUsersView.as_view()),
     path("admin/projects/<username>/", views.AdminUserProjectsView.as_view()),
+    path("admin/projectuser/<code>/<username>/", views.CreateProjectUserView.as_view()),
 ]
