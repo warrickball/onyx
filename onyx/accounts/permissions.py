@@ -26,6 +26,7 @@ class IsAdminUser(permissions.IsAdminUser):
     message = "You need to be an admin."
 
 
+# TODO: Checks for restricting users with no site? This is all temporary
 class IsActiveSite(permissions.BasePermission):
     """
     Allows access only to users who are still in an active site.
@@ -34,7 +35,9 @@ class IsActiveSite(permissions.BasePermission):
     message = "Your site needs to be activated."
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.site.is_active)
+        return bool(
+            request.user and (not request.user.site or request.user.site.is_active)
+        )
 
 
 class IsActiveUser(permissions.BasePermission):
@@ -96,7 +99,9 @@ class IsSameSiteAsObject(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return bool(
-            request.user and (request.user.site == obj.site or request.user.is_staff)
+            request.user
+            and request.user.site
+            and (request.user.site == obj.site or request.user.is_staff)
         )
 
 
@@ -143,7 +148,9 @@ class IsProjectApproved(permissions.BasePermission):
 # Useful permissions groupings
 Any = [AllowAny]
 Active = [IsAuthenticated, IsActiveSite, IsActiveUser]
-Approved = Active + [IsSiteApproved, IsAdminApproved]
+Approved = (
+    Active  #  + [IsSiteApproved, IsAdminApproved] # TODO: Remove this approval stuff
+)
 Admin = Approved + [IsAdminUser]
 
 SiteAuthority = Approved + [IsSiteAuthority]
