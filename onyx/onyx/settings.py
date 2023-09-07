@@ -148,7 +148,12 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.BasicAuthentication",
         "knox.auth.TokenAuthentication",
     ],
-    "DEFAULT_RENDERER_CLASSES": ("internal.renderers.OnyxJSONRenderer",),
+    "DEFAULT_PERMISSION_CLASSES": [
+        "accounts.permissions.IsAdminUser",
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "internal.renderers.OnyxJSONRenderer",
+    ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "DEFAULT_PAGINATION_CLASS": None,
     "PAGE_SIZE": 1000,
