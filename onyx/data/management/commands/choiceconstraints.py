@@ -3,6 +3,9 @@ from ...models import Choice
 import json
 
 
+# TODO: Case insensitivity in handling
+
+
 class Command(base.BaseCommand):
     help = "Set choice constraints in the database."
 
