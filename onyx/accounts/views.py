@@ -13,7 +13,7 @@ from .serializers import (
     SiteWaitingSerializer,
     AdminWaitingSerializer,
 )
-from .permissions import Any, Approved, SiteAuthority, Admin
+from .permissions import Any, Active, Approved, SiteAuthority, Admin
 from .exceptions import ProjectNotFound, UserNotFound
 
 
@@ -23,6 +23,7 @@ class LoginView(KnoxLoginView):
     """
 
     authentication_classes = [BasicAuthentication]
+    permission_classes = Active
 
 
 class CreateUserView(CreateAPIView):
@@ -161,7 +162,8 @@ class AdminUsersView(ListAPIView):
         return User.objects.order_by("-date_joined")
 
 
-class AdminUserProjectsView(APIView):
+# TODO: Filter ProjectGroups code with iexact?
+class ControlProjectGroupsView(APIView):
     """
     Set projects that can be viewed by a user.
     """
@@ -211,12 +213,29 @@ class AdminUserProjectsView(APIView):
         )
 
 
-class CreateProjectUserView(APIView):
+class ControlProjectUserView(KnoxLoginView):
     """
-    Create a user with permission to view a specific project.
+    Create/get a user with permission to view a specific project.
     """
 
     permission_classes = Admin
 
-    def post(self, request, code, username):
-        pass
+    def post(self, request, *args, **kwargs):
+        raise exceptions.MethodNotAllowed(self.request.method)
+
+    def get(self, request, code, username):
+        user, created = User.objects.get_or_create(username=username)
+
+        if created:
+            user.set_unusable_password()
+            user.save()
+
+        view_group = Group.objects.get(
+            projectgroup__project__code=code,
+            projectgroup__action="view",
+            projectgroup__scope="base",
+        )
+        user.groups.add(view_group)
+
+        request.user = user
+        return super().post(request)

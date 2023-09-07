@@ -4,6 +4,11 @@ import json
 
 
 # TODO: Issue with reactivate/deactivate choices if you provide them in uppercase in the json
+# Upgrade Choices management command to DELETE inactive choices if a new one comes in with the same characters but a different case
+# E.g. if a new choice Swab comes in, DELETE the old choice swab
+# TL:DR we need case insensitivity in handling
+
+
 class Command(base.BaseCommand):
     help = "Set choice groups in the database."
 

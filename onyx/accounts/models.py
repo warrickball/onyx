@@ -11,6 +11,7 @@ class Site(models.Model):
     is_active = models.BooleanField(default=True)
 
 
+# TODO: What to do about user email? Should it be optional?
 class User(AbstractUser):
     username = LowerCharField(
         _("username"),
@@ -32,8 +33,9 @@ class User(AbstractUser):
         error_messages={
             "unique": _("A user with that email already exists."),
         },
+        blank=True,
     )
-    site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
+    site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE, null=True)
     is_site_approved = models.BooleanField(default=False)
     is_admin_approved = models.BooleanField(default=False)
     is_site_authority = models.BooleanField(default=False)

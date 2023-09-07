@@ -7,7 +7,7 @@ def custom_page_not_found_view(request, exception):
         content=json.dumps(
             {
                 "status": "fail",
-                "messages": {"detail": "Endpoint not found."},
+                "messages": {"detail": "Not found."},
             }
         ),
         content_type="application/json",
@@ -21,7 +21,7 @@ def custom_error_view(request, exception=None):
             {
                 "status": "error",
                 "messages": {
-                    "detail": "Internal server error. If this error persists please contact an admin."
+                    "detail": "Internal server error. Please contact an admin."
                 },
             }
         ),

@@ -62,7 +62,19 @@ class ChoiceFieldForm(forms.ChoiceField):
     }
 
     def clean(self, value):
-        return super().clean(value.lower())
+        self.choice_map = {choice.lower().strip(): choice for choice, _ in self.choices}
+
+        if isinstance(value, str):
+            value = value.lower().strip()
+
+            if value in self.choice_map:
+                value = self.choice_map[value]
+
+        import logging
+
+        logging.debug(value)
+        logging.debug(self.choices)
+        return super().clean(value)
 
 
 class ChoiceFilter(filters.Filter):
@@ -172,7 +184,7 @@ RELATIONS = [
 ]
 
 # Accepted strings for True and False when validating BooleanField
-BOOLEAN_CHOICES = [(x, x) for x in ["true", "True", "false", "False"]]
+BOOLEAN_CHOICES = [(x, x) for x in ["true", "True", "TRUE", "false", "False", "FALSE"]]
 
 # Mappings from field type + lookup to filter
 FILTERS = {

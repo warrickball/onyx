@@ -91,7 +91,7 @@ class LowerCharField(StrippedCharField):
         return super().to_python(value)
 
 
-class ChoiceField(LowerCharField):
+class ChoiceField(models.TextField):
     pass
 
 
@@ -108,6 +108,10 @@ class UpperCharField(StrippedCharField):
 
 
 class HashField(StrippedCharField):
+    def __init__(self, *args, **kwargs):
+        kwargs["max_length"] = 256
+        super().__init__(*args, **kwargs)
+
     def to_python(self, value):
         if value is None:
             return value
