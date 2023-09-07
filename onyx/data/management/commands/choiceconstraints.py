@@ -26,12 +26,12 @@ class Command(base.BaseCommand):
             with open(options["scheme"]) as scheme:
                 data = json.load(scheme)
 
-                # Empty constraints
-                for choice in Choice.objects.all():
-                    choice.constraints.clear()
-
                 # For each project, set constraints for each choice
                 for project, fields in data.items():
+                    # Empty constraints for that project
+                    for choice in Choice.objects.filter(project_id=project):
+                        choice.constraints.clear()
+
                     for field, choices in fields.items():
                         for choice, constraint_fields in choices.items():
                             choice_instance = Choice.objects.get(
