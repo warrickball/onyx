@@ -86,6 +86,12 @@ class ChoiceField(serializers.ChoiceField):
                 flat=True,
             )
         )
+        self.choice_map = {choice.lower().strip(): choice for choice in self.choices}
+
         if isinstance(data, str):
-            data = data.lower()
+            data = data.lower().strip()
+
+            if data in self.choice_map:
+                data = self.choice_map[data]
+
         return super().to_internal_value(data)
