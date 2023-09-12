@@ -56,12 +56,12 @@ good_choices = [
     ("nW", "nw"),
     ("Nw", "nw"),
     ("NW", "nw"),
+    (" nw", "nw"),
+    (" ", ""),  # blank is allowed
 ]
 
 bad_choices = [
     "nws",
-    "  nw",
-    " ",
 ]
 
 good_bools = [
