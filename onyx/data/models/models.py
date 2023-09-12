@@ -128,6 +128,7 @@ class ProjectRecord(BaseRecord):
     cid = UpperCharField(max_length=12, unique=True)
     published_date = models.DateField(auto_now_add=True)
     suppressed = models.BooleanField(default=False)
+    site_restricted = models.BooleanField(default=False)
 
     class Meta:
         default_permissions = []

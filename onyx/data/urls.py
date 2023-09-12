@@ -32,7 +32,7 @@ urlpatterns = [
     ),
     re_path(
         r"^projects/(?P<code>[a-zA-Z_]*)/query/$",
-        views.ProjectRecordsViewSet.as_view({"post": "query"}),
+        views.ProjectRecordsViewSet.as_view({"post": "list"}),
         name="data.project.query",
     ),
     re_path(

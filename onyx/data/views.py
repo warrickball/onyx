@@ -1,4 +1,5 @@
 from django.core.exceptions import FieldDoesNotExist, ValidationError
+from django.db.models import Q
 from rest_framework import status, exceptions
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
@@ -91,6 +92,7 @@ class FieldsView(ProjectAPIView):
         """
         List all fields for a given project.
         """
+
         fields = view_fields(code, scopes=self.scopes)
         fields.pop("site")  # TODO: sort it
 
@@ -142,7 +144,7 @@ class ChoicesView(ProjectAPIView):
 class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
     def get_permissions(self):
         if self.request.method == "POST":
-            if self.action == "query":
+            if self.action == "list":
                 permission_classes = ProjectApproved
                 self.action = "view"
             else:
@@ -168,8 +170,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
 
     def create(self, request, code, test=False):
         """
-        Create an instance for the given project.
+        Create an instance for the given project `code`.
         """
+
         resolve_fields(
             project=self.project,
             user=request.user,
@@ -199,8 +202,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
 
     def retrieve(self, request, code, cid):
         """
-        Get an instance for the given project.
+        Use the `cid` to retrieve an instance for the given project `code`.
         """
+
         resolve_fields(
             project=self.project,
             user=request.user,
@@ -219,12 +223,16 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Initial queryset
         qs = self.model.objects.select_related()
 
-        # If the user is not a member of staff, ignore suppressed
+        # If the user is not a member of staff:
+        # - Ignore suppressed data
+        # - Ignore site_restricted objects from other sites
         if not request.user.is_staff:
-            qs = qs.filter(suppressed=False)
-
-        # If the suppressed field is not being viewed, ignore suppressed
-        if "suppressed" not in fields:
+            qs = qs.filter(suppressed=False).exclude(
+                Q(site_restricted=True) & ~Q(user__site=request.user.site)
+            )
+        elif "suppressed" not in fields:
+            # Regardless of whether the user is staff or not,
+            # if the suppressed field is not being viewed, ignore it
             qs = qs.filter(suppressed=False)
 
         # Get the instance
@@ -243,10 +251,24 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return response with data
         return Response(serializer.data)
 
-    def _query(self, request, code, query):
+    def list(self, request, code):
         """
-        Handles the logic for both the `filter` and `query` endpoints.
+        Filter and list instances for the given project `code`.
         """
+
+        # If method == GET, then parameters were provided in the query_params
+        # Convert these into the same format as the JSON provided when method == POST
+        if request.method == "GET":
+            query = [
+                {field: value}
+                for field in request.query_params
+                for value in request.query_params.getlist(field)
+            ]
+            if query:
+                query = {"&": query}
+        else:
+            query = request.data
+
         # Prepare paginator
         self.paginator = CursorPagination()
         self.paginator.ordering = "created"
@@ -299,12 +321,16 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Initial queryset
         qs = self.model.objects.select_related()
 
-        # If the user is not a member of staff, ignore suppressed
+        # If the user is not a member of staff:
+        # - Ignore suppressed objects
+        # - Ignore site_restricted objects from other sites
         if not request.user.is_staff:
-            qs = qs.filter(suppressed=False)
-
-        # If the suppressed field is not being viewed, ignore suppressed
-        if "suppressed" not in fields:
+            qs = qs.filter(suppressed=False).exclude(
+                Q(site_restricted=True) & ~Q(user__site=request.user.site)
+            )
+        elif "suppressed" not in fields:
+            # Regardless of whether the user is staff or not,
+            # if the suppressed field is not being viewed, ignore it
             qs = qs.filter(suppressed=False)
 
         # Prefetch any nested fields within scope
@@ -345,34 +371,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return paginated response
         return Response(serializer.data)
 
-    def list(self, request, code):
-        """
-        Filter and return instances for the given project.
-        """
-
-        # Parameters were provided in the query_params
-        # Convert these into the same format as the JSON provided on the query method
-        query = [
-            {field: value}
-            for field in request.query_params
-            for value in request.query_params.getlist(field)
-        ]
-        if query:
-            query = {"&": query}
-
-        return self._query(request, code, query)
-
-    def query(self, request, code):
-        """
-        Filter and return instances for the given project.
-        """
-
-        # Request body contains the JSON query
-        return self._query(request, code, request.data)
-
     def partial_update(self, request, code, cid, test=False):
         """
-        Update an instance for the given project.
+        Use the `cid` to update an instance for the given project `code`.
         """
 
         # TODO: separate identifiers into 'add' permission
@@ -416,7 +417,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
 
     def destroy(self, request, code, cid):
         """
-        Permanently delete an instance of the given project.
+        Use the `cid` to permanently delete an instance of the given project `code`.
         """
         # Initial queryset
         qs = self.model.objects.select_related()
