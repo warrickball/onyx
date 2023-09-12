@@ -1,3 +1,4 @@
+import hashlib
 from django import forms
 from django.db import models
 from django.db.models import ForeignKey, ManyToOneRel
@@ -70,10 +71,6 @@ class ChoiceFieldForm(forms.ChoiceField):
             if value in self.choice_map:
                 value = self.choice_map[value]
 
-        import logging
-
-        logging.debug(value)
-        logging.debug(self.choices)
         return super().clean(value)
 
 
@@ -83,6 +80,24 @@ class ChoiceFilter(filters.Filter):
 
 class ChoiceInFilter(filters.BaseInFilter, ChoiceFilter):
     pass
+
+
+class HashFieldForm(forms.CharField):
+    def clean(self, value):
+        hasher = hashlib.sha256()
+
+        hasher.update(value.strip().lower().encode("utf-8"))
+        value = hasher.hexdigest()
+
+        return super().clean(value)
+
+
+class HashFieldFilter(filters.Filter):
+    field_class = HashFieldForm
+
+
+# TODO: Could do the same for YearMonth here, and remove Yearmonth conversion from the field?
+# Idk if thats a good idea
 
 
 # Lookups shared by all fields
@@ -156,10 +171,10 @@ ALL_LOOKUPS = set(
 
 # Text field types
 TEXT_FIELDS = [
+    HashField,
     models.CharField,
     models.TextField,
     StrippedCharField,
-    HashField,
     LowerCharField,
     UpperCharField,
 ]
@@ -228,16 +243,25 @@ def get_filter(
     field_name,
     lookup,
 ):
+    # Text (hash)
+    if field_type == HashField:
+        if not lookup:
+            return f"{field_path}", HashFieldFilter(
+                field_name=field_path,
+            )
+
+        elif lookup in HASH_LOOKUPS:
+            return f"{field_path}__{lookup}", HashFieldFilter(
+                field_name=field_path,
+                lookup_expr=lookup,
+            )
+
     # Text
-    if field_type in TEXT_FIELDS:
+    elif field_type in TEXT_FIELDS:
         if not lookup:
             return f"{field_path}", filters.CharFilter(
                 field_name=field_path,
             )
-        elif field_type == HashField and lookup not in HASH_LOOKUPS:
-            # Hash fields have a more restricted set of lookups
-            # So if the lookup doesn't match this set, we pass
-            pass
         elif lookup in BASE_LOOKUPS or lookup in TEXT_LOOKUPS:
             filter = FILTERS.get(("text", lookup), filters.CharFilter)
             return f"{field_path}__{lookup}", filter(

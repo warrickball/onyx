@@ -1,4 +1,3 @@
-import hashlib
 from datetime import date, datetime
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -8,6 +7,7 @@ from django.utils import timezone
 from django.conf import settings
 
 
+# TODO: This might be largely redundant
 class YearMonthField(models.DateField):
     """
     Minimal override of DateField to support YYYY-MM format.
@@ -91,10 +91,6 @@ class LowerCharField(StrippedCharField):
         return super().to_python(value)
 
 
-class ChoiceField(models.TextField):
-    pass
-
-
 class UpperCharField(StrippedCharField):
     def to_python(self, value):
         if value is None:
@@ -107,19 +103,9 @@ class UpperCharField(StrippedCharField):
         return super().to_python(value)
 
 
-class HashField(StrippedCharField):
-    def __init__(self, *args, **kwargs):
-        kwargs["max_length"] = 256
-        super().__init__(*args, **kwargs)
+class ChoiceField(models.TextField):
+    pass
 
-    def to_python(self, value):
-        if value is None:
-            return value
 
-        if not isinstance(value, str):
-            value = str(value)
-
-        hasher = hashlib.sha256()
-        hasher.update(value.encode("utf-8"))
-        value = hasher.hexdigest()
-        return super().to_python(value)
+class HashField(models.TextField):
+    pass
