@@ -2,8 +2,8 @@ from contextlib import contextmanager
 from django.db import models
 from django.contrib.auth.models import Group
 from rest_framework import exceptions
-from utils.fields import ChoiceField, YearMonthField, ModelChoiceField
-from .filters import TEXT_FIELDS, ALL_LOOKUPS
+from utils.fields import YearMonthField, ModelChoiceField, ChoiceField, HashField
+from .filters import TEXT_FIELDS, DATE_FIELDS, ALL_LOOKUPS
 
 
 @contextmanager
@@ -92,16 +92,25 @@ def assign_field_types(fields, field_types, prefix=None):
             assign_field_types(nested, field_types, prefix=field_path)
         else:
             field_type = field_types[field_path].field_type
-            if field_type in TEXT_FIELDS:
+
+            if field_type == HashField:
+                fields[field] = "text (hashed)"
+
+            elif field_type in TEXT_FIELDS:
                 fields[field] = "text"
+
             elif field_type == ChoiceField:
                 fields[field] = "choice"
+
             elif field_type in [models.IntegerField, models.FloatField]:
                 fields[field] = "number"
-            elif field_type in [models.DateField, models.DateTimeField]:
-                fields[field] = "date (YYYY-MM-DD)"
+
             elif field_type == YearMonthField:
                 fields[field] = "date (YYYY-MM)"
+
+            elif field_type in DATE_FIELDS:
+                fields[field] = "date (YYYY-MM-DD)"
+
             elif field_type == models.BooleanField:
                 fields[field] = "bool"
 

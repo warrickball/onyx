@@ -1,3 +1,4 @@
+import hashlib
 from datetime import date
 from rest_framework import serializers, exceptions
 from django.core.exceptions import ObjectDoesNotExist
@@ -93,5 +94,14 @@ class ChoiceField(serializers.ChoiceField):
 
             if data in self.choice_map:
                 data = self.choice_map[data]
+
+        return super().to_internal_value(data)
+
+
+class HashField(serializers.CharField):
+    def to_internal_value(self, data):
+        hasher = hashlib.sha256()
+        hasher.update(data.strip().lower().encode("utf-8"))
+        data = hasher.hexdigest()
 
         return super().to_internal_value(data)

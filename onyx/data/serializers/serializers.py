@@ -15,6 +15,7 @@ from ..validators import (
 # TODO: Need to try out some nested FK data
 # TODO: Need to handle required FKs, not just optional many-to-one
 # TODO: Catch parse-errors within the keys that they occured?
+# TODO: RACE CONDITIONS??
 class SerializerNode:
     def __init__(self, serializer_class, data=None, context=None):
         self.serializer_class = serializer_class
@@ -300,6 +301,12 @@ class BaseRecordSerializer(serializers.ModelSerializer):
             # "site",
         ]
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # if representation.get("field"):
+        #     representation["field"] = "XXXXXX"
+        return representation
+
     class OnyxMeta:
         relations = {}
         identifiers = []
@@ -318,4 +325,5 @@ class ProjectRecordSerializer(BaseRecordSerializer):
             "cid",
             "published_date",
             "suppressed",
+            "site_restricted",
         ]

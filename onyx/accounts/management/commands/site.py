@@ -76,7 +76,7 @@ class Command(base.BaseCommand):
         # CREATE A SITE
         create_parser = command.add_parser("create", help="Create a site.")
         create_parser.add_argument("code")
-        create_parser.add_argument("-d", "--description")
+        create_parser.add_argument("-d", "--description", default="")
 
         # MANAGE SITE ROLES
         roles_parser = command.add_parser("roles", help="Manage roles for a site.")
