@@ -94,7 +94,6 @@ class FieldsView(ProjectAPIView):
         """
 
         fields = view_fields(code, scopes=self.scopes)
-        fields.pop("site")  # TODO: sort it
 
         self.fields = resolve_fields(
             project=self.project,
