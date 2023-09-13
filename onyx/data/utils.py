@@ -4,6 +4,7 @@ from django.contrib.auth.models import Group
 from rest_framework import exceptions
 from utils.fields import YearMonthField, ModelChoiceField, ChoiceField, HashField
 from .filters import TEXT_FIELDS, DATE_FIELDS, ALL_LOOKUPS
+from .models import Choice
 
 
 @contextmanager
@@ -94,25 +95,31 @@ def assign_field_types(fields, field_types, prefix=None):
             field_type = field_types[field_path].field_type
 
             if field_type == HashField:
-                fields[field] = "text (hashed)"
+                fields[field] = {"type": "hash"}
 
             elif field_type in TEXT_FIELDS:
-                fields[field] = "text"
+                fields[field] = {"type": "text"}
 
             elif field_type == ChoiceField:
-                fields[field] = "choice"
+                choices = Choice.objects.filter(
+                    project=field_types[field_path].project, field=field
+                ).values_list("choice", flat=True)
+                fields[field] = {"type": "choice", "values": choices}
 
-            elif field_type in [models.IntegerField, models.FloatField]:
-                fields[field] = "number"
+            elif field_type == models.IntegerField:
+                fields[field] = {"type": "numeric", "format": "integer"}
+
+            elif field_type == models.FloatField:
+                fields[field] = {"type": "numeric", "format": "decimal"}
 
             elif field_type == YearMonthField:
-                fields[field] = "date (YYYY-MM)"
+                fields[field] = {"type": "date", "format": "YYYY-MM"}
 
             elif field_type in DATE_FIELDS:
-                fields[field] = "date (YYYY-MM-DD)"
+                fields[field] = {"type": "date", "format": "YYYY-MM-DD"}
 
             elif field_type == models.BooleanField:
-                fields[field] = "bool"
+                fields[field] = {"type": "bool"}
 
 
 # TODO: All the below needs some serious TLC
