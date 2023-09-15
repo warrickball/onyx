@@ -1,4 +1,5 @@
 import time
+from rest_framework import status
 from .models import Request
 
 
@@ -7,7 +8,7 @@ from .models import Request
 class SaveRequest:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.prefixes = ["/accounts", "/projects"]
+        self.prefixes = ["/control", "/accounts", "/projects"]
 
     def __call__(self, request):
         _t = time.time()  # Calculated execution time.
@@ -19,6 +20,10 @@ class SaveRequest:
         if not any(request.path.startswith(prefix) for prefix in self.prefixes):
             return response
 
+        error_messages = ""
+        if not status.is_success(response.status_code):
+            error_messages = response.content
+
         # Create Request instance
         request_log = Request(
             endpoint=request.path,
@@ -26,6 +31,7 @@ class SaveRequest:
             status=response.status_code,
             address=self.get_client_ip(request),
             exec_time=_t,
+            error_messages=error_messages,
         )
 
         # Assign user to log if it's not an anonymous user

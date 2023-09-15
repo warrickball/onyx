@@ -54,3 +54,4 @@ class Request(models.Model):
     address = models.CharField(max_length=20, blank=True)
     exec_time = models.IntegerField(null=True)
     date = models.DateTimeField(auto_now=True)
+    error_messages = models.TextField(blank=True)
