@@ -7,7 +7,7 @@ from .models import Request
 class SaveRequest:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.prefixes = ["/admin", "/accounts", "/data"]
+        self.prefixes = ["/accounts", "/projects"]
 
     def __call__(self, request):
         _t = time.time()  # Calculated execution time.
