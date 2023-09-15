@@ -14,7 +14,7 @@ urlpatterns = [
         name="data.project.fields",
     ),
     re_path(
-        r"^projects/(?P<code>[a-zA-Z_]*)/choices/(?P<field>[a-zA-Z_]*)/$",
+        r"^projects/(?P<code>[a-zA-Z_]*)/choices/(?P<field>[a-zA-Z0-9_]*)/$",
         views.ChoicesView.as_view(),
         name="data.project.choices",
     ),
