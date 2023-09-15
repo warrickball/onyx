@@ -93,33 +93,63 @@ def assign_field_types(fields, field_types, prefix=None):
             assign_field_types(nested, field_types, prefix=field_path)
         else:
             field_type = field_types[field_path].field_type
+            field_instance = field_types[field_path].field_instance
 
             if field_type == HashField:
-                fields[field] = {"type": "hash"}
+                fields[field] = {
+                    "type": "hash",
+                    "required": not field_instance.blank,
+                }
 
             elif field_type in TEXT_FIELDS:
-                fields[field] = {"type": "text"}
+                fields[field] = {
+                    "type": "text",
+                    "required": not field_instance.blank,
+                }
 
             elif field_type == ChoiceField:
                 choices = Choice.objects.filter(
                     project=field_types[field_path].project, field=field
                 ).values_list("choice", flat=True)
-                fields[field] = {"type": "choice", "values": choices}
+                fields[field] = {
+                    "type": "choice",
+                    "required": not field_instance.blank,
+                    "values": choices,
+                }
 
             elif field_type == models.IntegerField:
-                fields[field] = {"type": "numeric", "format": "integer"}
+                fields[field] = {
+                    "type": "numeric",
+                    "required": not field_instance.null,
+                    "format": "integer",
+                }
 
             elif field_type == models.FloatField:
-                fields[field] = {"type": "numeric", "format": "decimal"}
+                fields[field] = {
+                    "type": "numeric",
+                    "required": not field_instance.null,
+                    "format": "decimal",
+                }
 
             elif field_type == YearMonthField:
-                fields[field] = {"type": "date", "format": "YYYY-MM"}
+                fields[field] = {
+                    "type": "date",
+                    "required": not field_instance.null,
+                    "format": "YYYY-MM",
+                }
 
             elif field_type in DATE_FIELDS:
-                fields[field] = {"type": "date", "format": "YYYY-MM-DD"}
+                fields[field] = {
+                    "type": "date",
+                    "required": not field_instance.null,
+                    "format": "YYYY-MM-DD",
+                }
 
             elif field_type == models.BooleanField:
-                fields[field] = {"type": "bool"}
+                fields[field] = {
+                    "type": "bool",
+                    "required": not field_instance.null,
+                }
 
 
 # TODO: All the below needs some serious TLC
