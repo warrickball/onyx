@@ -100,8 +100,10 @@ class ChoiceField(serializers.ChoiceField):
 
 class HashField(serializers.CharField):
     def to_internal_value(self, data):
+        data = super().to_internal_value(data).strip().lower()
+
         hasher = hashlib.sha256()
-        hasher.update(data.strip().lower().encode("utf-8"))
+        hasher.update(data.encode("utf-8"))
         data = hasher.hexdigest()
 
-        return super().to_internal_value(data)
+        return data
