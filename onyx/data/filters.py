@@ -1,4 +1,5 @@
 import hashlib
+from datetime import datetime
 from django import forms
 from django.db import models
 from django.db.models import ForeignKey, ManyToOneRel
@@ -31,19 +32,43 @@ class NumberRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
     pass
 
 
-class DateInFilter(filters.BaseInFilter, filters.DateFilter):
+class DateFieldForm(forms.DateField):
+    def clean(self, value):
+        if isinstance(value, str) and value.strip().lower() == "today":
+            value = datetime.now().date()
+
+        return super().clean(value)
+
+
+class DateFilter(filters.Filter):
+    field_class = DateFieldForm
+
+
+class DateInFilter(filters.BaseInFilter, DateFilter):
     pass
 
 
-class DateRangeFilter(filters.BaseRangeFilter, filters.DateFilter):
+class DateRangeFilter(filters.BaseRangeFilter, DateFilter):
     pass
 
 
-class DateTimeInFilter(filters.BaseInFilter, filters.DateTimeFilter):
+class DateTimeFieldForm(forms.DateTimeField):
+    def clean(self, value):
+        if isinstance(value, str) and value.strip().lower() == "today":
+            value = datetime.now()
+
+        return super().clean(value)
+
+
+class DateTimeFilter(filters.Filter):
+    field_class = DateTimeFieldForm
+
+
+class DateTimeInFilter(filters.BaseInFilter, DateTimeFilter):
     pass
 
 
-class DateTimeRangeFilter(filters.BaseRangeFilter, filters.DateTimeFilter):
+class DateTimeRangeFilter(filters.BaseRangeFilter, DateTimeFilter):
     pass
 
 
@@ -84,20 +109,17 @@ class ChoiceInFilter(filters.BaseInFilter, ChoiceFilter):
 
 class HashFieldForm(forms.CharField):
     def clean(self, value):
-        hasher = hashlib.sha256()
+        value = super().clean(value).strip().lower()
 
-        hasher.update(value.strip().lower().encode("utf-8"))
+        hasher = hashlib.sha256()
+        hasher.update(value.encode("utf-8"))
         value = hasher.hexdigest()
 
-        return super().clean(value)
+        return value
 
 
 class HashFieldFilter(filters.Filter):
     field_class = HashFieldForm
-
-
-# TODO: Could do the same for YearMonth here, and remove Yearmonth conversion from the field?
-# Idk if thats a good idea
 
 
 # Lookups shared by all fields
@@ -292,12 +314,12 @@ def get_filter(
             lookups = YEARMONTH_LOOKUPS
             input_formats = ["%Y-%m"]
         elif field_type == models.DateField:
-            filter = filters.DateFilter
+            filter = DateFilter
             filter_type = "date"
             lookups = DATE_LOOKUPS
             input_formats = ["%Y-%m-%d"]
         else:
-            filter = filters.DateTimeFilter
+            filter = DateTimeFilter
             filter_type = "datetime"
             lookups = DATE_LOOKUPS
             input_formats = ["%Y-%m-%d"]
