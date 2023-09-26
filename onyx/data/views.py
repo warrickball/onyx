@@ -1,6 +1,6 @@
 from django.core.exceptions import FieldDoesNotExist, ValidationError
-from django.db.models import Q
 from rest_framework import status, exceptions
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
@@ -12,11 +12,15 @@ from .serializers import ModelSerializerMap, SerializerNode
 from .exceptions import CIDNotFound
 from .utils import (
     mutable,
-    parse_dunders,
     prefetch_nested,
-    assign_field_types,
+    assign_fields_info,
     resolve_fields,
-    view_fields,
+    validate_fields,
+    get_fields,
+    flatten_fields,
+    unflatten_fields,
+    include_exclude_fields,
+    init_project_queryset,
 )
 from django_query_tools.server import (
     make_atoms,
@@ -27,7 +31,11 @@ from django_query_tools.server import (
 
 
 class ProjectAPIView(APIView):
-    def initial(self, request, *args, **kwargs):
+    """
+    `APIView` with some additional initial setup for working with a specific project.
+    """
+
+    def initial(self, request: Request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
 
         self.project = Project.objects.get(code__iexact=kwargs["code"])
@@ -73,12 +81,25 @@ class ProjectsView(APIView):
 
         return [permission() for permission in permission_classes]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
         """
-        List all projects.
+        List all projects that the user has allowed actions on.
         """
 
-        return Response({"detail": "Endpoint under construction..."})
+        projects = {}
+
+        # Filter user groups to determine all distinct (code, action) pairs
+        # Create list of available actions for each project
+        for project_action in (
+            request.user.groups.filter(projectgroup__isnull=False)
+            .values("projectgroup__project__code", "projectgroup__action")
+            .distinct()
+        ):
+            projects.setdefault(
+                project_action["projectgroup__project__code"], []
+            ).append(project_action["projectgroup__action"])
+
+        return Response(projects)
 
 
 class FieldsView(ProjectAPIView):
@@ -88,23 +109,35 @@ class FieldsView(ProjectAPIView):
 
         return [permission() for permission in permission_classes]
 
-    def get(self, request, code):
+    def get(self, request: Request, code: str) -> Response:
         """
         List all fields for a given project.
         """
 
-        fields = view_fields(code, scopes=self.scopes)
-
-        self.fields = resolve_fields(
-            project=self.project,
-            user=request.user,
+        # Get all viewable fields within requested scope
+        fields = get_fields(
+            code=self.project.code,
             action=self.action,
-            fields=parse_dunders(fields),
+            scopes=self.scopes,
         )
 
-        assign_field_types(fields, self.fields)
+        # Determine field info for each field
+        fields_info, _ = resolve_fields(
+            code=self.project.code,
+            model=self.model,
+            fields=fields,
+        )
 
-        return Response(fields)
+        # Unflatten list of fields into nested dict
+        fields_dict = unflatten_fields(fields)
+
+        # Assign field information into nested structure
+        field_types = assign_fields_info(
+            fields_dict=fields_dict,
+            fields_info=fields_info,
+        )
+
+        return Response(field_types)
 
 
 class ChoicesView(ProjectAPIView):
@@ -114,23 +147,31 @@ class ChoicesView(ProjectAPIView):
 
         return [permission() for permission in permission_classes]
 
-    def get(self, request, code, field):
+    def get(self, request: Request, code: str, field: str) -> Response:
         """
         List all choices for a given field.
         """
 
-        self.fields = resolve_fields(
-            project=self.project,
+        # Validate the field
+        validate_fields(
             user=request.user,
+            code=self.project.code,
+            app_label=self.project.content_type.app_label,
             action=self.action,
             fields=[field],
         )
 
-        field = self.fields[field.lower()]
+        # Determine field info for the field
+        fields_info, _ = resolve_fields(
+            code=self.project.code,
+            model=self.model,
+            fields=[field],
+        )
 
+        # Obtain choices for the field
         choices = Choice.objects.filter(
             project_id=self.project.code,
-            field=field.field_name,
+            field=fields_info[field].field_name,
             is_active=True,
         ).values_list(
             "choice",
@@ -167,23 +208,28 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
 
         return [permission() for permission in permission_classes]
 
-    def create(self, request, code, test=False):
+    def create(self, request: Request, code: str, test: bool = False) -> Response:
         """
         Create an instance for the given project `code`.
         """
 
-        resolve_fields(
-            project=self.project,
+        # Validate the fields
+        validate_fields(
             user=request.user,
+            code=self.project.code,
+            app_label=self.project.content_type.app_label,
             action=self.action,
-            fields=parse_dunders(request.data),
+            fields=flatten_fields(request.data),
         )
 
         # Validate the data
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
-            context={"project": self.project.code, "request": self.request},
+            context={
+                "project": self.project.code,
+                "request": self.request,
+            },
         )
 
         if not node.is_valid():
@@ -199,40 +245,43 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return response indicating creation
         return Response({"cid": cid}, status=status.HTTP_201_CREATED)
 
-    def retrieve(self, request, code, cid):
+    def retrieve(self, request: Request, code: str, cid: str) -> Response:
         """
         Use the `cid` to retrieve an instance for the given project `code`.
         """
 
-        resolve_fields(
-            project=self.project,
+        # Validate the fields
+        validate_fields(
             user=request.user,
+            code=self.project.code,
+            app_label=self.project.content_type.app_label,
             action=self.action,
             fields=list(self.include) + list(self.exclude),
         )
 
-        # View fields
-        fields = view_fields(
+        # Get all viewable fields within requested scope
+        fields = get_fields(
             code=self.project.code,
+            action=self.action,
             scopes=self.scopes,
-            include=self.include,
-            exclude=self.exclude,
         )
 
         # Initial queryset
-        qs = self.model.objects.select_related()
+        qs = init_project_queryset(
+            model=self.model,
+            user=request.user,
+            fields=fields,
+        )
 
-        # If the user is not a member of staff:
-        # - Ignore suppressed data
-        # - Ignore site_restricted objects from other sites
-        if not request.user.is_staff:
-            qs = qs.filter(suppressed=False).exclude(
-                Q(site_restricted=True) & ~Q(user__site=request.user.site)
+        # Apply include/exclude rules to the fields
+        # Unflatten list of fields into nested fields_dict
+        fields_dict = unflatten_fields(
+            include_exclude_fields(
+                fields=fields,
+                include=self.include,
+                exclude=self.exclude,
             )
-        elif "suppressed" not in fields:
-            # Regardless of whether the user is staff or not,
-            # if the suppressed field is not being viewed, ignore it
-            qs = qs.filter(suppressed=False)
+        )
 
         # Get the instance
         # If the instance does not exist, return 404
@@ -244,13 +293,13 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Serialize the result
         serializer = self.serializer_cls(
             instance,
-            fields=fields,
+            fields=fields_dict,
         )
 
         # Return response with data
         return Response(serializer.data)
 
-    def list(self, request, code):
+    def list(self, request: Request, code: str) -> Response:
         """
         Filter and list instances for the given project `code`.
         """
@@ -287,11 +336,22 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         else:
             atoms = []
 
-        self.fields = resolve_fields(
-            project=self.project,
+        fields_info, unknown = resolve_fields(
+            code=self.project.code,
+            model=self.model,
+            fields=[x.key for x in atoms],
+        )
+
+        # Validate the fields
+        validate_fields(
             user=request.user,
+            code=self.project.code,
+            app_label=self.project.content_type.app_label,
             action=self.action,
-            fields=[x.key for x in atoms] + list(self.include) + list(self.exclude),
+            fields=[field_info.field_path for _, field_info in fields_info.items()]
+            + list(self.include)
+            + list(self.exclude),
+            unknown=unknown,
         )
 
         # Validate and clean the provided key-value pairs
@@ -301,39 +361,42 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             validate_atoms(
                 atoms,
                 filterset=OnyxFilter,
-                filterset_args=[self.fields],
+                filterset_args=[fields_info],
                 filterset_model=self.model,
             )
         except FieldDoesNotExist as e:
-            raise exceptions.ValidationError({"unknown_fields": e.args[0]})
+            raise exceptions.ValidationError(
+                {field: ["This field has an invalid lookup."] for field in e.args[0]}
+            )
         except ValidationError as e:
             raise exceptions.ValidationError(e.args[0])
 
-        # View fields
-        fields = view_fields(
-            self.project.code,
+        # Get all viewable fields within requested scope
+        fields = get_fields(
+            code=self.project.code,
+            action=self.action,
             scopes=self.scopes,
-            include=self.include,
-            exclude=self.exclude,
         )
 
         # Initial queryset
-        qs = self.model.objects.select_related()
+        qs = init_project_queryset(
+            model=self.model,
+            user=request.user,
+            fields=fields,
+        )
 
-        # If the user is not a member of staff:
-        # - Ignore suppressed objects
-        # - Ignore site_restricted objects from other sites
-        if not request.user.is_staff:
-            qs = qs.filter(suppressed=False).exclude(
-                Q(site_restricted=True) & ~Q(user__site=request.user.site)
+        # Apply include/exclude rules to the fields
+        # Unflatten list of fields into nested fields_dict
+        fields_dict = unflatten_fields(
+            include_exclude_fields(
+                fields=fields,
+                include=self.include,
+                exclude=self.exclude,
             )
-        elif "suppressed" not in fields:
-            # Regardless of whether the user is staff or not,
-            # if the suppressed field is not being viewed, ignore it
-            qs = qs.filter(suppressed=False)
+        )
 
         # Prefetch any nested fields within scope
-        qs = prefetch_nested(qs, fields)
+        qs = prefetch_nested(qs=qs, fields_dict=fields_dict)
 
         # If data was provided, then it has now been validated
         # So we form the Q object, and filter the queryset with it
@@ -364,31 +427,33 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         serializer = self.serializer_cls(
             result_page,
             many=True,
-            fields=fields,
+            fields=fields_dict,
         )
 
         # Return paginated response
         return Response(serializer.data)
 
-    def partial_update(self, request, code, cid, test=False):
+    def partial_update(
+        self, request: Request, code: str, cid: str, test: bool = False
+    ) -> Response:
         """
         Use the `cid` to update an instance for the given project `code`.
         """
 
-        # TODO: separate identifiers into 'add' permission
-        resolve_fields(
-            project=self.project,
+        # Validate the fields
+        validate_fields(
             user=request.user,
+            code=self.project.code,
+            app_label=self.project.content_type.app_label,
             action=self.action,
-            fields=parse_dunders(request.data),
+            fields=flatten_fields(request.data),
         )
 
         # Initial queryset
-        qs = self.model.objects.select_related()
-
-        # If the user is not a member of staff, ignore suppressed
-        if not request.user.is_staff:
-            qs = qs.filter(suppressed=False)
+        qs = init_project_queryset(
+            model=self.model,
+            user=request.user,
+        )
 
         # Get the instance to be updated
         # If the instance does not exist, return 404
@@ -401,7 +466,10 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         node = SerializerNode(
             self.serializer_cls,
             data=request.data,
-            context={"project": self.project.code, "request": self.request},
+            context={
+                "project": self.project.code,
+                "request": self.request,
+            },
         )
 
         if not node.is_valid(instance=instance):
@@ -414,16 +482,15 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return response indicating update
         return Response({"cid": cid})
 
-    def destroy(self, request, code, cid):
+    def destroy(self, request: Request, code: str, cid: str) -> Response:
         """
         Use the `cid` to permanently delete an instance of the given project `code`.
         """
         # Initial queryset
-        qs = self.model.objects.select_related()
-
-        # If the user is not a member of staff, ignore suppressed
-        if not request.user.is_staff:
-            qs = qs.filter(suppressed=False)
+        qs = init_project_queryset(
+            model=self.model,
+            user=request.user,
+        )
 
         # Get the instance to be deleted
         # If the instance does not exist, return 404

@@ -5,6 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.utils.encoding import smart_str
 from django.utils.translation import gettext_lazy as _
 from data.models import Choice
+from utils.functions import get_suggestions
 
 
 class YearMonthField(serializers.Field):
@@ -68,7 +69,7 @@ class ModelChoiceField(serializers.RelatedField):
 
 class ChoiceField(serializers.ChoiceField):
     default_error_messages = {
-        "invalid_choice": "Select a valid choice. That choice is not one of the available choices."
+        "invalid_choice": _("Select a valid choice.{suggestions}")
     }
 
     def __init__(self, project, field, **kwargs):
@@ -90,12 +91,26 @@ class ChoiceField(serializers.ChoiceField):
         self.choice_map = {choice.lower().strip(): choice for choice in self.choices}
 
         if isinstance(data, str):
-            data = data.lower().strip()
+            data = data.strip()
+            data_key = data.lower()
 
-            if data in self.choice_map:
-                data = self.choice_map[data]
+            if data_key in self.choice_map:
+                data = self.choice_map[data_key]
 
-        return super().to_internal_value(data)
+        if data == "" and self.allow_blank:
+            return ""
+
+        try:
+            return self.choice_strings_to_values[str(data)]
+        except KeyError:
+            s = get_suggestions(data, self.choices, n=1)
+
+            if s:
+                suggestions = f" Perhaps you meant: {', '.join(s)}"
+            else:
+                suggestions = ""
+
+            self.fail("invalid_choice", suggestions=suggestions)
 
 
 class HashField(serializers.CharField):
