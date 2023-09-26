@@ -4,6 +4,15 @@ from django.contrib.auth.models import Group
 from ...models import User, Site
 
 
+ROLES = [
+    "is_active",
+    "is_site_approved",
+    "is_admin_approved",
+    "is_site_authority",
+    "is_staff",
+]
+
+
 def create_user(
     username, email, site, password, password_env_var, first_name, last_name
 ):
@@ -35,21 +44,13 @@ def manage_user_roles(username, granted, revoked):
     user = User.objects.get(username=username)
     print("User:", user.username)
 
-    allowed = [
-        "is_active",
-        "is_site_approved",
-        "is_admin_approved",
-        "is_site_authority",
-        "is_staff",
-    ]
-
     if granted:
         roles = []
         for role in granted:
             if not hasattr(user, role):
                 raise Exception("Role is unknown")
 
-            if role not in allowed:
+            if role not in ROLES:
                 raise Exception("Role cannot be changed")
 
             setattr(user, role, True)
@@ -66,7 +67,7 @@ def manage_user_roles(username, granted, revoked):
             if not hasattr(user, role):
                 raise Exception("Role is unknown")
 
-            if role not in allowed:
+            if role not in ROLES:
                 raise Exception("Role cannot be changed")
 
             setattr(user, role, False)
@@ -79,7 +80,7 @@ def manage_user_roles(username, granted, revoked):
 
     else:
         print("Roles:")
-        for role in allowed:
+        for role in ROLES:
             print(f"\t{role}:", getattr(user, role))
 
 
@@ -105,6 +106,36 @@ def manage_user_groups(username, granted, revoked):
         print("Groups:")
         for group in user.groups.all():
             print(f"\t{group}")
+
+
+def list_users():
+    for user in User.objects.all():
+        attrs = {"username": user.username, "email": user.email}
+        for role in ROLES:
+            value = getattr(user, role)
+            if value:
+                attrs[role] = role.upper()
+            else:
+                attrs[role] = "NOT_" + role.removeprefix("is_").upper()
+
+        projects = {}
+
+        # Filter user groups to determine all distinct (code, action) pairs
+        # Create list of available actions for each project
+        for project_action in (
+            user.groups.filter(projectgroup__isnull=False)
+            .values("projectgroup__project__code", "projectgroup__action")
+            .distinct()
+        ):
+            projects.setdefault(
+                project_action["projectgroup__project__code"], []
+            ).append(project_action["projectgroup__action"])
+
+        print(
+            *attrs.values(),
+            *(f"{k}-{ ':'.join(v)}".upper() for k, v in sorted(projects.items())),
+            sep="\t",
+        )
 
 
 class Command(base.BaseCommand):
@@ -143,6 +174,12 @@ class Command(base.BaseCommand):
         groups_action.add_argument("-g", "--grant", nargs="+")
         groups_action.add_argument("-r", "--revoke", nargs="+")
 
+        # LIST USERS
+        list_parser = command.add_parser(
+            "list",
+            help="Print a table of all users, with their roles and project groups.",
+        )
+
     def handle(self, *args, **options):
         if options["command"] == "create":
             create_user(
@@ -168,3 +205,6 @@ class Command(base.BaseCommand):
                 granted=options.get("grant"),
                 revoked=options.get("revoke"),
             )
+
+        elif options["command"] == "list":
+            list_users()
