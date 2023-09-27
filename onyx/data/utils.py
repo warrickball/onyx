@@ -140,12 +140,14 @@ def assign_fields_info(
 
             if field_type == HashField:
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "hash",
                     "required": not field_instance.blank,
                 }
 
             elif field_type in TEXT_FIELDS:
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "text",
                     "required": not field_instance.blank,
                 }
@@ -155,6 +157,7 @@ def assign_fields_info(
                     project=fields_info[field_path].project, field=field
                 ).values_list("choice", flat=True)
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "choice",
                     "required": not field_instance.blank,
                     "values": choices,
@@ -162,6 +165,7 @@ def assign_fields_info(
 
             elif field_type == models.IntegerField:
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "numeric",
                     "required": not field_instance.null,
                     "format": "integer",
@@ -169,6 +173,7 @@ def assign_fields_info(
 
             elif field_type == models.FloatField:
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "numeric",
                     "required": not field_instance.null,
                     "format": "decimal",
@@ -176,6 +181,7 @@ def assign_fields_info(
 
             elif field_type == YearMonthField:
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "date",
                     "required": not field_instance.null,
                     "format": "YYYY-MM",
@@ -183,6 +189,7 @@ def assign_fields_info(
 
             elif field_type in [models.DateField, models.DateTimeField]:
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "date",
                     "required": not field_instance.null,
                     "format": "YYYY-MM-DD",
@@ -190,6 +197,7 @@ def assign_fields_info(
 
             elif field_type == models.BooleanField:
                 fields_dict[field] = {
+                    "description": field_instance.help_text,
                     "type": "bool",
                     "required": not field_instance.null,
                 }
