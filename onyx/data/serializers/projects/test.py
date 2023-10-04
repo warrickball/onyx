@@ -102,6 +102,3 @@ class TestModelSerializer(BaseTestModelSerializer):
                 },
             }
         }
-
-
-mapping = {TestModel: TestModelSerializer}
