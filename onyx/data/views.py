@@ -38,18 +38,16 @@ class ProjectAPIView(APIView):
     def initial(self, request: Request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
 
+        # Get the project
         self.project = Project.objects.get(code__iexact=kwargs["code"])
 
-        # Get the model
+        # Get the project's model
         model = self.project.content_type.model_class()
-        if not model:
-            raise Exception("Model could not be found when loading project")
+        assert model is not None
         self.model = model
 
-        # Get the model serializer
+        # Get the model's serializer
         serializer_cls = ModelSerializerMap.get(self.model)
-        if not serializer_cls:
-            raise Exception("Serializer could not be found for the project model")
         self.serializer_cls = serializer_cls
 
         # Take out any special params from the request
