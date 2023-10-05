@@ -1,34 +1,178 @@
-from contextlib import contextmanager
+from enum import Enum
 from django.db import models
 from django.contrib.auth.models import Group, Permission
 from rest_framework import exceptions
 from utils.fields import HashField, ChoiceField, YearMonthField, TEXT_FIELDS
-from .filters import ALL_LOOKUPS
 from utils.functions import get_suggestions
 from accounts.models import User
 from .models import Choice
 
 
-@contextmanager
-def mutable(obj):
-    """
-    If the provided `obj` has a `_mutable` property, this context manager temporarily sets it to `True`.
-    """
-    _mutable = getattr(obj, "_mutable", None)
-    if _mutable is not None:
-        obj._mutable = True
+class OnyxType(Enum):
+    HASH = (
+        "hash",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+        ],
+    )
+    TEXT = (
+        "text",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+            "contains",
+            "startswith",
+            "endswith",
+            "iexact",
+            "icontains",
+            "istartswith",
+            "iendswith",
+            "regex",
+            "iregex",
+        ],
+    )
+    CHOICE = (
+        "choice",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+        ],
+    )
+    INTEGER = (
+        "integer",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+            "isnull",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "range",
+        ],
+    )
+    DECIMAL = (
+        "decimal",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+            "isnull",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "range",
+        ],
+    )
+    DATE_YYYY_MM = (
+        "date (YYYY-MM)",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+            "isnull",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "range",
+            "year",
+            "year__in",
+            "year__range",
+        ],
+    )
+    DATE_YYYY_MM_DD = (
+        "date (YYYY-MM-DD)",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+            "isnull",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "range",
+            "year",
+            "year__in",
+            "year__range",
+            "iso_year",
+            "iso_year__in",
+            "iso_year__range",
+            "week",
+            "week__in",
+            "week__range",
+        ],
+    )
+    DATETIME = (
+        "date (YYYY-MM-DD HH:MM:SS)",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+            "isnull",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "range",
+            "year",
+            "year__in",
+            "year__range",
+            "iso_year",
+            "iso_year__in",
+            "iso_year__range",
+            "week",
+            "week__in",
+            "week__range",
+        ],
+    )
+    BOOLEAN = (
+        "bool",
+        [
+            "",
+            "exact",
+            "ne",
+            "in",
+            "isnull",
+        ],
+    )
+    RELATION = (
+        "relation",
+        [
+            "isnull",
+        ],
+    )
 
-    try:
-        yield obj
-    finally:
-        # Reset object's mutability
-        if _mutable is not None:
-            obj._mutable = _mutable
+    def __init__(self, label, lookups) -> None:
+        self.label = label
+        self.lookups = lookups
+
+
+ALL_LOOKUPS = set(lookup for onyx_type in OnyxType for lookup in onyx_type.lookups)
+
+
+class InvalidLookup(Exception):
+    pass
 
 
 class FieldInfo:
     """
-    Class for storing information on a field.
+    Class for storing information on a field (and lookup) requested by a user.
     """
 
     def __init__(
@@ -36,15 +180,66 @@ class FieldInfo:
         project: str,
         field_model: type[models.Model],
         field_path: str,
-        field_name: str,
         lookup: str,
     ):
         self.project = project
         self.field_model = field_model
-        self.field_instance = self.field_model._meta.get_field(field_name)
-        self.field_type = type(self.field_instance)
         self.field_path = field_path
-        self.field_name = field_name
+        self.field_name = self.field_path.split("__")[-1]
+        self.field_instance = self.field_model._meta.get_field(self.field_name)
+        self.field_type = type(self.field_instance)
+
+        if self.field_type == HashField:
+            self.onyx_type = OnyxType.HASH
+            self.required = not self.field_instance.blank
+
+        elif self.field_type in TEXT_FIELDS:
+            self.onyx_type = OnyxType.TEXT
+            self.required = not self.field_instance.blank
+
+        elif self.field_type == ChoiceField:
+            self.onyx_type = OnyxType.CHOICE
+            self.required = not self.field_instance.blank
+            self.choices = Choice.objects.filter(
+                project=self.project,
+                field=self.field_name,
+            ).values_list("choice", flat=True)
+
+        elif self.field_type == models.IntegerField:
+            self.onyx_type = OnyxType.INTEGER
+            self.required = not self.field_instance.null
+
+        elif self.field_type == models.FloatField:
+            self.onyx_type = OnyxType.DECIMAL
+            self.required = not self.field_instance.null
+
+        elif self.field_type == YearMonthField:
+            self.onyx_type = OnyxType.DATE_YYYY_MM
+            self.required = not self.field_instance.null
+
+        elif self.field_type == models.DateField:
+            self.onyx_type = OnyxType.DATE_YYYY_MM_DD
+            self.required = not self.field_instance.null
+
+        elif self.field_type == models.DateTimeField:
+            self.onyx_type = OnyxType.DATETIME
+            self.required = not self.field_instance.null
+
+        elif self.field_type == models.BooleanField:
+            self.onyx_type = OnyxType.BOOLEAN
+            self.required = not self.field_instance.null
+
+        elif self.field_instance.is_relation:
+            self.onyx_type = OnyxType.RELATION
+
+        else:
+            raise NotImplementedError(
+                f"Field {self.field_type} did not match an OnyxType."
+            )
+
+        if lookup not in self.onyx_type.lookups:
+            raise InvalidLookup
+
         self.lookup = lookup
 
 
@@ -87,30 +282,35 @@ def resolve_fields(
             # Corresponding field instance for the component
             component_instance = model_fields[component]
             field_path = "__".join(components[: i + 1])
-            field_name = field_path.split("__")[-1]
             lookup = "__".join(components[i + 1 :])
 
-            if not lookup or lookup in ALL_LOOKUPS:
-                # The field is determined, and the lookup is recognised
-                # So we instantiate the resolved field instance
-                resolved[field] = FieldInfo(
-                    project=code,
-                    field_model=current_model,
-                    field_path=field_path,
-                    field_name=field_name,
-                    lookup=lookup,
-                )
+            if lookup in ALL_LOOKUPS:
+                # The field is valid, and the lookup is not sus
+                # So we attempt to instantiate the field instance
+                # This could fail if the lookup is not allowed for the given field
+                try:
+                    field_info = FieldInfo(
+                        project=code,
+                        field_model=current_model,
+                        field_path=field_path,
+                        lookup=lookup,
+                    )
+                    resolved[field] = field_info
+                except InvalidLookup:
+                    unknown.append(field)
                 break
 
-            if component_instance.is_relation:
-                # These may be remaining components
+            elif component_instance.is_relation:
+                # The field's 'lookup' may be remaining components in a relation
                 # Move on to them
                 current_model = component_instance.related_model
                 assert current_model is not None
 
                 model_fields = {x.name: x for x in current_model._meta.get_fields()}
                 continue
+
             else:
+                # Otherwise, it is unknown
                 unknown.append(field)
                 break
 
@@ -135,71 +335,23 @@ def assign_fields_info(
                 prefix=field_path,
             )
         else:
-            field_type = fields_info[field_path].field_type
+            onyx_type = fields_info[field_path].onyx_type
             field_instance = fields_info[field_path].field_instance
+            required = fields_info[field_path].required
 
-            if field_type == HashField:
+            if onyx_type == OnyxType.CHOICE:
+                choices = fields_info[field_path].choices
                 fields_dict[field] = {
                     "description": field_instance.help_text,
-                    "type": "hash",
-                    "required": not field_instance.blank,
-                }
-
-            elif field_type in TEXT_FIELDS:
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": "text",
-                    "required": not field_instance.blank,
-                }
-
-            elif field_type == ChoiceField:
-                choices = Choice.objects.filter(
-                    project=fields_info[field_path].project, field=field
-                ).values_list("choice", flat=True)
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": "choice",
-                    "required": not field_instance.blank,
+                    "type": onyx_type.label,
+                    "required": required,
                     "values": choices,
                 }
-
-            elif field_type == models.IntegerField:
+            else:
                 fields_dict[field] = {
                     "description": field_instance.help_text,
-                    "type": "numeric",
-                    "required": not field_instance.null,
-                    "format": "integer",
-                }
-
-            elif field_type == models.FloatField:
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": "numeric",
-                    "required": not field_instance.null,
-                    "format": "decimal",
-                }
-
-            elif field_type == YearMonthField:
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": "date",
-                    "required": not field_instance.null,
-                    "format": "YYYY-MM",
-                }
-
-            elif field_type in [models.DateField, models.DateTimeField]:
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": "date",
-                    "required": not field_instance.null,
-                    "format": "YYYY-MM-DD",
-                }
-
-            elif field_type == models.BooleanField:
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": "bool",
-                    "required": not field_instance.null,
+                    "type": onyx_type.label,
+                    "required": required,
                 }
 
     return fields_dict
@@ -373,7 +525,7 @@ def validate_fields(
         user_fields = get_user_fields(user, code, action)
 
         for u in unknown:
-            suggestions = get_suggestions(u, fields=user_fields)
+            suggestions = get_suggestions(u, user_fields)
 
             if suggestions:
                 unknown_dict[u] = [
