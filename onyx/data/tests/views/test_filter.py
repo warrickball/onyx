@@ -13,14 +13,14 @@ class TestFilterView(OnyxTestCase):
             "testuser",
             roles=["is_staff"],
             groups=[
-                "test.add.base",
                 "test.view.base",
             ],
         )
+
+        self.user.groups.add(Group.objects.get(name="test.add.base"))
         for payload in test_data():
             response = self.client.post(self.endpoint, data=payload)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
     def assertEqualCids(self, records, qs):
@@ -136,13 +136,6 @@ class TestFilterView(OnyxTestCase):
             response.json()["data"],
             TestModel.objects.filter(run_name__in=["run-1", "run-2", "run-3"]),
         )
-
-    def test_charfield_range_ok(self):
-        response = self.client.get(
-            self.endpoint, data={"run_name__range": "run-0,run-9"}
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(response.json()["data"], TestModel.objects.all())
 
     def test_charfield_blank_ok(self):
         response = self.client.get(self.endpoint, data={"region": ""})

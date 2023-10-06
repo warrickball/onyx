@@ -13,7 +13,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ["3.10", "3.11"]
 
     steps:
     - uses: actions/checkout@v3
@@ -26,5 +26,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     - name: Run Tests
+      env:
+        ONYX_DJANGO_SECRET_KEY: super-duper-secret-key
+        ONYX_DOMAIN: localhost
+        ONYX_POSTGRES_DB: db-not-found
+        ONYX_POSTGRES_USER: user-not-found
+      working-directory: ./onyx
       run: |
         python manage.py test
