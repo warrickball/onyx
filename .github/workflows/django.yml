@@ -28,6 +28,7 @@ jobs:
     - name: Run Tests
       env:
         ONYX_DJANGO_SECRET_KEY: super-duper-secret-key
+        ONYX_DOMAIN: localhost
       working-directory: ./onyx
       run: |
         python manage.py test

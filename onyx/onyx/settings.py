@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
-import os
+import os, sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -98,6 +98,14 @@ DATABASES = {
         "USER": os.environ["ONYX_POSTGRES_USER"],
     }
 }
+
+# TODO: A bit hacky but okay for now
+# In the long run we should probably use postgres for tests as well
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": "testdb",
+    }
 
 
 # Password validation
