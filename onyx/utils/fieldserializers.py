@@ -1,8 +1,6 @@
 import hashlib
 from datetime import date
 from rest_framework import serializers, exceptions
-from django.core.exceptions import ObjectDoesNotExist
-from django.utils.encoding import smart_str
 from django.utils.translation import gettext_lazy as _
 from data.models import Choice
 from utils.functions import get_suggestions
@@ -33,38 +31,6 @@ class YearMonthField(serializers.Field):
             raise exceptions.ValidationError("Must be in YYYY-MM-DD format.")
 
         return year + "-" + month
-
-
-class ModelChoiceField(serializers.RelatedField):
-    default_error_messages = {
-        "does_not_exist": _(
-            "Select a valid choice. That choice is not one of the available choices."
-        ),
-        "invalid": _("Invalid value."),
-    }
-
-    def __init__(self, project, **kwargs):
-        self.project = project
-        super().__init__(queryset=Choice.objects.all(), **kwargs)
-
-    def to_internal_value(self, data):
-        queryset = self.get_queryset()
-
-        try:
-            return queryset.get(  # type: ignore
-                **{
-                    "project_id": self.project,
-                    "field": self.source,
-                    "choice": data,
-                }
-            )
-        except ObjectDoesNotExist:
-            self.fail("does_not_exist", slug_name="choice", value=smart_str(data))
-        except (TypeError, ValueError):
-            self.fail("invalid")
-
-    def to_representation(self, obj):
-        return getattr(obj, "choice")  # type: ignore
 
 
 class ChoiceField(serializers.ChoiceField):

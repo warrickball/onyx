@@ -1,13 +1,12 @@
 import hashlib
 from datetime import datetime
+from distutils.util import strtobool
 from django import forms
-from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-from utils.fields import HashField, ChoiceField, YearMonthField, TEXT_FIELDS
-from utils.functions import get_suggestions, strtobool
-from .models import Choice
+from utils.functions import get_suggestions
+from .utils import OnyxType, FieldInfo
 
 
 class HashFieldForm(forms.CharField):
@@ -21,8 +20,12 @@ class HashFieldForm(forms.CharField):
         return value
 
 
-class HashFieldFilter(filters.Filter):
+class HashFilter(filters.Filter):
     field_class = HashFieldForm
+
+
+class HashInFilter(filters.BaseInFilter, HashFilter):
+    pass
 
 
 class CharInFilter(filters.BaseInFilter, filters.CharFilter):
@@ -33,13 +36,16 @@ class CharRangeFilter(filters.BaseRangeFilter, filters.CharFilter):
     pass
 
 
-class ChoiceFieldForm(forms.ChoiceField):
+class ChoiceFieldMixin:
     default_error_messages = {
         "invalid_choice": _("Select a valid choice.%(suggestions)s"),
     }
 
     def clean(self, value):
-        self.choice_map = {choice.lower().strip(): choice for choice, _ in self.choices}
+        self.choice_map = {
+            choice.lower().strip(): choice
+            for choice, _ in self.choices  #  type: ignore
+        }
 
         if isinstance(value, str):
             value = value.strip()
@@ -48,13 +54,13 @@ class ChoiceFieldForm(forms.ChoiceField):
             if value_key in self.choice_map:
                 value = self.choice_map[value_key]
 
-        return super().clean(value)
+        return super().clean(value)  #  type: ignore
 
     def validate(self, value):
-        super(forms.ChoiceField, self).validate(value)
+        super(forms.ChoiceField, self).validate(value)  #  type: ignore
 
-        if value and not self.valid_value(value):
-            choices = [str(x) for (_, x) in self.choices]
+        if value and not self.valid_value(value):  #  type: ignore
+            choices = [str(x) for (_, x) in self.choices]  #  type: ignore
             s = get_suggestions(value, choices, n=1)
 
             if s:
@@ -63,10 +69,14 @@ class ChoiceFieldForm(forms.ChoiceField):
                 suggestions = ""
 
             raise ValidationError(
-                self.error_messages["invalid_choice"],
+                self.error_messages["invalid_choice"],  #  type: ignore
                 code="invalid_choice",
                 params={"suggestions": suggestions},
             )
+
+
+class ChoiceFieldForm(ChoiceFieldMixin, forms.ChoiceField):
+    pass
 
 
 class ChoiceFilter(filters.Filter):
@@ -85,7 +95,29 @@ class NumberRangeFilter(filters.BaseRangeFilter, filters.NumberFilter):
     pass
 
 
+class YearMonthForm(forms.DateField):
+    def __init__(self, **kwargs):
+        kwargs["input_formats"] = ["%Y-%m"]
+        super().__init__(**kwargs)
+
+
+class YearMonthFilter(filters.Filter):
+    field_class = YearMonthForm
+
+
+class YearMonthInFilter(filters.BaseInFilter, YearMonthFilter):
+    pass
+
+
+class YearMonthRangeFilter(filters.BaseRangeFilter, YearMonthFilter):
+    pass
+
+
 class DateFieldForm(forms.DateField):
+    def __init__(self, **kwargs):
+        kwargs["input_formats"] = ["%Y-%m-%d"]
+        super().__init__(**kwargs)
+
     def clean(self, value):
         if isinstance(value, str) and value.strip().lower() == "today":
             value = datetime.now().date()
@@ -106,6 +138,15 @@ class DateRangeFilter(filters.BaseRangeFilter, DateFilter):
 
 
 class DateTimeFieldForm(forms.DateTimeField):
+    def __init__(self, **kwargs):
+        kwargs["input_formats"] = [
+            "%Y-%m-%d",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M:%S.%f",
+        ]
+        super().__init__(**kwargs)
+
     def clean(self, value):
         if isinstance(value, str) and value.strip().lower() == "today":
             value = datetime.now()
@@ -125,305 +166,151 @@ class DateTimeRangeFilter(filters.BaseRangeFilter, DateTimeFilter):
     pass
 
 
-class TypedChoiceInFilter(filters.BaseInFilter, filters.TypedChoiceFilter):
+class BooleanFieldForm(ChoiceFieldMixin, forms.TypedChoiceField):
+    def __init__(self, **kwargs):
+        kwargs["choices"] = [
+            (x, x)
+            for x in [
+                "y",
+                "yes",
+                "t",
+                "true",
+                "on",
+                "1",
+                "n",
+                "no",
+                "f",
+                "false",
+                "off",
+                "0",
+            ]
+        ]
+        # TODO: I have a sneaky suspicion that strtobool's [0, 1] coercion
+        # was messing up the filtering of isnull for relations. I have
+        # yet to confirm this, but would be something good to confirm.
+        kwargs["coerce"] = lambda x: bool(strtobool(x))
+        super().__init__(**kwargs)
+
+
+class BooleanFilter(filters.TypedChoiceFilter):
+    field_class = BooleanFieldForm
+
+
+class BooleanInFilter(filters.BaseInFilter, BooleanFilter):
     pass
 
 
-# Lookups shared by all fields
-BASE_LOOKUPS = [
-    "exact",
-    "ne",
-    "in",
-]
-
-# Lookups available for hash fields
-HASH_LOOKUPS = BASE_LOOKUPS
-
-# Lookups available for text fields
-TEXT_LOOKUPS = BASE_LOOKUPS + [
-    "contains",
-    "startswith",
-    "endswith",
-    "iexact",
-    "icontains",
-    "istartswith",
-    "iendswith",
-    "regex",
-    "iregex",
-]
-
-# Lookups available for choice fields
-CHOICE_LOOKUPS = BASE_LOOKUPS
-
-# Lookups available for numeric fields
-NUMERIC_LOOKUPS = BASE_LOOKUPS + [
-    "lt",
-    "lte",
-    "gt",
-    "gte",
-    "range",
-]
-
-# Lookups available for date (YYYY-MM) fields
-YEARMONTH_LOOKUPS = BASE_LOOKUPS + [
-    "lt",
-    "lte",
-    "gt",
-    "gte",
-    "range",
-    "year",
-    "year__in",
-    "year__range",
-]
-
-# Lookups available for date (YYYY-MM-DD) fields
-DATE_LOOKUPS = BASE_LOOKUPS + [
-    "lt",
-    "lte",
-    "gt",
-    "gte",
-    "range",
-    "year",
-    "year__in",
-    "year__range",
-    "iso_year",
-    "iso_year__in",
-    "iso_year__range",
-    "week",
-    "week__in",
-    "week__range",
-]
-
-# Lookups available for boolean fields
-BOOLEAN_LOOKUPS = BASE_LOOKUPS
-
-ALL_LOOKUPS = set(
-    BASE_LOOKUPS
-    + HASH_LOOKUPS
-    + TEXT_LOOKUPS
-    + CHOICE_LOOKUPS
-    + NUMERIC_LOOKUPS
-    + YEARMONTH_LOOKUPS
-    + DATE_LOOKUPS
-    + BOOLEAN_LOOKUPS
-    + ["isnull"]
-)
-
-# Accepted strings for True and False when validating BooleanField
-BOOLEAN_CHOICES = [(x, x) for x in ["true", "True", "TRUE", "false", "False", "FALSE"]]
-
 # Mappings from field type + lookup to filter
 FILTERS = {
-    ("text", "in"): CharInFilter,
-    ("text", "range"): CharRangeFilter,
-    ("choice", "in"): ChoiceInFilter,
-    ("numeric", "in"): NumberInFilter,
-    ("numeric", "range"): NumberRangeFilter,
-    ("date", "in"): DateInFilter,
-    ("date", "range"): DateRangeFilter,
-    ("date", "year"): filters.NumberFilter,
-    ("date", "year__in"): NumberInFilter,
-    ("date", "year__range"): NumberRangeFilter,
-    ("date", "iso_year"): filters.NumberFilter,
-    ("date", "iso_year__in"): NumberInFilter,
-    ("date", "iso_year__range"): NumberRangeFilter,
-    ("date", "week"): filters.NumberFilter,
-    ("date", "week__in"): NumberInFilter,
-    ("date", "week__range"): NumberRangeFilter,
-    ("datetime", "in"): DateTimeInFilter,
-    ("datetime", "range"): DateTimeRangeFilter,
-    ("datetime", "year"): filters.NumberFilter,
-    ("datetime", "year__in"): NumberInFilter,
-    ("datetime", "year__range"): NumberRangeFilter,
-    ("datetime", "iso_year"): filters.NumberFilter,
-    ("datetime", "iso_year__in"): NumberInFilter,
-    ("datetime", "iso_year__range"): NumberRangeFilter,
-    ("datetime", "week"): filters.NumberFilter,
-    ("datetime", "week__in"): NumberInFilter,
-    ("datetime", "week__range"): NumberRangeFilter,
-    ("boolean", "in"): TypedChoiceInFilter,
+    OnyxType.HASH: {lookup: HashFilter for lookup in OnyxType.HASH.lookups}
+    | {
+        "in": HashInFilter,
+    },
+    OnyxType.TEXT: {lookup: filters.CharFilter for lookup in OnyxType.TEXT.lookups}
+    | {
+        "in": CharInFilter,
+        "range": CharRangeFilter,
+    },
+    OnyxType.CHOICE: {lookup: ChoiceFilter for lookup in OnyxType.CHOICE.lookups}
+    | {
+        "in": ChoiceInFilter,
+    },
+    OnyxType.INTEGER: {
+        lookup: filters.NumberFilter for lookup in OnyxType.INTEGER.lookups
+    }
+    | {
+        "in": NumberInFilter,
+        "range": NumberRangeFilter,
+        "isnull": BooleanFilter,
+    },
+    OnyxType.DECIMAL: {
+        lookup: filters.NumberFilter for lookup in OnyxType.DECIMAL.lookups
+    }
+    | {
+        "in": NumberInFilter,
+        "range": NumberRangeFilter,
+        "isnull": BooleanFilter,
+    },
+    OnyxType.DATE_YYYY_MM: {
+        lookup: YearMonthFilter for lookup in OnyxType.DATE_YYYY_MM.lookups
+    }
+    | {
+        "in": YearMonthInFilter,
+        "range": YearMonthRangeFilter,
+        "year": filters.NumberFilter,
+        "year__in": NumberInFilter,
+        "year__range": NumberRangeFilter,
+        "iso_year": filters.NumberFilter,
+        "iso_year__in": NumberInFilter,
+        "iso_year__range": NumberRangeFilter,
+        "week": filters.NumberFilter,
+        "week__in": NumberInFilter,
+        "week__range": NumberRangeFilter,
+        "isnull": BooleanFilter,
+    },
+    OnyxType.DATE_YYYY_MM_DD: {
+        lookup: DateFilter for lookup in OnyxType.DATE_YYYY_MM_DD.lookups
+    }
+    | {
+        "in": DateInFilter,
+        "range": DateRangeFilter,
+        "year": filters.NumberFilter,
+        "year__in": NumberInFilter,
+        "year__range": NumberRangeFilter,
+        "iso_year": filters.NumberFilter,
+        "iso_year__in": NumberInFilter,
+        "iso_year__range": NumberRangeFilter,
+        "week": filters.NumberFilter,
+        "week__in": NumberInFilter,
+        "week__range": NumberRangeFilter,
+        "isnull": BooleanFilter,
+    },
+    OnyxType.DATETIME: {lookup: DateTimeFilter for lookup in OnyxType.DATETIME.lookups}
+    | {
+        "in": DateTimeInFilter,
+        "range": DateTimeRangeFilter,
+        "year": filters.NumberFilter,
+        "year__in": NumberInFilter,
+        "year__range": NumberRangeFilter,
+        "iso_year": filters.NumberFilter,
+        "iso_year__in": NumberInFilter,
+        "iso_year__range": NumberRangeFilter,
+        "week": filters.NumberFilter,
+        "week__in": NumberInFilter,
+        "week__range": NumberRangeFilter,
+        "isnull": BooleanFilter,
+    },
+    OnyxType.BOOLEAN: {lookup: BooleanFilter for lookup in OnyxType.BOOLEAN.lookups}
+    | {
+        "in": BooleanInFilter,
+        "isnull": BooleanFilter,
+    },
+    OnyxType.RELATION: {
+        "isnull": BooleanFilter,
+    },
 }
 
 
-def isnull(field):
-    return filters.TypedChoiceFilter(
-        field_name=field,
-        choices=BOOLEAN_CHOICES,
-        coerce=strtobool,
-        lookup_expr="isnull",
-    )
-
-
-def get_filter(
-    project,
-    field_type,
-    field_path,
-    field_name,
-    lookup,
-):
-    # Hash
-    if field_type == HashField:
-        if not lookup:
-            return f"{field_path}", HashFieldFilter(
-                field_name=field_path,
-            )
-
-        elif lookup in HASH_LOOKUPS:
-            return f"{field_path}__{lookup}", HashFieldFilter(
-                field_name=field_path,
-                lookup_expr=lookup,
-            )
-
-    # Text
-    elif field_type in TEXT_FIELDS:
-        if not lookup:
-            return f"{field_path}", filters.CharFilter(
-                field_name=field_path,
-            )
-        elif lookup in TEXT_LOOKUPS:
-            filter = FILTERS.get(("text", lookup), filters.CharFilter)
-            return f"{field_path}__{lookup}", filter(
-                field_name=field_path,
-                lookup_expr=lookup,
-            )
-
-    # Choice
-    elif field_type == ChoiceField:
-        choices = [
-            (x, x)
-            for x in Choice.objects.filter(
-                project_id=project,
-                field=field_name,
-            ).values_list(
-                "choice",
-                flat=True,
-            )
-        ]
-        if not lookup:
-            return f"{field_path}", ChoiceFilter(
-                field_name=field_path,
-                choices=choices,
-            )
-        elif lookup in CHOICE_LOOKUPS:
-            filter = FILTERS.get(("choice", lookup), ChoiceFilter)
-            return f"{field_path}__{lookup}", filter(
-                field_name=field_path,
-                choices=choices,
-                lookup_expr=lookup,
-            )
-
-    # Numeric
-    elif field_type in [models.IntegerField, models.FloatField]:
-        if not lookup:
-            return f"{field_path}", filters.NumberFilter(
-                field_name=field_path,
-            )
-        elif lookup in NUMERIC_LOOKUPS:
-            filter = FILTERS.get(("numeric", lookup), filters.NumberFilter)
-            return f"{field_path}__{lookup}", filter(
-                field_name=field_path,
-                lookup_expr=lookup,
-            )
-        elif lookup == "isnull":
-            return f"{field_path}__isnull", isnull(field_path)
-
-    # Date (YYYY-MM)
-    elif field_type == YearMonthField:
-        if not lookup:
-            return f"{field_path}", filters.DateFilter(
-                field_name=field_path,
-                input_formats=["%Y-%m"],
-            )
-        elif lookup in YEARMONTH_LOOKUPS:
-            filter = FILTERS.get(("date", lookup), filters.DateFilter)
-            if filter in [filters.NumberFilter, NumberInFilter, NumberRangeFilter]:
-                return f"{field_path}__{lookup}", filter(
-                    field_name=field_path,
-                    lookup_expr=lookup,
-                )
-            else:
-                return f"{field_path}__{lookup}", filter(
-                    field_name=field_path,
-                    input_formats=["%Y-%m"],
-                    lookup_expr=lookup,
-                )
-        elif lookup == "isnull":
-            return f"{field_path}__isnull", isnull(field_path)
-
-    # Date (YYYY-MM-DD)
-    elif field_type in [models.DateField, models.DateTimeField]:
-        if field_type == models.DateField:
-            filter = DateFilter
-            filter_type = "date"
-        else:
-            filter = DateTimeFilter
-            filter_type = "datetime"
-
-        if not lookup:
-            return f"{field_path}", filter(
-                field_name=field_path,
-                input_formats=["%Y-%m-%d"],
-            )
-        elif lookup in DATE_LOOKUPS:
-            filter = FILTERS.get((filter_type, lookup), filter)  # type: ignore
-            if filter in [filters.NumberFilter, NumberInFilter, NumberRangeFilter]:
-                return f"{field_path}__{lookup}", filter(
-                    field_name=field_path,
-                    lookup_expr=lookup,
-                )
-            else:
-                return f"{field_path}__{lookup}", filter(
-                    field_name=field_path,
-                    input_formats=["%Y-%m-%d"],
-                    lookup_expr=lookup,
-                )
-        elif lookup == "isnull":
-            return f"{field_path}__isnull", isnull(field_path)
-
-    # Boolean
-    elif field_type == models.BooleanField:
-        if not lookup:
-            return f"{field_path}", filters.TypedChoiceFilter(
-                field_name=field_path,
-                choices=BOOLEAN_CHOICES,
-                coerce=strtobool,
-            )
-        elif lookup in BOOLEAN_LOOKUPS:
-            filter = FILTERS.get(("boolean", lookup), filters.TypedChoiceFilter)
-            return f"{field_path}__{lookup}", filter(
-                field_name=field_path,
-                choices=BOOLEAN_CHOICES,
-                coerce=strtobool,
-                lookup_expr=lookup,
-            )
-        elif lookup == "isnull":
-            return f"{field_path}__isnull", isnull(field_path)
-
-    # Relations
-    elif field_type in [models.ForeignKey, models.ManyToOneRel]:
-        if lookup == "isnull":
-            return f"{field_path}__isnull", isnull(field_path)
-
-    return None, None
-
-
 class OnyxFilter(filters.FilterSet):
-    def __init__(self, fields, *args, **kwargs):
+    def __init__(self, fields: dict[str, FieldInfo], *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Constructing the filterset dynamically enables:
         # Checking whether the provided field_path and lookup can be used together
         # Validating the values provided by the user for the fields
         # Returning cleaned values from user inputs, using the filterset's underlying form
-        for field in self.data:
-            mfield = fields[field]
+        for field, field_info in fields.items():
+            filter = FILTERS[field_info.onyx_type][field_info.lookup]
 
-            name, filter = get_filter(
-                project=mfield.project,
-                field_type=mfield.field_type,
-                field_path=mfield.field_path,
-                field_name=mfield.field_name,
-                lookup=mfield.lookup,
-            )
-            if name:
-                self.filters[name] = filter
+            if field_info.onyx_type == OnyxType.CHOICE:
+                choices = [(x, x) for x in field_info.choices]
+                self.filters[field] = filter(
+                    field_name=field_info.field_path,
+                    choices=choices,
+                    lookup_expr=field_info.lookup,
+                )
+            else:
+                self.filters[field] = filter(
+                    field_name=field_info.field_path,
+                    lookup_expr=field_info.lookup,
+                )

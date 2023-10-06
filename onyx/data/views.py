@@ -1,4 +1,4 @@
-from django.core.exceptions import FieldDoesNotExist, ValidationError
+from django.core.exceptions import ValidationError
 from rest_framework import status, exceptions
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -6,12 +6,12 @@ from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSetMixin
 from accounts.permissions import Approved, ProjectApproved, ProjectAdmin
+from utils.functions import mutable
 from .models import Project, Choice
 from .filters import OnyxFilter
 from .serializers import ModelSerializerMap, SerializerNode
 from .exceptions import CIDNotFound
 from .utils import (
-    mutable,
     prefetch_nested,
     assign_fields_info,
     resolve_fields,
@@ -47,8 +47,7 @@ class ProjectAPIView(APIView):
         self.model = model
 
         # Get the model's serializer
-        serializer_cls = ModelSerializerMap.get(self.model)
-        self.serializer_cls = serializer_cls
+        self.serializer_cls = ModelSerializerMap.get(self.model)
 
         # Take out any special params from the request
         with mutable(request.query_params) as query_params:
@@ -356,15 +355,13 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # This is done by first building a FilterSet
         # And then checking the underlying form is valid
         try:
+            # TODO: Remove FieldDoesNotExist error from validate_atoms?
+            # Because we shouldn't need it anymore, with the updates to resolve_fields
             validate_atoms(
                 atoms,
                 filterset=OnyxFilter,
                 filterset_args=[fields_info],
                 filterset_model=self.model,
-            )
-        except FieldDoesNotExist as e:
-            raise exceptions.ValidationError(
-                {field: ["This field has an invalid lookup."] for field in e.args[0]}
             )
         except ValidationError as e:
             raise exceptions.ValidationError(e.args[0])

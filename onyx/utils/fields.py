@@ -2,15 +2,6 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
-class ModelChoiceField(models.ForeignKey):
-    def __init__(self, *args, **kwargs):
-        name = kwargs.pop("name", None)
-        kwargs["to"] = "data.Choice"
-        kwargs["on_delete"] = models.CASCADE
-        kwargs["related_name"] = f"%(app_label)s_%(class)s_{name}"
-        super().__init__(*args, **kwargs)
-
-
 class StrippedCharField(models.CharField):
     def to_python(self, value):
         if value is None:
