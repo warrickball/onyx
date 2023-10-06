@@ -1,0 +1,9 @@
+gunicorn
+psycopg2-binary
+django
+djangorestframework
+django-rest-knox
+django-filter
+django-cursor-pagination
+django-simple-history
+django-query-tools
