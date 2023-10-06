@@ -210,9 +210,6 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         Create an instance for the given project `code`.
         """
 
-        # A terrible error to test Django CI github action for tests
-        1 / 0
-
         # Validate the fields
         validate_fields(
             user=request.user,
