@@ -160,8 +160,8 @@ class TestCreateView(OnyxTestCase):
             "testuser",
             roles=["is_staff"],
             groups=[
-                "test.add.base",
                 "test.view.base",
+                "test.add.base",
             ],
         )
 
@@ -187,7 +187,7 @@ class TestCreateView(OnyxTestCase):
         payload = copy.deepcopy(default_payload)
         payload["cid"] = "helloooo"
         response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 

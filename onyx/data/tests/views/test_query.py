@@ -12,13 +12,14 @@ class TestQueryView(OnyxTestCase):
             "testuser",
             roles=["is_staff"],
             groups=[
-                "test.add.base",
                 "test.view.base",
             ],
         )
+
+        self.user.groups.add(Group.objects.get(name="test.add.base"))
         for payload in test_data():
             response = self.client.post(self.endpoint, data=payload)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
         self.endpoint = reverse("data.project.query", kwargs={"code": "test"})
-        self.user.groups.remove(Group.objects.get(name="test.add.base"))
