@@ -11,4 +11,4 @@ dependencies:
     - django-rest-knox>=4.2.0
     - django-filter>=2.3.0
     - django-simple-history>=2.12.0
-    - django-query-tools>=0.3.0
+    - django-query-tools>=0.3.3

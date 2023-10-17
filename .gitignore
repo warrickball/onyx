@@ -3,6 +3,7 @@
 **/migrations
 logs
 stuff
+env
 onyx/data/models/projects/*
 !onyx/data/models/projects/__init__.py
 !onyx/data/models/projects/test.py
