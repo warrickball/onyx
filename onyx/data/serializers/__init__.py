@@ -6,18 +6,18 @@ from . import projects
 from .serializers import SerializerNode, ProjectRecordSerializer
 
 
-class ModelSerializerMap:
+class ProjectSerializerMap:
     MAPPING = {}
 
     @classmethod
-    def add(cls, model: type[Model], serializer: type[ModelSerializer]):
+    def add(cls, model: type[Model], serializer: type[ProjectRecordSerializer]):
         """
-        Add a `Model` and its `ModelSerializer` to the `ModelSerializerMap`.
+        Add a root project `Model` and its `ProjectRecordSerializer` to the `ProjectSerializerMap`.
         """
         cls.MAPPING[model] = serializer
 
     @classmethod
-    def get(cls, model: type[Model]) -> type[ModelSerializer]:
+    def get(cls, model: type[Model]) -> type[ProjectRecordSerializer]:
         """
         Retrieve the `ModelSerializer` for a `Model`.
         """
@@ -45,7 +45,7 @@ for module_info in pkgutil.iter_modules(
     # For each member of the module that satisfies the predicate
     # Add it to the mapping
     for name, cls in inspect.getmembers(module, predicate):
-        ModelSerializerMap.add(
+        ProjectSerializerMap.add(
             model=cls.Meta.model,
             serializer=cls,
         )

@@ -7,9 +7,9 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSetMixin
 from accounts.permissions import Approved, ProjectApproved, ProjectAdmin
 from utils.functions import mutable
-from .models import Project, Choice
+from .models import Project, Choice, ProjectRecord
 from .filters import OnyxFilter
-from .serializers import ModelSerializerMap, SerializerNode
+from .serializers import ProjectSerializerMap, SerializerNode
 from .exceptions import CIDNotFound
 from .utils import (
     prefetch_nested,
@@ -21,6 +21,7 @@ from .utils import (
     unflatten_fields,
     include_exclude_fields,
     init_project_queryset,
+    OnyxType,
 )
 from django_query_tools.server import (
     make_atoms,
@@ -44,10 +45,11 @@ class ProjectAPIView(APIView):
         # Get the project's model
         model = self.project.content_type.model_class()
         assert model is not None
+        assert issubclass(model, ProjectRecord)
         self.model = model
 
         # Get the model's serializer
-        self.serializer_cls = ModelSerializerMap.get(self.model)
+        self.serializer_cls = ProjectSerializerMap.get(self.model)
 
         # Take out any special params from the request
         with mutable(request.query_params) as query_params:
@@ -83,20 +85,28 @@ class ProjectsView(APIView):
         List all projects that the user has allowed actions on.
         """
 
-        projects = {}
+        project_groups = []
 
         # Filter user groups to determine all distinct (code, action) pairs
         # Create list of available actions for each project
-        for project_action in (
+        for project_action_scope in (
             request.user.groups.filter(projectgroup__isnull=False)
-            .values("projectgroup__project__code", "projectgroup__action")
+            .values(
+                "projectgroup__project__code",
+                "projectgroup__action",
+                "projectgroup__scope",
+            )
             .distinct()
         ):
-            projects.setdefault(
-                project_action["projectgroup__project__code"], []
-            ).append(project_action["projectgroup__action"])
+            project_groups.append(
+                {
+                    "project": project_action_scope["projectgroup__project__code"],
+                    "action": project_action_scope["projectgroup__action"],
+                    "scope": project_action_scope["projectgroup__scope"],
+                }
+            )
 
-        return Response(projects)
+        return Response(project_groups)
 
 
 class FieldsView(ProjectAPIView):
@@ -123,6 +133,7 @@ class FieldsView(ProjectAPIView):
             code=self.project.code,
             model=self.model,
             fields=fields,
+            ignore_lookup=True,
         )
 
         # Unflatten list of fields into nested dict
@@ -134,7 +145,7 @@ class FieldsView(ProjectAPIView):
             fields_info=fields_info,
         )
 
-        return Response(field_types)
+        return Response({"version": self.model.version(), "fields": field_types})
 
 
 class ChoicesView(ProjectAPIView):
@@ -164,6 +175,11 @@ class ChoicesView(ProjectAPIView):
             model=self.model,
             fields=[field],
         )
+
+        if fields_info[field].onyx_type != OnyxType.CHOICE:
+            raise exceptions.ValidationError(
+                {"detail": f"This field is not a '{OnyxType.CHOICE.label}' field."}
+            )
 
         # Obtain choices for the field
         choices = Choice.objects.filter(
@@ -235,6 +251,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Create the instance
         if not test:
             instance = node.save()
+            assert isinstance(instance, ProjectRecord)
             cid = instance.cid
         else:
             cid = None
@@ -473,6 +490,8 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Update the instance
         if not test:
             instance = node.save()
+            assert isinstance(instance, ProjectRecord)
+            cid = instance.cid
 
         # Return response indicating update
         return Response({"cid": cid})

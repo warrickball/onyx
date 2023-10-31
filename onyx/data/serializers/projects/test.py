@@ -26,7 +26,7 @@ class TestModelRecordSerializer(BaseRecordSerializer):
             ("test_start", "test_end"),
         ]
         optional_value_groups = BaseRecordSerializer.OnyxMeta.optional_value_groups + [
-            ("score_a", "score_b")
+            ["score_a", "score_b"]
         ]
         conditional_required = BaseRecordSerializer.OnyxMeta.conditional_required | {
             "score_c": ["score_a", "score_b"]
@@ -65,7 +65,7 @@ class BaseTestModelSerializer(ProjectRecordSerializer):
     class OnyxMeta(ProjectRecordSerializer.OnyxMeta):
         optional_value_groups = (
             ProjectRecordSerializer.OnyxMeta.optional_value_groups
-            + [("collection_month", "received_month")]
+            + [["collection_month", "received_month"]]
         )
         orderings = ProjectRecordSerializer.OnyxMeta.orderings + [
             ("collection_month", "received_month"),
@@ -93,12 +93,11 @@ class TestModelSerializer(BaseTestModelSerializer):
 
     class OnyxMeta(BaseTestModelSerializer.OnyxMeta):
         relations = BaseTestModelSerializer.OnyxMeta.relations | {
+            "records": TestModelRecordSerializer,
+        }
+        relation_options = BaseTestModelSerializer.OnyxMeta.relation_options | {
             "records": {
-                "serializer": TestModelRecordSerializer,
-                "kwargs": {
-                    "many": True,
-                    "required": False,
-                    "allow_null": True,
-                },
-            }
+                "many": True,
+                "required": False,
+            },
         }
