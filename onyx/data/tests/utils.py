@@ -50,7 +50,7 @@ class OnyxTestCase(APITestCase):
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(username=username)
+        user = User.objects.get(username=f"onyx-{username}")
 
         if roles:
             for role in roles:
