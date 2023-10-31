@@ -125,10 +125,27 @@ class BaseRecord(models.Model):
 
 
 class ProjectRecord(BaseRecord):
-    cid = UpperCharField(max_length=12, unique=True)
-    published_date = models.DateField(auto_now_add=True)
-    suppressed = models.BooleanField(default=False)
-    site_restricted = models.BooleanField(default=False)
+    @classmethod
+    def version(cls):
+        raise NotImplementedError("A version number is required.")
+
+    cid = UpperCharField(
+        max_length=12,
+        unique=True,
+        help_text="Unique identifier for a project record. Set by Onyx.",
+    )
+    published_date = models.DateField(
+        auto_now_add=True,
+        help_text="The date the project record was published. Set by Onyx.",
+    )
+    suppressed = models.BooleanField(
+        default=False,
+        help_text="Indicator for whether a project record has been hidden from users.",
+    )
+    site_restricted = models.BooleanField(
+        default=False,
+        help_text="Indicator for whether a project record has been hidden from users not within the record's site.",
+    )
 
     class Meta:
         default_permissions = []
