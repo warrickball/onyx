@@ -6,15 +6,24 @@ from rest_framework.authentication import BasicAuthentication
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView
 from knox.views import LoginView as KnoxLoginView
-from .models import User
+from .models import User, Site
 from .serializers import (
-    CreateUserSerializer,
+    RegisterSerializer,
     ViewUserSerializer,
-    SiteWaitingSerializer,
-    AdminWaitingSerializer,
+    WaitingUserSerializer,
 )
-from .permissions import Any, Active, Approved, SiteAuthority, Admin
-from .exceptions import ProjectNotFound, UserNotFound
+from .permissions import Any, Approved, Admin
+from .exceptions import ProjectNotFound, UserNotFound, SiteNotFound
+
+
+class RegisterView(CreateAPIView):
+    """
+    Register a user.
+    """
+
+    permission_classes = Any
+    serializer_class = RegisterSerializer
+    queryset = User.objects.all()
 
 
 class LoginView(KnoxLoginView):
@@ -22,135 +31,85 @@ class LoginView(KnoxLoginView):
     Login a user.
     """
 
+    permission_classes = Approved
     authentication_classes = [BasicAuthentication]
-    permission_classes = Active
 
 
-class CreateUserView(CreateAPIView):
+class ProfileView(APIView):
     """
-    Create a user.
-    """
-
-    permission_classes = Any
-    serializer_class = CreateUserSerializer
-    queryset = User.objects.all()
-
-
-class SiteApproveView(APIView):
-    """
-    Grant site approval to a user.
+    View the user's information.
     """
 
-    permission_classes = SiteAuthority
+    permission_classes = Approved
 
-    def patch(self, request, username):
-        # Get user to be approved
-        try:
-            # Admins can approve users from any site
-            if request.user.is_staff:
-                user = User.objects.get(username=username)
-            else:
-                user = User.objects.filter(site=request.user.site).get(
-                    username=username
-                )
-        except User.DoesNotExist:
-            raise UserNotFound
-
-        # Approve user
-        user.is_site_approved = True
-        user.when_site_approved = datetime.now()
-        user.save(update_fields=["is_site_approved", "when_site_approved"])
-
-        return Response(
-            {
-                "username": username,
-                "is_site_approved": user.is_site_approved,
-            },
-        )
+    def get(self, request):
+        serializer = ViewUserSerializer(instance=request.user)
+        return Response(serializer.data)
 
 
-class AdminApproveView(APIView):
+class WaitingUsersView(ListAPIView):
     """
-    Grant admin approval to a user.
+    List users waiting for approval.
     """
 
     permission_classes = Admin
-
-    def patch(self, request, username):
-        # Get user to be approved
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            raise UserNotFound
-
-        # Approve user
-        user.is_admin_approved = True
-        user.when_admin_approved = datetime.now()
-        user.save(update_fields=["is_admin_approved", "when_admin_approved"])
-
-        return Response(
-            {
-                "username": username,
-                "is_admin_approved": user.is_admin_approved,
-            },
-        )
-
-
-class SiteWaitingView(ListAPIView):
-    """
-    List all users waiting for site approval.
-    """
-
-    permission_classes = SiteAuthority
-    serializer_class = SiteWaitingSerializer
-
-    def get_queryset(self):
-        # Admins can view users from any site
-        if self.request.user.is_staff:  # type: ignore
-            return (
-                User.objects.filter(is_active=True)
-                .filter(is_site_approved=False)
-                .order_by("-date_joined")
-            )
-        else:
-            return (
-                User.objects.filter(is_active=True)
-                .filter(site=self.request.user.site)  # type: ignore
-                .filter(is_site_approved=False)
-                .order_by("-date_joined")
-            )
-
-
-class AdminWaitingView(ListAPIView):
-    """
-    List all users waiting for admin approval.
-    """
-
-    permission_classes = Admin
-    serializer_class = AdminWaitingSerializer
+    serializer_class = WaitingUserSerializer
 
     def get_queryset(self):
         return (
             User.objects.filter(is_active=True)
-            .filter(is_site_approved=True)
-            .filter(is_admin_approved=False)
-            .order_by("-when_site_approved")
+            .filter(is_approved=False)
+            .order_by("-date_joined")
+        )
+
+
+class ApproveUserView(APIView):
+    """
+    Approve a user.
+    """
+
+    permission_classes = Admin
+
+    def patch(self, request, username):
+        # Get the user to be approved
+        try:
+            user = User.objects.get(
+                username=username,
+                is_active=True,
+            )
+        except User.DoesNotExist:
+            raise UserNotFound
+
+        # Approve user
+        user.is_approved = True
+        user.when_approved = datetime.now()
+        user.save(update_fields=["is_approved", "when_approved"])
+
+        return Response(
+            {
+                "username": username,
+                "is_approved": user.is_approved,
+            },
         )
 
 
 class SiteUsersView(ListAPIView):
     """
-    List all users in the site of the requesting user.
+    List users in the site of the requesting user.
     """
 
     permission_classes = Approved
     serializer_class = ViewUserSerializer
 
     def get_queryset(self):
-        return User.objects.filter(site=self.request.user.site).order_by("-date_joined")  # type: ignore
+        assert isinstance(self.request.user, User)
+        return User.objects.filter(
+            is_approved=True,
+            site=self.request.user.site,
+        ).order_by("-date_joined")
 
 
-class AdminUsersView(ListAPIView):
+class AllUsersView(ListAPIView):
     """
     List all users.
     """
@@ -162,10 +121,44 @@ class AdminUsersView(ListAPIView):
         return User.objects.order_by("-date_joined")
 
 
-# TODO: Filter ProjectGroups code with iexact?
-class ControlProjectGroupsView(APIView):
+class ProjectUserView(KnoxLoginView):
     """
-    Set projects that can be viewed by a user.
+    Create/retrieve a user with permission to view a specific project.
+    """
+
+    permission_classes = Admin
+
+    def post(self, request, *args, **kwargs):
+        raise exceptions.MethodNotAllowed(self.request.method)
+
+    def get(self, request, code, site_code, username):
+        try:
+            site = Site.objects.get(code=site_code)
+        except Site.DoesNotExist:
+            raise SiteNotFound
+
+        user, created = User.objects.get_or_create(
+            username=username, site=site, defaults={"is_approved": True}
+        )
+
+        if created:
+            user.set_unusable_password()
+            user.save()
+
+        view_group = Group.objects.get(
+            projectgroup__project__code=code,
+            projectgroup__action="view",
+            projectgroup__scope="base",
+        )
+        user.groups.add(view_group)
+
+        request.user = user
+        return super().post(request)
+
+
+class ProjectGroupsView(APIView):
+    """
+    Define projects that can be viewed by a user.
     """
 
     permission_classes = Admin
@@ -178,9 +171,7 @@ class ControlProjectGroupsView(APIView):
             raise UserNotFound
 
         if not isinstance(request.data, list):
-            raise exceptions.ValidationError(
-                {"detail": f"Expected a list but received type: {type(request.data)}"}
-            )
+            raise exceptions.ValidationError({"detail": f"Expected a list."})
 
         # Remove any project groups with a code not in the request data
         removed = []
@@ -200,6 +191,7 @@ class ControlProjectGroupsView(APIView):
                 )
             except Group.DoesNotExist:
                 raise ProjectNotFound
+
             if group not in user.groups.all():
                 user.groups.add(group)
                 added.append(group.name)
@@ -211,31 +203,3 @@ class ControlProjectGroupsView(APIView):
                 "removed": removed,
             },
         )
-
-
-class ControlProjectUserView(KnoxLoginView):
-    """
-    Create/get a user with permission to view a specific project.
-    """
-
-    permission_classes = Admin
-
-    def post(self, request, *args, **kwargs):
-        raise exceptions.MethodNotAllowed(self.request.method)
-
-    def get(self, request, code, username):
-        user, created = User.objects.get_or_create(username=username)
-
-        if created:
-            user.set_unusable_password()
-            user.save()
-
-        view_group = Group.objects.get(
-            projectgroup__project__code=code,
-            projectgroup__action="view",
-            projectgroup__scope="base",
-        )
-        user.groups.add(view_group)
-
-        request.user = user
-        return super().post(request)

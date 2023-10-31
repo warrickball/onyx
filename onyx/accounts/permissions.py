@@ -1,4 +1,5 @@
 from rest_framework import permissions
+from rest_framework.request import Request
 from .exceptions import ProjectNotFound, ScopeNotFound
 
 
@@ -26,7 +27,6 @@ class IsAdminUser(permissions.IsAdminUser):
     message = "You need to be an admin."
 
 
-# TODO: Checks for restricting users with no site? This is all temporary
 class IsActiveSite(permissions.BasePermission):
     """
     Allows access only to users who are still in an active site.
@@ -34,10 +34,8 @@ class IsActiveSite(permissions.BasePermission):
 
     message = "Your site needs to be activated."
 
-    def has_permission(self, request, view):
-        return bool(
-            request.user and (not request.user.site or request.user.site.is_active)
-        )
+    def has_permission(self, request: Request, view):
+        return bool(request.user and request.user.site and request.user.site.is_active)
 
 
 class IsActiveUser(permissions.BasePermission):
@@ -47,57 +45,31 @@ class IsActiveUser(permissions.BasePermission):
 
     message = "Your account needs to be activated."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view):
         return bool(request.user and request.user.is_active)
 
 
-class IsSiteApproved(permissions.BasePermission):
+class IsApproved(permissions.BasePermission):
     """
-    Allows access only to users that have been approved by an authority for their site.
+    Allows access only to users that have been approved.
     """
 
-    message = "You need to be approved by an authority from your site."
+    message = "Your account needs to be approved."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view):
         return bool(
-            request.user and (request.user.is_site_approved or request.user.is_staff)
+            request.user and (request.user.is_approved or request.user.is_staff)
         )
 
 
-class IsAdminApproved(permissions.BasePermission):
-    """
-    Allows access only to users that have been approved by an admin.
-    """
-
-    message = "You need to be approved by an admin."
-
-    def has_permission(self, request, view):
-        return bool(
-            request.user and (request.user.is_admin_approved or request.user.is_staff)
-        )
-
-
-class IsSiteAuthority(permissions.BasePermission):
-    """
-    Allows access only to users who are an authority for their site.
-    """
-
-    message = "You need to be an authority for your site."
-
-    def has_permission(self, request, view):
-        return bool(
-            request.user and (request.user.is_site_authority or request.user.is_staff)
-        )
-
-
-class IsSameSiteAsObject(permissions.BasePermission):
+class IsObjectSite(permissions.BasePermission):
     """
     Allows access only to users of the same site as the object they are accessing.
     """
 
     message = "You need to be from the object's site."
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request: Request, view, obj):
         return bool(
             request.user
             and request.user.site
@@ -110,7 +82,7 @@ class IsProjectApproved(permissions.BasePermission):
     Allows access only to users who can perform action on the project + scopes they are accessing.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view):
         project = view.kwargs["code"].lower()
         scopes = ["base"] + [
             code.lower() for code in request.query_params.getlist("scope")
@@ -148,13 +120,7 @@ class IsProjectApproved(permissions.BasePermission):
 # Useful permissions groupings
 Any = [AllowAny]
 Active = [IsAuthenticated, IsActiveSite, IsActiveUser]
-Approved = (
-    Active  #  + [IsSiteApproved, IsAdminApproved] # TODO: Remove this approval stuff
-)
+Approved = Active + [IsApproved]
 Admin = Approved + [IsAdminUser]
-
-SiteAuthority = Approved + [IsSiteAuthority]
-SiteAuthorityForObject = SiteAuthority + [IsSameSiteAsObject]
-
 ProjectApproved = Approved + [IsProjectApproved]
 ProjectAdmin = Admin + [IsProjectApproved]

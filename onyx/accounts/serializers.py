@@ -4,14 +4,17 @@ from django.core.exceptions import ValidationError
 import django.contrib.auth.password_validation as validators
 
 
-class CreateUserSerializer(serializers.ModelSerializer):
+class RegisterSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False)
     password = serializers.CharField(write_only=True)
+    email = serializers.CharField(required=True)
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
 
     def create(self, validated_data):
-        username = validated_data["last_name"] + validated_data["first_name"][:1]
+        username = (
+            f"onyx-{validated_data['last_name']}{validated_data['first_name'][:1]}"
+        )
         increment = 0
 
         while User.objects.filter(
@@ -32,14 +35,14 @@ class CreateUserSerializer(serializers.ModelSerializer):
             last_name=validated_data["last_name"],
         )
 
-    def validate_first_name(self, value):
+    def validate_first_name(self, value: str):
         if not value.isalpha():
             raise exceptions.ValidationError(
                 "This field must only contain alphabetic characters."
             )
         return value
 
-    def validate_last_name(self, value):
+    def validate_last_name(self, value: str):
         if not value.isalpha():
             raise exceptions.ValidationError(
                 "This field must only contain alphabetic characters."
@@ -66,11 +69,11 @@ class CreateUserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "username",
+            "password",
+            "site",
+            "email",
             "first_name",
             "last_name",
-            "email",
-            "site",
-            "password",
         ]
 
 
@@ -79,28 +82,17 @@ class ViewUserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "username",
-            "email",
             "site",
+            "email",
         ]
 
 
-class SiteWaitingSerializer(serializers.ModelSerializer):
+class WaitingUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
             "username",
-            "email",
             "site",
+            "email",
             "date_joined",
-        ]
-
-
-class AdminWaitingSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = [
-            "username",
-            "email",
-            "site",
-            "when_site_approved",
         ]

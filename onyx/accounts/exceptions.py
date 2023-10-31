@@ -12,3 +12,7 @@ class ScopeNotFound(exceptions.NotFound):
 
 class UserNotFound(exceptions.NotFound):
     default_detail = _("User not found.")
+
+
+class SiteNotFound(exceptions.NotFound):
+    default_detail = _("Site not found.")

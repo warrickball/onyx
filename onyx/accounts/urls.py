@@ -3,30 +3,21 @@ from . import views
 from knox import views as knox_views
 
 urlpatterns = [
-    path("accounts/register/", views.CreateUserView.as_view()),
-    path("accounts/login/", views.LoginView.as_view(), name="knox_login"),
-    path("accounts/logout/", knox_views.LogoutView.as_view(), name="knox_logout"),
-    path(
-        "accounts/logoutall/", knox_views.LogoutAllView.as_view(), name="knox_logoutall"
+    path("register/", views.RegisterView.as_view()),
+    path("login/", views.LoginView.as_view(), name="knox_login"),
+    path("logout/", knox_views.LogoutView.as_view(), name="knox_logout"),
+    path("logoutall/", knox_views.LogoutAllView.as_view(), name="knox_logoutall"),
+    path("profile/", views.ProfileView.as_view()),
+    path("waiting/", views.WaitingUsersView.as_view()),
+    re_path(r"^approve/(?P<username>[a-zA-Z_\-]*)/$", views.ApproveUserView.as_view()),
+    path("site/", views.SiteUsersView.as_view()),
+    path("all/", views.AllUsersView.as_view()),
+    re_path(
+        r"^projectuser/(?P<code>[a-zA-Z_]*)/(?P<site_code>[a-zA-Z]*)/(?P<username>[a-zA-Z_\-]*)/$",
+        views.ProjectUserView.as_view(),
     ),
     re_path(
-        r"^accounts/site/approve/(?P<username>[a-zA-Z_]*)/$",
-        views.SiteApproveView.as_view(),
-    ),
-    path("accounts/site/waiting/", views.SiteWaitingView.as_view()),
-    path("accounts/site/users/", views.SiteUsersView.as_view()),
-    re_path(
-        r"^accounts/admin/approve/(?P<username>[a-zA-Z_]*)/$",
-        views.AdminApproveView.as_view(),
-    ),
-    path("accounts/admin/waiting/", views.AdminWaitingView.as_view()),
-    path("accounts/admin/users/", views.AdminUsersView.as_view()),
-    re_path(
-        r"^control/projectgroups/(?P<username>[a-zA-Z_]*)/$",
-        views.ControlProjectGroupsView.as_view(),
-    ),
-    re_path(
-        r"^control/projectuser/(?P<code>[a-zA-Z_]*)/(?P<username>[a-zA-Z_]*)/$",
-        views.ControlProjectUserView.as_view(),
+        r"^projectgroups/(?P<username>[a-zA-Z_\-]*)/$",
+        views.ProjectGroupsView.as_view(),
     ),
 ]

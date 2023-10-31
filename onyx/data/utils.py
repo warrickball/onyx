@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 from django.db import models
 from django.contrib.auth.models import Group, Permission
 from rest_framework import exceptions
@@ -181,6 +182,7 @@ class FieldInfo:
         field_model: type[models.Model],
         field_path: str,
         lookup: str,
+        ignore_lookup=False,
     ):
         self.project = project
         self.field_model = field_model
@@ -231,6 +233,7 @@ class FieldInfo:
 
         elif self.field_instance.is_relation:
             self.onyx_type = OnyxType.RELATION
+            self.required = not self.field_instance.null
 
         else:
             raise NotImplementedError(
@@ -238,7 +241,10 @@ class FieldInfo:
             )
 
         if lookup not in self.onyx_type.lookups:
-            raise InvalidLookup
+            if ignore_lookup:
+                pass
+            else:
+                raise InvalidLookup
 
         self.lookup = lookup
 
@@ -247,6 +253,7 @@ def resolve_fields(
     code: str,
     model: type[models.Model],
     fields: list[str],
+    ignore_lookup=False,
 ) -> tuple[dict[str, FieldInfo], list[str]]:
     """
     Resolves provided `fields`, determining which models they come from.
@@ -260,6 +267,8 @@ def resolve_fields(
     # Resolve each field
     for field in fields:
         # Check for trailing underscore
+        # This is required because if a field ends in "__"
+        # Splitting will result in some funky stuff
         if field.endswith("_"):
             unknown.append(field)
             continue
@@ -294,6 +303,7 @@ def resolve_fields(
                         field_model=current_model,
                         field_path=field_path,
                         lookup=lookup,
+                        ignore_lookup=ignore_lookup,
                     )
                     resolved[field] = field_info
                 except InvalidLookup:
@@ -321,7 +331,7 @@ def assign_fields_info(
     fields_dict: dict,
     fields_info: dict[str, FieldInfo],
     prefix: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     for field, nested in fields_dict.items():
         if prefix:
             field_path = f"{prefix}__{field}"
@@ -329,11 +339,18 @@ def assign_fields_info(
             field_path = field
 
         if nested:
+            onyx_type = fields_info[field_path].onyx_type
+            required = fields_info[field_path].required
             assign_fields_info(
                 fields_dict=nested,
                 fields_info=fields_info,
                 prefix=field_path,
             )
+            fields_dict[field] = {
+                "type": onyx_type.label,
+                "required": required,
+                "fields": nested,
+            }
         else:
             onyx_type = fields_info[field_path].onyx_type
             field_instance = fields_info[field_path].field_instance
@@ -389,7 +406,8 @@ def get_fields(
     return fields
 
 
-# TODO: A lack of type-checking is required on obj in order for request.data to pass.
+# TODO: This function feels very hacky.
+# A lack of type-checking is required on obj in order for request.data to pass.
 # Which does make me wonder: is this robust against whatever could be provided through request.data?
 # E.g. how sure are we that all 'fields' have been flattened from obj?
 def flatten_fields(obj) -> list[str]:
@@ -400,6 +418,15 @@ def flatten_fields(obj) -> list[str]:
     dunders = []
     if isinstance(obj, dict):
         for key, item in obj.items():
+            # TODO: An ugly but effective fix until I come up with a more elegant solution
+            # Basically just want to prevent any dunder separators in keys
+            # Long-term would be nice to not need the flatten_fields function, and check perms recursively
+            if "__" in key:
+                raise exceptions.ValidationError(
+                    {
+                        "detail": "Field names in request body cannot contain '__' separator."
+                    }
+                )
             prefix = key
             values = flatten_fields(item)
 
@@ -408,7 +435,6 @@ def flatten_fields(obj) -> list[str]:
                     dunders.append(f"{prefix}__{v}")
             else:
                 dunders.append(prefix)
-
     elif isinstance(obj, list):
         for item in obj:
             values = flatten_fields(item)
@@ -423,7 +449,7 @@ def flatten_fields(obj) -> list[str]:
 
 def unflatten_fields(
     fields: list[str],
-) -> dict:
+) -> dict[str, Any]:
     fields_dict = {}
 
     for field in fields:
@@ -551,6 +577,7 @@ def init_project_queryset(
         # If the user is not a member of staff:
         # - Ignore suppressed data
         # - Ignore site_restricted objects from other sites
+        # TODO: For site_restricted to work properly, need to have site stored directly on project record
         qs = qs.filter(suppressed=False).exclude(
             models.Q(site_restricted=True) & ~models.Q(user__site=user.site)
         )

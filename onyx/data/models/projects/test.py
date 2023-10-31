@@ -8,7 +8,14 @@ from utils.constraints import (
 )
 
 
+__version__ = "0.1.0"
+
+
 class BaseTestModel(ProjectRecord):
+    @classmethod
+    def version(cls):
+        return __version__
+
     sample_id = StrippedCharField(max_length=24)
     run_name = StrippedCharField(max_length=96)
     collection_month = YearMonthField(null=True)
