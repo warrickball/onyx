@@ -1,4 +1,4 @@
-import os
+from typing import Optional, List
 from django.core.management import base
 from django.contrib.auth.models import Group
 from ...models import User, Site
@@ -6,41 +6,41 @@ from ...models import User, Site
 
 ROLES = [
     "is_active",
-    "is_site_approved",
-    "is_admin_approved",
-    "is_site_authority",
+    "is_approved",
     "is_staff",
 ]
 
 
 def create_user(
-    username, email, site, password, password_env_var, first_name, last_name
+    username: str,
+    password: str,
+    site: str,
+    email: str,
+    first_name: str,
+    last_name: str,
 ):
-    if not password:
-        password = os.environ[password_env_var]
-
     if User.objects.filter(username=username).exists():
         print(f"User with username '{username}' already exists.")
         exit()
 
-    if User.objects.filter(email=email).exists():
-        print(f"User with email '{email}' already exists.")
-        exit()
-
     user = User.objects.create_user(  # type: ignore
         username=username,
-        email=email,
         password=password,
         site=Site.objects.get(code=site),
+        email=email,
         first_name=first_name,
         last_name=last_name,
     )
     print("Created user:", user.username)
-    print("\temail:", user.email)
     print("\tsite:", user.site.code)
+    print("\temail:", user.email)
 
 
-def manage_user_roles(username, granted, revoked):
+def manage_user_roles(
+    username: str,
+    granted: Optional[List[str]],
+    revoked: Optional[List[str]],
+):
     user = User.objects.get(username=username)
     print("User:", user.username)
 
@@ -84,7 +84,11 @@ def manage_user_roles(username, granted, revoked):
             print(f"\t{role}:", getattr(user, role))
 
 
-def manage_user_groups(username, granted, revoked):
+def manage_user_groups(
+    username: str,
+    granted: Optional[List[str]],
+    revoked: Optional[List[str]],
+):
     user = User.objects.get(username=username)
     print("User:", user.username)
 
@@ -110,36 +114,42 @@ def manage_user_groups(username, granted, revoked):
 
 def list_users():
     for user in User.objects.all():
-        attrs = {"username": user.username, "email": user.email}
+        attrs = {
+            "username": user.username,
+            "email": user.email if user.email else "-----",
+        }
         for role in ROLES:
             value = getattr(user, role)
             if value:
-                attrs[role] = role.upper()
+                attrs[role] = role.lower()
             else:
-                attrs[role] = "NOT_" + role.removeprefix("is_").upper()
+                attrs[role] = ("NOT_" + role.removeprefix("is_")).lower()
 
-        projects = {}
+        groups = []
 
-        # Filter user groups to determine all distinct (code, action) pairs
-        # Create list of available actions for each project
-        for project_action in (
+        # Filter user groups to determine all distinct (code, action, scope) pairs
+        for project_action_scope in (
             user.groups.filter(projectgroup__isnull=False)
-            .values("projectgroup__project__code", "projectgroup__action")
+            .values(
+                "projectgroup__project__code",
+                "projectgroup__action",
+                "projectgroup__scope",
+            )
             .distinct()
         ):
-            projects.setdefault(
-                project_action["projectgroup__project__code"], []
-            ).append(project_action["projectgroup__action"])
+            groups.append(
+                f"{project_action_scope['projectgroup__project__code']}[{project_action_scope['projectgroup__action']}][{project_action_scope['projectgroup__scope']}]",
+            )
 
         print(
             *attrs.values(),
-            *(f"{k}-{ ':'.join(v)}".upper() for k, v in sorted(projects.items())),
+            f":".join(groups),
             sep="\t",
         )
 
 
 class Command(base.BaseCommand):
-    help = "Create/manage users."
+    help = "Manage users."
 
     def add_arguments(self, parser):
         command = parser.add_subparsers(
@@ -149,14 +159,9 @@ class Command(base.BaseCommand):
         # CREATE A USER
         create_parser = command.add_parser("create", help="Create a user.")
         create_parser.add_argument("--username", required=True)
-        create_parser.add_argument("--email", required=True)
+        create_parser.add_argument("--password", required=True)
         create_parser.add_argument("--site", required=True)
-        password_group = create_parser.add_mutually_exclusive_group(required=True)
-        password_group.add_argument("--password")
-        password_group.add_argument(
-            "--password-env-var",
-            help="Name of environment variable containing password.",
-        )
+        create_parser.add_argument("--email", default="")
         create_parser.add_argument("--first-name", default="")
         create_parser.add_argument("--last-name", default="")
 
@@ -184,10 +189,9 @@ class Command(base.BaseCommand):
         if options["command"] == "create":
             create_user(
                 username=options["username"],
-                email=options["email"],
-                site=options["site"],
                 password=options["password"],
-                password_env_var=options["password_env_var"],
+                site=options["site"],
+                email=options["email"],
                 first_name=options["first_name"],
                 last_name=options["last_name"],
             )

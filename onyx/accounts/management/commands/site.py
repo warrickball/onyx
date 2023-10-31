@@ -1,8 +1,12 @@
+from typing import Optional, List
 from django.core.management import base
 from ...models import Site
 
 
-def create_site(code, description):
+def create_site(
+    code: str,
+    description: str,
+):
     site, created = Site.objects.update_or_create(
         code=code.lower(), defaults={"description": description}
     )
@@ -15,7 +19,11 @@ def create_site(code, description):
     print("\tdescription:", site.description)
 
 
-def manage_site_roles(code, granted, revoked):
+def manage_site_roles(
+    code: str,
+    granted: Optional[List[str]],
+    revoked: Optional[List[str]],
+):
     site = Site.objects.get(code=code)
 
     print("Site:", site.code)
