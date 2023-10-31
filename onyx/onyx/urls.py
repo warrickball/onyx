@@ -19,8 +19,8 @@ from django.urls import path, include
 
 urlpatterns = [
     # path("admin/", admin.site.urls),
-    path("", include("accounts.urls")),
-    path("", include("data.urls")),
+    path("accounts/", include("accounts.urls")),
+    path("projects/", include("data.urls")),
 ]
 
 handler404 = "internal.views.custom_page_not_found_view"
