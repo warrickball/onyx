@@ -21,20 +21,14 @@ def validate_optional_value_groups(
         for group in groups:
             # Existing fields from the group
             instance_fields = set(
-                [
-                    field
-                    for field in group
-                    if getattr(instance, field) not in EMPTY_VALUES
-                ]
+                field for field in group if getattr(instance, field) not in EMPTY_VALUES
             )
 
             # Fields specified by the request data
             request_fields = set(
-                [
-                    field
-                    for field in group
-                    if field in data and data[field] not in EMPTY_VALUES
-                ]
+                field
+                for field in group
+                if field in data and data[field] not in EMPTY_VALUES
             )
 
             # Fields that exist/are being added
@@ -42,11 +36,9 @@ def validate_optional_value_groups(
 
             # Fields specified by the request data that are going to be removed
             remove_fields = set(
-                [
-                    field
-                    for field in group
-                    if field in data and data[field] in EMPTY_VALUES
-                ]
+                field
+                for field in group
+                if field in data and data[field] in EMPTY_VALUES
             )
 
             # If the resulting set is empty, it means one of two not-good things:
