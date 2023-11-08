@@ -368,13 +368,13 @@ class SerializerNode:
                                 if len(n.identifiers) == 1:
                                     self.errors[field] = {
                                         "non_field_errors": [
-                                            f"The field {next(iter(n.identifiers))} must be unique."
+                                            f"Each {next(iter(n.identifiers))} in this set of {field} must be unique."
                                         ]
                                     }
                                 else:
                                     self.errors[field] = {
                                         "non_field_errors": [
-                                            f"The fields {', '.join(n.identifiers)} must make a unique set."
+                                            f"Each combination of {', '.join(n.identifiers)} in this set of {field} must be unique."
                                         ]
                                     }
                                 break
