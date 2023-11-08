@@ -2,15 +2,18 @@ import copy
 from datetime import datetime, timedelta
 from rest_framework import status
 from rest_framework.reverse import reverse
+from rest_framework.serializers import BooleanField
 from ..utils import OnyxTestCase
 from ...models.projects.test import TestModel, TestModelRecord
 
 
 default_payload = {
     "sample_id": "sample-1234",
-    "run_name": "run-1",
+    "run_name": "run-5678",
     "collection_month": "2023-01",
     "received_month": "2023-02",
+    "text_option_1": "hi",
+    "text_option_2": "bye",
     "submission_date": "2023-03-01",
     "country": "eng",
     "region": "nw",
@@ -37,40 +40,37 @@ default_payload = {
     ],
 }
 
-bad_yearmonths = [
+bad_yearmonths = {
     "0-0-0-0-",
     "0000-01",
     "209999999999-01",
     "2023-01-01",
     "2023-0",
-]
+}
 
-bad_dates = [
+bad_dates = {
     "0-0-0-0-",
     "0000-01",
     "209999999999-01-01",
     "2023-01",
-]
+}
 
-good_choices = [
+# (submitted, coerced) format
+good_choices = {
     ("nW", "nw"),
     ("Nw", "nw"),
     ("NW", "nw"),
     (" nw", "nw"),
-    (" ", ""),  # blank is allowed
-]
+    ("    ", ""),
+}
 
 bad_choices = [
-    "nws",
+    "not a choice",
 ]
 
-good_bools = [
-    ("true", True),
-    ("True", True),
-    ("TRUE", True),
-    ("false", False),
-    ("False", False),
-    ("FALSE", False),
+# (submitted, coerced) format
+good_bools = [(value, True) for value in BooleanField.TRUE_VALUES] + [
+    (value, False) for value in BooleanField.FALSE_VALUES
 ]
 
 bad_bools = [
@@ -82,6 +82,7 @@ bad_bools = [
     "FalsE",
 ]
 
+# (submitted, coerced) format
 good_ints = [
     ("5", 5),
     ("  7  ", 7),
@@ -90,6 +91,7 @@ good_ints = [
 
 bad_ints = [
     "2.45",
+    "hello",
 ]
 
 good_floats = [
@@ -100,6 +102,7 @@ good_floats = [
 bad_floats = [
     "2.45.3",
     "1/0",
+    "goodbye",
 ]
 
 
@@ -304,6 +307,19 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
+
+        for op_1, op_2 in [
+            ("collection_month", "received_month"),
+            ("text_option_1", "text_option_2"),
+        ]:
+            for empty_value in [" ", "", None]:
+                payload = copy.deepcopy(default_payload)
+                payload[op_1] = empty_value
+                payload[op_2] = empty_value
+                response = self.client.post(self.endpoint, data=payload)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                assert TestModel.objects.count() == 0
+                assert TestModelRecord.objects.count() == 0
 
     def test_nested_optional_value_group_fail(self):
         payload = copy.deepcopy(default_payload)

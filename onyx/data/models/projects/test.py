@@ -20,6 +20,8 @@ class BaseTestModel(ProjectRecord):
     run_name = StrippedCharField(max_length=96)
     collection_month = YearMonthField(null=True)
     received_month = YearMonthField(null=True)
+    text_option_1 = models.TextField(blank=True)
+    text_option_2 = models.TextField(blank=True)
     submission_date = models.DateField()
     country = ChoiceField(max_length=20, blank=True)
     region = ChoiceField(max_length=20, blank=True)
@@ -46,6 +48,10 @@ class BaseTestModel(ProjectRecord):
             optional_value_group(
                 model_name="basetestmodel",
                 fields=["collection_month", "received_month"],
+            ),
+            optional_value_group(
+                model_name="basetestmodel",
+                fields=["text_option_1", "text_option_2"],
             ),
             conditional_required(
                 model_name="basetestmodel", field="region", required=["country"]
