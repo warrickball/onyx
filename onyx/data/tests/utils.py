@@ -75,6 +75,8 @@ def test_data(n=100):
             "run_name": f"run-{random.randint(1, 3)}",
             "collection_month": f"2022-{random.randint(1, 12)}",
             "received_month": f"2023-{random.randint(1, 6)}",
+            "text_option_1": random.choice(["hi", ""]),
+            "text_option_2": "bye",
             "submission_date": f"2023-{random.randint(1, 6)}-{random.randint(1, 25)}",
             "country": ["eng", "scot", "wales", "ni", ""][country_region_group],
             "region": [

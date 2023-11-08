@@ -46,6 +46,8 @@ class BaseTestModelSerializer(ProjectRecordSerializer):
             "run_name",
             "collection_month",
             "received_month",
+            "text_option_1",
+            "text_option_2",
             "submission_date",
             "country",
             "region",
@@ -65,7 +67,10 @@ class BaseTestModelSerializer(ProjectRecordSerializer):
     class OnyxMeta(ProjectRecordSerializer.OnyxMeta):
         optional_value_groups = (
             ProjectRecordSerializer.OnyxMeta.optional_value_groups
-            + [["collection_month", "received_month"]]
+            + [
+                ["collection_month", "received_month"],
+                ["text_option_1", "text_option_2"],
+            ]
         )
         orderings = ProjectRecordSerializer.OnyxMeta.orderings + [
             ("collection_month", "received_month"),
