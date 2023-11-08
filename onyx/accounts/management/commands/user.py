@@ -1,6 +1,7 @@
 from typing import Optional, List
 from django.core.management import base
 from django.contrib.auth.models import Group
+from knox.models import AuthToken
 from ...models import User, Site
 
 
@@ -13,27 +14,45 @@ ROLES = [
 
 def create_user(
     username: str,
-    password: str,
     site: str,
     email: str,
     first_name: str,
     last_name: str,
+    password: Optional[str] = None,
 ):
     if User.objects.filter(username=username).exists():
         print(f"User with username '{username}' already exists.")
         exit()
 
-    user = User.objects.create_user(  # type: ignore
-        username=username,
-        password=password,
-        site=Site.objects.get(code=site),
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-    )
-    print("Created user:", user.username)
-    print("\tsite:", user.site.code)
-    print("\temail:", user.email)
+    if password:
+        user = User.objects.create_user(  # type: ignore
+            username=username,
+            password=password,
+            site=Site.objects.get(code=site),
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        print("Created user:", user.username)
+        print("\tsite:", user.site.code)
+        if email:
+            print("\temail:", user.email)
+    else:
+        user = User.objects.create_user(  # type: ignore
+            username=username,
+            site=Site.objects.get(code=site),
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        user.set_unusable_password()
+        user.save()
+        _, token = AuthToken.objects.create(user, None)  #  type: ignore
+        print("Created user:", user.username)
+        print("\tsite:", user.site.code)
+        if email:
+            print("\temail:", user.email)
+        print("\ttoken:", token)
 
 
 def manage_user_roles(
@@ -159,7 +178,11 @@ class Command(base.BaseCommand):
         # CREATE A USER
         create_parser = command.add_parser("create", help="Create a user.")
         create_parser.add_argument("--username", required=True)
-        create_parser.add_argument("--password", required=True)
+        create_parser.add_argument(
+            "--password",
+            required=False,
+            help="If a password is not provided, the user is assigned a non-expiring token.",
+        )
         create_parser.add_argument("--site", required=True)
         create_parser.add_argument("--email", default="")
         create_parser.add_argument("--first-name", default="")
@@ -189,11 +212,11 @@ class Command(base.BaseCommand):
         if options["command"] == "create":
             create_user(
                 username=options["username"],
-                password=options["password"],
                 site=options["site"],
                 email=options["email"],
                 first_name=options["first_name"],
                 last_name=options["last_name"],
+                password=options["password"],
             )
 
         elif options["command"] == "roles":
