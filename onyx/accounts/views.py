@@ -144,12 +144,15 @@ class ProjectUserView(KnoxLoginView):
         if created:
             user.set_unusable_password()
             user.save()
+        try:
+            view_group = Group.objects.get(
+                projectgroup__project__code=code,
+                projectgroup__action="view",
+                projectgroup__scope="base",
+            )
+        except Group.DoesNotExist:
+            raise ProjectNotFound
 
-        view_group = Group.objects.get(
-            projectgroup__project__code=code,
-            projectgroup__action="view",
-            projectgroup__scope="base",
-        )
         user.groups.add(view_group)
 
         request.user = user
