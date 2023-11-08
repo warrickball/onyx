@@ -6,17 +6,7 @@ urlpatterns = [
     path(
         "",
         views.ProjectsView.as_view(),
-        name="data.project.list",
-    ),
-    re_path(
-        r"^(?P<code>[a-zA-Z_]*)/fields/$",
-        views.FieldsView.as_view(),
-        name="data.project.fields",
-    ),
-    re_path(
-        r"^(?P<code>[a-zA-Z_]*)/choices/(?P<field>[a-zA-Z0-9_]*)/$",
-        views.ChoicesView.as_view(),
-        name="data.project.choices",
+        name="data.projects",
     ),
     re_path(
         r"^(?P<code>[a-zA-Z_]*)/$",
@@ -31,11 +21,6 @@ urlpatterns = [
         name="data.project.cid",
     ),
     re_path(
-        r"^(?P<code>[a-zA-Z_]*)/query/$",
-        views.ProjectRecordsViewSet.as_view({"post": "list"}),
-        name="data.project.query",
-    ),
-    re_path(
         r"^(?P<code>[a-zA-Z_]*)/test/$",
         views.ProjectRecordsViewSet.as_view({"post": "create"}),
         name="data.project.test",
@@ -46,5 +31,25 @@ urlpatterns = [
         views.ProjectRecordsViewSet.as_view({"patch": "partial_update"}),
         name="data.project.test.cid",
         kwargs={"test": True},
+    ),
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/query/$",
+        views.ProjectRecordsViewSet.as_view({"post": "list"}),
+        name="data.project.query",
+    ),
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/fields/$",
+        views.FieldsView.as_view(),
+        name="data.project.fields",
+    ),
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/lookups/$",
+        views.LookupsView.as_view(),
+        name="data.project.lookups",
+    ),
+    re_path(
+        r"^(?P<code>[a-zA-Z_]*)/choices/(?P<field>[a-zA-Z0-9_]*)/$",
+        views.ChoicesView.as_view(),
+        name="data.project.choices",
     ),
 ]

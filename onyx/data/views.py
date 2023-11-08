@@ -148,6 +148,45 @@ class FieldsView(ProjectAPIView):
         return Response({"version": self.model.version(), "fields": field_types})
 
 
+class LookupsView(ProjectAPIView):
+    def get_permissions(self):
+        permission_classes = ProjectApproved
+        self.action = "view"
+
+        return [permission() for permission in permission_classes]
+
+    def get(self, request: Request, code: str) -> Response:
+        """
+        List all lookups for a given project.
+        """
+
+        # Get all viewable fields within requested scope
+        fields = get_fields(
+            code=self.project.code,
+            action=self.action,
+            scopes=self.scopes,
+        )
+
+        # Determine field info for each field
+        fields_info, _ = resolve_fields(
+            code=self.project.code,
+            model=self.model,
+            fields=fields,
+            ignore_lookup=True,
+        )
+
+        # Get onyx types
+        onyx_types = {field_info.onyx_type for _, field_info in fields_info.items()}
+
+        # Build lookups structure
+        lookups = {}
+        for onyx_type in OnyxType:
+            if onyx_type in onyx_types:
+                lookups[onyx_type.label] = onyx_type.lookups
+
+        return Response(lookups)
+
+
 class ChoicesView(ProjectAPIView):
     def get_permissions(self):
         permission_classes = ProjectApproved
