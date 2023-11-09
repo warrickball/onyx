@@ -132,17 +132,17 @@ def manage_user_groups(
 
 
 def list_users():
-    for user in User.objects.all():
+    for user in User.objects.all().order_by("-is_staff", "date_joined"):
         attrs = {
             "username": user.username,
-            "email": user.email if user.email else "-----",
+            "site": user.site.code,
+            "email": user.email,
+            "creator": user.creator.username if user.creator else None,
+            "date_joined": user.date_joined,
         }
         for role in ROLES:
             value = getattr(user, role)
-            if value:
-                attrs[role] = role.lower()
-            else:
-                attrs[role] = ("NOT_" + role.removeprefix("is_")).lower()
+            attrs[role.removeprefix("is_").lower()] = value
 
         groups = []
 
@@ -161,7 +161,7 @@ def list_users():
             )
 
         print(
-            *attrs.values(),
+            *(f"{key}={val}" for key, val in attrs.items()),
             f":".join(groups),
             sep="\t",
         )
