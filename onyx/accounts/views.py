@@ -1,4 +1,3 @@
-from datetime import datetime
 from django.contrib.auth.models import Group
 from rest_framework import exceptions
 from rest_framework.response import Response
@@ -12,7 +11,7 @@ from .serializers import (
     ViewUserSerializer,
     WaitingUserSerializer,
 )
-from .permissions import Any, Approved, Admin
+from .permissions import Nobody, Approved, Admin
 from .exceptions import ProjectNotFound, UserNotFound, SiteNotFound
 
 
@@ -21,7 +20,7 @@ class RegisterView(CreateAPIView):
     Register a user.
     """
 
-    permission_classes = Any
+    permission_classes = Nobody
     serializer_class = RegisterSerializer
     queryset = User.objects.all()
 
@@ -43,6 +42,7 @@ class ProfileView(APIView):
     permission_classes = Approved
 
     def get(self, request):
+        # Serialize and return the user's profile information
         serializer = ViewUserSerializer(instance=request.user)
         return Response(serializer.data)
 
@@ -56,10 +56,9 @@ class WaitingUsersView(ListAPIView):
     serializer_class = WaitingUserSerializer
 
     def get_queryset(self):
-        return (
-            User.objects.filter(is_active=True)
-            .filter(is_approved=False)
-            .order_by("-date_joined")
+        # Filter and return all active but unapproved users
+        return User.objects.filter(is_active=True, is_approved=False).order_by(
+            "-date_joined"
         )
 
 
@@ -71,19 +70,15 @@ class ApproveUserView(APIView):
     permission_classes = Admin
 
     def patch(self, request, username):
-        # Get the user to be approved
+        # Get the user to be approved (they must be active)
         try:
-            user = User.objects.get(
-                username=username,
-                is_active=True,
-            )
+            user = User.objects.get(is_active=True, username=username)
         except User.DoesNotExist:
             raise UserNotFound
 
-        # Approve user
+        # Approve the user
         user.is_approved = True
-        user.when_approved = datetime.now()
-        user.save(update_fields=["is_approved", "when_approved"])
+        user.save()
 
         return Response(
             {
@@ -102,8 +97,10 @@ class SiteUsersView(ListAPIView):
     serializer_class = ViewUserSerializer
 
     def get_queryset(self):
+        # Filter and return all active, approved users for the site
         assert isinstance(self.request.user, User)
         return User.objects.filter(
+            is_active=True,
             is_approved=True,
             site=self.request.user.site,
         ).order_by("-date_joined")
@@ -118,6 +115,7 @@ class AllUsersView(ListAPIView):
     serializer_class = ViewUserSerializer
 
     def get_queryset(self):
+        # Filter and return all users
         return User.objects.order_by("-date_joined")
 
 
@@ -132,18 +130,7 @@ class ProjectUserView(KnoxLoginView):
         raise exceptions.MethodNotAllowed(self.request.method)
 
     def get(self, request, code, site_code, username):
-        try:
-            site = Site.objects.get(code=site_code)
-        except Site.DoesNotExist:
-            raise SiteNotFound
-
-        user, created = User.objects.get_or_create(
-            username=username, site=site, defaults={"is_approved": True}
-        )
-
-        if created:
-            user.set_unusable_password()
-            user.save()
+        # Get the base view group for the requested project
         try:
             view_group = Group.objects.get(
                 projectgroup__project__code=code,
@@ -153,56 +140,35 @@ class ProjectUserView(KnoxLoginView):
         except Group.DoesNotExist:
             raise ProjectNotFound
 
+        # Get the requested site
+        try:
+            site = Site.objects.get(code=site_code)
+        except Site.DoesNotExist:
+            raise SiteNotFound
+
+        # Get the user, and check they have the correct creator and site
+        # If the user does not exist, create them
+        try:
+            user = User.objects.get(username=username)
+            if user.creator != request.user:
+                raise exceptions.PermissionDenied(
+                    {"detail": "This user cannot be modified."}
+                )
+            if user.site != site:
+                raise exceptions.ValidationError(
+                    {"detail": "This user belongs to a different site."}
+                )
+        except User.DoesNotExist:
+            user = User.objects.create(
+                username=username,
+                site=site,
+                is_approved=True,
+                creator=request.user,
+            )
+            user.set_unusable_password()
+            user.save()
+
         user.groups.add(view_group)
 
         request.user = user
         return super().post(request)
-
-
-class ProjectGroupsView(APIView):
-    """
-    Define projects that can be viewed by a user.
-    """
-
-    permission_classes = Admin
-
-    def post(self, request, username):
-        # Get user
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            raise UserNotFound
-
-        if not isinstance(request.data, list):
-            raise exceptions.ValidationError({"detail": f"Expected a list."})
-
-        # Remove any project groups with a code not in the request data
-        removed = []
-        for group in user.groups.filter(projectgroup__isnull=False):
-            if group.projectgroup.project.code not in request.data:  # type: ignore
-                user.groups.remove(group)
-                removed.append(group.name)
-
-        # Add the base view group for any new project groups
-        added = []
-        for project in request.data:
-            try:
-                group = Group.objects.get(
-                    projectgroup__project__code=project,
-                    projectgroup__action="view",
-                    projectgroup__scope="base",
-                )
-            except Group.DoesNotExist:
-                raise ProjectNotFound
-
-            if group not in user.groups.all():
-                user.groups.add(group)
-                added.append(group.name)
-
-        return Response(
-            {
-                "username": username,
-                "added": added,
-                "removed": removed,
-            },
-        )
