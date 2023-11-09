@@ -26,4 +26,4 @@ class User(AbstractUser):
     )
     site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
     is_approved = models.BooleanField(default=False)
-    when_approved = models.DateTimeField(null=True)
+    creator = models.ForeignKey("User", on_delete=models.PROTECT, null=True)

@@ -18,8 +18,4 @@ urlpatterns = [
         r"^projectuser/(?P<code>[a-zA-Z_]*)/(?P<site_code>[a-zA-Z]*)/(?P<username>[a-zA-Z_\.\-]*)/$",
         views.ProjectUserView.as_view(),
     ),
-    re_path(
-        r"^projectgroups/(?P<username>[a-zA-Z_\.\-]*)/$",
-        views.ProjectGroupsView.as_view(),
-    ),
 ]

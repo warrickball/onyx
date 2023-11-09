@@ -1,4 +1,4 @@
-from rest_framework.validators import UniqueTogetherValidator
+from utils.validators import OnyxUniqueTogetherValidator
 from ..serializers import BaseRecordSerializer, ProjectRecordSerializer
 from ...models.projects.test import BaseTestModel, TestModel, TestModelRecord
 from utils.fieldserializers import ChoiceField, YearMonthField
@@ -58,7 +58,7 @@ class BaseTestModelSerializer(ProjectRecordSerializer):
             "end",
         ]
         validators = [
-            UniqueTogetherValidator(
+            OnyxUniqueTogetherValidator(
                 queryset=BaseTestModel.objects.all(),
                 fields=["sample_id", "run_name"],
             )

@@ -11,6 +11,17 @@ class AllowAny(permissions.AllowAny):
     message = "You should be able to do this."
 
 
+class AllowNobody(permissions.BasePermission):
+    """
+    Allow no access.
+    """
+
+    message = "This endpoint is closed."
+
+    def has_permission(self, request: Request, view):
+        return False
+
+
 class IsAuthenticated(permissions.IsAuthenticated):
     """
     Allows access only to authenticated users.
@@ -119,6 +130,7 @@ class IsProjectApproved(permissions.BasePermission):
 
 # Useful permissions groupings
 Any = [AllowAny]
+Nobody = [AllowNobody]
 Active = [IsAuthenticated, IsActiveSite, IsActiveUser]
 Approved = Active + [IsApproved]
 Admin = Approved + [IsAdminUser]

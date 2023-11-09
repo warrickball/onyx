@@ -37,20 +37,22 @@ class OnyxTestCase(APITestCase):
         )
 
     def setup_user(self, username, roles=None, groups=None):
-        first_name = username[-1]
-        last_name = username[0:-1]
-        response = self.client.post(
-            "/accounts/register/",
-            data={
-                "first_name": first_name,
-                "last_name": last_name,
-                "password": "pass123456",
-                "email": f"{username}@test.com",
-                "site": self.site.code,
-            },
+        # first_name = username[-1]
+        # last_name = username[0:-1]
+        # response = self.client.post(
+        #     "/accounts/register/",
+        #     data={
+        #         "first_name": first_name,
+        #         "last_name": last_name,
+        #         "password": "pass123456",
+        #         "email": f"{username}@test.com",
+        #         "site": self.site.code,
+        #     },
+        # )
+        # self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user, _ = User.objects.get_or_create(
+            username=f"onyx-{username}", site=self.site
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(username=f"onyx-{username}")
 
         if roles:
             for role in roles:
