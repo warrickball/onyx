@@ -1,19 +1,24 @@
 """gunicorn WSGI server configuration."""
 
+from pathlib import Path
 import os
+from dotenv import load_dotenv
 
-chdir = os.path.join(os.environ["ONYX_WORKING_DIR"], "onyx")
+chdir = os.path.dirname(os.path.abspath(__file__))
+
+load_dotenv(Path(chdir) / ".env")
+
 wsgi_app = "onyx.wsgi"
 
-bind = os.environ["ONYX_GUNICORN_BIND"]
-workers = os.environ["ONYX_GUNICORN_WORKERS"]
+bind = os.environ["GUNICORN_BIND"]
+workers = os.environ["GUNICORN_WORKERS"]
 
-accesslog = os.path.join(os.environ["ONYX_WORKING_DIR"], "logs", "access.log")
+accesslog = os.path.join(chdir, "../logs", "access.log")
 access_log_format = (
     '%(t)s %({x-forwarded-for}i)s %(u)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(M)s ms'
 )
 
-errorlog = os.path.join(os.environ["ONYX_WORKING_DIR"], "logs", "error.log")
+errorlog = os.path.join(chdir, "../logs", "error.log")
 capture_output = True  # Redirect stdout/stderr to errorlog
 
 daemon = True  # Run process in the background

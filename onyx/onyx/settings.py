@@ -13,10 +13,12 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 from datetime import timedelta
 from pathlib import Path
 import os, sys
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(Path(BASE_DIR) / ".env")  # loads .env
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
@@ -25,14 +27,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # python manage.py shell
 # from django.core.management.utils import get_random_secret_key
-SECRET_KEY = os.environ["ONYX_DJANGO_SECRET_KEY"]
+SECRET_KEY = os.environ["SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = [os.environ["ONYX_DOMAIN"]]
+ALLOWED_HOSTS = [os.environ["HOST_NAME"]]
 
-# ADMINS = [(os.environ["ONYX_ADMIN_NAME"], os.environ["ONYX_ADMIN_EMAIL"])]
+# ADMINS = [(os.environ["ADMIN_NAME"], os.environ["ADMIN_EMAIL"])]
 
 # Application definition
 
@@ -94,8 +96,8 @@ WSGI_APPLICATION = "onyx.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ["ONYX_POSTGRES_DB"],
-        "USER": os.environ["ONYX_POSTGRES_USER"],
+        "NAME": os.environ["DATABASE_NAME"],
+        "USER": os.environ["DATABASE_USER"],
     }
 }
 
