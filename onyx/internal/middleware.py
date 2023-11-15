@@ -8,45 +8,54 @@ from .models import Request
 class SaveRequest:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.prefixes = ["/control", "/accounts", "/projects"]
+        self.prefixes = ["/accounts", "/projects"]
 
     def __call__(self, request):
-        _t = time.time()  # Calculated execution time.
-        response = self.get_response(request)  # Get response from view function.
+        # Get response from view function, and calculate the execution time (in ms)
+        _t = time.time()
+        response = self.get_response(request)
         _t = int((time.time() - _t) * 1000)
 
-        # If the url does not start with one of the prefixes
-        # Return the response and dont log the request
+        # If the url does not start with a correct prefix, don't log the request
         if not any(request.path.startswith(prefix) for prefix in self.prefixes):
             return response
 
+        # If the request was not successful, log the response content
         error_messages = ""
         if not status.is_success(response.status_code):
             error_messages = response.content
 
-        # Create Request instance
-        request_log = Request(
-            endpoint=request.path,
+        # Store the first 100 characters of the path
+        # Any path beyond that is likely to be rubbish
+        path = request.path[:100]
+
+        # Record the user who made the request (if not anonymous)
+        if not request.user.is_anonymous:
+            user = request.user
+        else:
+            user = None
+
+        # Record the client's ip address
+        # TODO: This can be spoofed, check nginx is passing correct address
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            address = x_forwarded_for.split(",")[0]
+        else:
+            address = request.META.get("REMOTE_ADDR")
+
+        # Store the first 20 characters of the address
+        # Any address beyond that is likely to be rubbish
+        address = address[:20]
+
+        # Log the request
+        Request.objects.create(
+            endpoint=path,
             method=request.method,
             status=response.status_code,
-            address=self.get_client_ip(request),
+            user=user,
+            address=address,
             exec_time=_t,
             error_messages=error_messages,
         )
 
-        # Assign user to log if it's not an anonymous user
-        if not request.user.is_anonymous:
-            request_log.user = request.user
-
-        # Save log in db
-        request_log.save()
         return response
-
-    # get clients ip address
-    def get_client_ip(self, request):
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            _ip = x_forwarded_for.split(",")[0]
-        else:
-            _ip = request.META.get("REMOTE_ADDR")
-        return _ip
