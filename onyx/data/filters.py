@@ -1,11 +1,10 @@
 import hashlib
 from datetime import datetime
-from distutils.util import strtobool
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-from utils.functions import get_suggestions
+from utils.functions import get_suggestions, strtobool
 from .utils import OnyxType, FieldInfo
 
 
@@ -185,10 +184,7 @@ class BooleanFieldForm(ChoiceFieldMixin, forms.TypedChoiceField):
                 "0",
             ]
         ]
-        # TODO: I have a sneaky suspicion that strtobool's [0, 1] coercion
-        # was messing up the filtering of isnull for relations. I have
-        # yet to confirm this, but would be something good to confirm.
-        kwargs["coerce"] = lambda x: bool(strtobool(x))
+        kwargs["coerce"] = lambda x: strtobool(x)
         super().__init__(**kwargs)
 
 
