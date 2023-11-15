@@ -4,7 +4,6 @@ import logging
 from django.core.management import call_command
 from django.contrib.auth.models import Group
 from rest_framework.test import APITestCase
-from rest_framework import status
 from accounts.models import User, Site
 
 
@@ -15,25 +14,15 @@ class OnyxTestCase(APITestCase):
     def setUp(self):
         logging.disable(logging.CRITICAL)
 
-        # Set up test project, choices, and site
+        # Set up site and test project
+        self.site = Site.objects.create(
+            code="TEST",
+            description="Department of Testing",
+        )
         call_command(
             "project",
             os.path.join(directory, "project.json"),
             quiet=True,
-        )
-        call_command(
-            "choices",
-            os.path.join(directory, "choices.json"),
-            quiet=True,
-        )
-        call_command(
-            "choiceconstraints",
-            os.path.join(directory, "constraints.json"),
-            quiet=True,
-        )
-        self.site = Site.objects.create(
-            code="TEST",
-            description="Department of Testing",
         )
 
     def setup_user(self, username, roles=None, groups=None):
@@ -49,7 +38,7 @@ class OnyxTestCase(APITestCase):
         #         "site": self.site.code,
         #     },
         # )
-        # self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        # self.assertEqual(response.status_code, 201)
         user, _ = User.objects.get_or_create(
             username=f"onyx-{username}", site=self.site
         )

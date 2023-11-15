@@ -1,88 +1,129 @@
 {
-    "test": {
-        "content_type": "data.testmodel",
-        "groups": {
-            "add": {
-                "base": [
-                    "sample_id",
-                    "run_name",
-                    "collection_month",
-                    "received_month",
-                    "text_option_1",
-                    "text_option_2",
-                    "submission_date",
-                    "country",
-                    "region",
-                    "concern",
-                    "tests",
-                    "score",
-                    "start",
-                    "end",
-                    "records",
-                    "records__test_id",
-                    "records__test_pass",
-                    "records__test_start",
-                    "records__test_end",
-                    "records__score_a",
-                    "records__score_b",
-                    "records__score_c"
+    "name": "test",
+    "content_type": "data.testmodel",
+    "groups": {
+        "add": {
+            "base": [
+                "sample_id",
+                "run_name",
+                "collection_month",
+                "received_month",
+                "text_option_1",
+                "text_option_2",
+                "submission_date",
+                "country",
+                "region",
+                "concern",
+                "tests",
+                "score",
+                "start",
+                "end",
+                "records",
+                "records__test_id",
+                "records__test_pass",
+                "records__test_start",
+                "records__test_end",
+                "records__score_a",
+                "records__score_b",
+                "records__score_c"
+            ]
+        },
+        "view": {
+            "base": [
+                "site",
+                "cid",
+                "published_date",
+                "sample_id",
+                "run_name",
+                "collection_month",
+                "received_month",
+                "text_option_1",
+                "text_option_2",
+                "submission_date",
+                "country",
+                "region",
+                "concern",
+                "tests",
+                "score",
+                "start",
+                "end",
+                "records",
+                "records__test_id",
+                "records__test_pass",
+                "records__test_start",
+                "records__test_end",
+                "records__score_a",
+                "records__score_b",
+                "records__score_c"
+            ]
+        },
+        "change": {
+            "base": [
+                "collection_month",
+                "received_month",
+                "text_option_1",
+                "text_option_2",
+                "submission_date",
+                "country",
+                "region",
+                "concern",
+                "tests",
+                "score",
+                "start",
+                "end",
+                "records",
+                "records__test_id",
+                "records__test_pass",
+                "records__test_start",
+                "records__test_end",
+                "records__score_a",
+                "records__score_b",
+                "records__score_c"
+            ]
+        },
+        "delete": {
+            "base": []
+        }
+    },
+    "choices": {
+        "country": [
+            "eng",
+            "wales",
+            "scot",
+            "ni"
+        ],
+        "region": [
+            "ne",
+            "nw",
+            "se",
+            "sw",
+            "other"
+        ]
+    },
+    "choice_constraints": {
+        "country": {
+            "eng": {
+                "region": [
+                    "ne",
+                    "nw",
+                    "se",
+                    "sw"
                 ]
             },
-            "view": {
-                "base": [
-                    "site",
-                    "cid",
-                    "published_date",
-                    "sample_id",
-                    "run_name",
-                    "collection_month",
-                    "received_month",
-                    "text_option_1",
-                    "text_option_2",
-                    "submission_date",
-                    "country",
-                    "region",
-                    "concern",
-                    "tests",
-                    "score",
-                    "start",
-                    "end",
-                    "records",
-                    "records__test_id",
-                    "records__test_pass",
-                    "records__test_start",
-                    "records__test_end",
-                    "records__score_a",
-                    "records__score_b",
-                    "records__score_c"
+            "wales": {
+                "region": [
+                    "other"
                 ]
             },
-            "change": {
-                "base": [
-                    "collection_month",
-                    "received_month",
-                    "text_option_1",
-                    "text_option_2",
-                    "submission_date",
-                    "country",
-                    "region",
-                    "concern",
-                    "tests",
-                    "score",
-                    "start",
-                    "end",
-                    "records",
-                    "records__test_id",
-                    "records__test_pass",
-                    "records__test_start",
-                    "records__test_end",
-                    "records__score_a",
-                    "records__score_b",
-                    "records__score_c"
+            "scot": {
+                "region": [
+                    "other"
                 ]
             },
-            "delete": {
-                "base": []
+            "ni": {
+                "region": [
+                    "other"
+                ]
             }
         }
     }
