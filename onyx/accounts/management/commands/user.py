@@ -107,6 +107,8 @@ def manage_user_groups(
     username: str,
     granted: Optional[List[str]],
     revoked: Optional[List[str]],
+    grant_regex: Optional[str],
+    revoke_regex: Optional[str],
 ):
     user = User.objects.get(username=username)
     print("User:", user.username)
@@ -122,6 +124,18 @@ def manage_user_groups(
         print("Revoked groups:")
         for g in revoked:
             group = Group.objects.get(name=g)
+            user.groups.remove(group)
+            print(f"\t{group}")
+
+    elif grant_regex:
+        print("Granted groups:")
+        for group in Group.objects.filter(name__regex=grant_regex):
+            user.groups.add(group)
+            print(f"\t{group}")
+
+    elif revoke_regex:
+        print("Revoked groups:")
+        for group in Group.objects.filter(name__regex=revoke_regex):
             user.groups.remove(group)
             print(f"\t{group}")
 
@@ -201,6 +215,8 @@ class Command(base.BaseCommand):
         groups_action = groups_parser.add_mutually_exclusive_group()
         groups_action.add_argument("-g", "--grant", nargs="+")
         groups_action.add_argument("-r", "--revoke", nargs="+")
+        groups_action.add_argument("--rxgrant")
+        groups_action.add_argument("--rxrevoke")
 
         # LIST USERS
         list_parser = command.add_parser(
@@ -231,6 +247,8 @@ class Command(base.BaseCommand):
                 username=options["user"],
                 granted=options.get("grant"),
                 revoked=options.get("revoke"),
+                grant_regex=options.get("rxgrant"),
+                revoke_regex=options.get("rxrevoke"),
             )
 
         elif options["command"] == "list":
