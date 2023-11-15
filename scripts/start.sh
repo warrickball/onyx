@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 cd "${0%/*}"
-./stop-server.sh
+./stop.sh
 cd ..
 
 echo "Activating Python virtual environment..."
