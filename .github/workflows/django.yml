@@ -32,4 +32,4 @@ jobs:
       working-directory: ./onyx
       run: |
         python -m poetry run coverage run --source='.' manage.py test -v 2
-        python -m poetry coverage report
+        python -m poetry run coverage report
