@@ -1,9 +1,10 @@
 .vscode
 .venv
 .env
+.coverage
+**.log
 __pycache__
 migrations
-logs
 stuff
 onyx/data/models/projects/*
 !onyx/data/models/projects/__init__.py
