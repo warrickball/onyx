@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Count
 from rest_framework import status, exceptions
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -9,7 +10,7 @@ from accounts.permissions import Approved, ProjectApproved, ProjectAdmin
 from utils.functions import mutable
 from .models import Project, Choice, ProjectRecord
 from .filters import OnyxFilter
-from .serializers import ProjectSerializerMap, SerializerNode
+from .serializers import ProjectSerializerMap, SerializerNode, SummarySerializer
 from .exceptions import CIDNotFound
 from .utils import (
     prefetch_nested,
@@ -60,18 +61,19 @@ class ProjectAPIView(APIView):
 
             # Used for including fields in output of get/filter/query
             self.include = query_params.getlist("include")
-            if self.include:
-                query_params.pop("include")
+            query_params.pop("include", None)
 
             # Used for excluding fields in output of get/filter/query
             self.exclude = query_params.getlist("exclude")
-            if self.exclude:
-                query_params.pop("exclude")
+            query_params.pop("exclude", None)
 
             # Used for specifying scopes of fields in get/filter/query
             self.scopes = query_params.getlist("scope")
-            if self.scopes:
-                query_params.pop("scope")
+            query_params.pop("scope", None)
+
+            # Used for summary aggregate in get/filter/query
+            self.summarise = query_params.get("summarise")
+            query_params.pop("summarise", None)
 
 
 class ProjectsView(APIView):
@@ -214,10 +216,12 @@ class ChoicesView(ProjectAPIView):
             model=self.model,
             fields=[field],
         )
-
-        if fields_info[field].onyx_type != OnyxType.CHOICE:
+        if (
+            not fields_info.get(field, None)
+            or fields_info[field].onyx_type != OnyxType.CHOICE
+        ):
             raise exceptions.ValidationError(
-                {"detail": f"This field is not a '{OnyxType.CHOICE.label}' field."}
+                {field: [f"This field is not a '{OnyxType.CHOICE.label}' field."]}
             )
 
         # Obtain choices for the field
@@ -370,10 +374,6 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         else:
             query = request.data
 
-        # Prepare paginator
-        self.paginator = CursorPagination()
-        self.paginator.ordering = "created"
-
         # If a query was provided
         # Turn the value of each key-value pair in query into a 'QueryAtom' object
         # A list of QueryAtoms is returned by make_atoms
@@ -389,10 +389,16 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         else:
             atoms = []
 
+        fields_to_resolve = [x.key for x in atoms]
+        if self.summarise and self.summarise not in fields_to_resolve:
+            fields_to_resolve.append(self.summarise)
+
+        # TODO: I don't like the return structure of this field
+        # I think a separate class for field validation is needed
         fields_info, unknown = resolve_fields(
             code=self.project.code,
             model=self.model,
-            fields=[x.key for x in atoms],
+            fields=fields_to_resolve,  #  type: ignore
         )
 
         # Validate the fields
@@ -465,23 +471,58 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             # TODO: Tests will be needed to confirm all of this
             qs = qs.filter(q_object).distinct()
 
-        # Add the pagination cursor param back into the request
-        if self.cursor:
-            with mutable(request.query_params) as query_params:
-                query_params[self.paginator.cursor_query_param] = self.cursor
+        if self.summarise:
+            summary_onyx_type = fields_info[self.summarise].onyx_type
+            if summary_onyx_type == OnyxType.RELATION:
+                raise exceptions.ValidationError(
+                    {self.summarise: ["Cannot summarise over this field."]}
+                )
 
-        # Paginate the response
-        instances = qs.order_by("id")
-        result_page = self.paginator.paginate_queryset(instances, request)
+            summary_lookup = fields_info[self.summarise].lookup
+            if summary_lookup:
+                raise exceptions.ValidationError(
+                    {self.summarise: ["Cannot summarise over a lookup."]}
+                )
 
-        # Serialize the results
-        serializer = self.serializer_cls(
-            result_page,
-            many=True,
-            fields=fields_dict,
-        )
+            qs_summary_values = qs.values(self.summarise)
+            if qs_summary_values.distinct().count() > 10000:
+                raise exceptions.ValidationError(
+                    {
+                        self.summarise: [
+                            "The current summary would return too many distinct values."
+                        ]
+                    }
+                )
 
-        # Return paginated response
+            # Serialize the results
+            serializer = SummarySerializer(
+                qs_summary_values.annotate(count=Count(self.summarise)),
+                field_name=self.summarise,
+                onyx_type=summary_onyx_type,
+                many=True,
+            )
+        else:
+            # Prepare paginator
+            self.paginator = CursorPagination()
+            self.paginator.ordering = "created"
+
+            # Add the pagination cursor param back into the request
+            if self.cursor:
+                with mutable(request.query_params) as query_params:
+                    query_params[self.paginator.cursor_query_param] = self.cursor
+
+            # Paginate the response
+            instances = qs.order_by("id")
+            result_page = self.paginator.paginate_queryset(instances, request)
+
+            # Serialize the results
+            serializer = self.serializer_cls(
+                result_page,
+                many=True,
+                fields=fields_dict,
+            )
+
+        # Return response
         return Response(serializer.data)
 
     def partial_update(

@@ -4,6 +4,7 @@ from django.db import transaction, DatabaseError, models
 from rest_framework import serializers, exceptions
 from accounts.models import User, Site
 from utils.defaults import CurrentUserSiteDefault
+from utils.fieldserializers import YearMonthField
 from ..validators import (
     validate_optional_value_groups,
     validate_orderings,
@@ -12,6 +13,34 @@ from ..validators import (
     validate_choice_constraints,
     validate_conditional_required,
 )
+from ..utils import OnyxType
+
+
+# TODO: Works, but could be better
+class SummarySerializer(serializers.Serializer):
+    def __init__(self, *args, field_name: str, onyx_type: OnyxType, **kwargs):
+        if onyx_type in {OnyxType.HASH, OnyxType.CHOICE, OnyxType.TEXT}:
+            field = serializers.CharField()
+        elif onyx_type == OnyxType.INTEGER:
+            field = serializers.IntegerField()
+        elif onyx_type == OnyxType.DECIMAL:
+            field = serializers.FloatField()
+        elif onyx_type == OnyxType.DATE_YYYY_MM:
+            field = YearMonthField()
+        elif onyx_type == OnyxType.DATE_YYYY_MM_DD:
+            field = serializers.DateField()
+        elif onyx_type == OnyxType.DATETIME:
+            field = serializers.DateTimeField()
+        elif onyx_type == OnyxType.BOOLEAN:
+            field = serializers.BooleanField()
+        else:
+            raise NotImplementedError(
+                f"'{onyx_type}' did not match an accepted OnyxType."
+            )
+
+        self.fields[field_name] = field
+        self.fields["count"] = serializers.IntegerField()
+        super().__init__(*args, **kwargs)
 
 
 # https://www.django-rest-framework.org/api-guide/serializers/#dynamically-modifying-fields
