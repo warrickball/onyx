@@ -1,9 +1,8 @@
 import pkgutil
 import importlib, inspect
 from django.db.models import Model
-from rest_framework.serializers import ModelSerializer
 from . import projects
-from .serializers import SerializerNode, ProjectRecordSerializer
+from .serializers import ProjectRecordSerializer, SerializerNode, SummarySerializer
 
 
 class ProjectSerializerMap:
