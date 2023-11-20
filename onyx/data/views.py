@@ -496,7 +496,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
 
             # Serialize the results
             serializer = SummarySerializer(
-                qs_summary_values.annotate(count=Count(self.summarise)),
+                qs_summary_values.annotate(count=Count("*")),
                 field_name=self.summarise,
                 onyx_type=summary_onyx_type,
                 many=True,
