@@ -1,3 +1,4 @@
+import re
 import hashlib
 from datetime import datetime
 from django import forms
@@ -31,8 +32,17 @@ class CharInFilter(filters.BaseInFilter, filters.CharFilter):
     pass
 
 
-class CharRangeFilter(filters.BaseRangeFilter, filters.CharFilter):
-    pass
+class RegexForm(forms.CharField):
+    def validate(self, value):
+        super().validate(value)
+        try:
+            re.compile(value)
+        except re.error as e:
+            raise ValidationError(f"Invalid pattern: {e}")
+
+
+class RegexFilter(filters.Filter):
+    field_class = RegexForm
 
 
 class ChoiceFieldMixin:
@@ -205,7 +215,8 @@ FILTERS = {
     OnyxType.TEXT: {lookup: filters.CharFilter for lookup in OnyxType.TEXT.lookups}
     | {
         "in": CharInFilter,
-        "range": CharRangeFilter,
+        "regex": RegexFilter,
+        "iregex": RegexFilter,
     },
     OnyxType.CHOICE: {lookup: ChoiceFilter for lookup in OnyxType.CHOICE.lookups}
     | {
