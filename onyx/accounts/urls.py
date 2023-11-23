@@ -10,12 +10,12 @@ urlpatterns = [
     path("profile/", views.ProfileView.as_view()),
     path("waiting/", views.WaitingUsersView.as_view()),
     re_path(
-        r"^approve/(?P<username>[a-zA-Z_\.\-]*)/$", views.ApproveUserView.as_view()
+        r"^approve/(?P<username>[a-zA-Z0-9_\.\-]*)/$", views.ApproveUserView.as_view()
     ),
     path("site/", views.SiteUsersView.as_view()),
     path("all/", views.AllUsersView.as_view()),
     re_path(
-        r"^projectuser/(?P<code>[a-zA-Z_]*)/(?P<site_code>[a-zA-Z]*)/(?P<username>[a-zA-Z_\.\-]*)/$",
+        r"^projectuser/(?P<code>[a-zA-Z_]*)/(?P<site_code>[a-zA-Z]*)/(?P<username>[a-zA-Z0-9_\.\-]*)/$",
         views.ProjectUserView.as_view(),
     ),
 ]
