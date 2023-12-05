@@ -126,7 +126,8 @@ class IsProjectApproved(permissions.BasePermission):
                             project,
                             options=(
                                 request.user.groups.filter(
-                                    projectgroup__action=view.project_action
+                                    projectgroup__action=view.project_action,
+                                    projectgroup__scope=scope,
                                 )
                                 .values_list("projectgroup__project__code", flat=True)
                                 .distinct()
