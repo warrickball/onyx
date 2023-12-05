@@ -48,7 +48,7 @@ class RegexFilter(filters.Filter):
 
 class ChoiceFieldMixin:
     default_error_messages = {
-        "invalid_choice": _("Select a valid choice.%(suggestions)s"),
+        "invalid_choice": _("%(suggestions)s"),
     }
 
     def clean(self, value):
@@ -71,12 +71,12 @@ class ChoiceFieldMixin:
 
         if value and not self.valid_value(value):  #  type: ignore
             choices = [str(x) for (_, x) in self.choices]  #  type: ignore
-            s = get_suggestions(value, choices, n=1)
-
-            if s:
-                suggestions = f" Perhaps you meant: {', '.join(s)}"
-            else:
-                suggestions = ""
+            suggestions = get_suggestions(
+                value,
+                options=choices,
+                n=1,
+                message_prefix="Select a valid choice.",
+            )
 
             raise ValidationError(
                 self.error_messages["invalid_choice"],  #  type: ignore

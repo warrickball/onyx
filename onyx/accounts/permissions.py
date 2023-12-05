@@ -1,6 +1,7 @@
 from rest_framework import permissions
 from rest_framework.request import Request
 from .exceptions import ProjectNotFound, ScopeNotFound
+from utils.functions import get_suggestions
 
 
 class AllowAny(permissions.AllowAny):
@@ -121,9 +122,36 @@ class IsProjectApproved(permissions.BasePermission):
                 else:
                     # If they do not have permission to view the project + scope, tell them the project / scope doesn't exist
                     if scope == "base":
-                        raise ProjectNotFound
+                        suggestions = get_suggestions(
+                            project,
+                            options=(
+                                request.user.groups.filter(
+                                    projectgroup__action=view.project_action
+                                )
+                                .values_list("projectgroup__project__code", flat=True)
+                                .distinct()
+                            ),
+                            n=1,
+                            message_prefix="Project not found.",
+                        )
+
+                        raise ProjectNotFound(suggestions)
                     else:
-                        raise ScopeNotFound
+                        suggestions = get_suggestions(
+                            scope,
+                            options=(
+                                request.user.groups.filter(
+                                    projectgroup__project__code=project,
+                                    projectgroup__action=view.project_action,
+                                )
+                                .values_list("projectgroup__scope", flat=True)
+                                .distinct()
+                            ),
+                            n=1,
+                            message_prefix="Scope not found.",
+                        )
+
+                        raise ScopeNotFound(suggestions)
 
         return True
 

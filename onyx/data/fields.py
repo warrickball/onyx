@@ -98,13 +98,14 @@ class OnyxField:
             raise exceptions.ValidationError("Lookups are not allowed.")
 
         if allow_lookup and lookup not in self.onyx_type.lookups:
-            message = "Invalid lookup."
-            suggestions = get_suggestions(lookup, self.onyx_type.lookups, n=3, cutoff=0)
+            suggestions = get_suggestions(
+                lookup,
+                options=self.onyx_type.lookups,
+                cutoff=0,
+                message_prefix="Invalid lookup.",
+            )
 
-            if suggestions:
-                message += f" Perhaps you meant: {', '.join(suggestions)}"
-
-            raise exceptions.ValidationError(message)
+            raise exceptions.ValidationError(suggestions)
 
         self.lookup = lookup
 
@@ -171,14 +172,14 @@ class FieldHandler:
 
         return self.user_fields
 
-    def unknown_field_message(self, field) -> str:
-        message = "This field is unknown."
-        suggestions = get_suggestions(field, self.get_user_fields())
+    def unknown_field_suggestions(self, field) -> str:
+        suggestions = get_suggestions(
+            field,
+            options=self.get_user_fields(),
+            message_prefix="This field is unknown.",
+        )
 
-        if suggestions:
-            message += f" Perhaps you meant: {', '.join(suggestions)}"
-
-        return message
+        return suggestions
 
     def check_field_permissions(
         self,
@@ -198,7 +199,7 @@ class FieldHandler:
                 )
             else:
                 # If the user does not have permission, tell them it is unknown
-                raise exceptions.ValidationError(self.unknown_field_message(field))
+                raise exceptions.ValidationError(self.unknown_field_suggestions(field))
 
     def resolve_field(
         self,
@@ -209,7 +210,7 @@ class FieldHandler:
         # This is required because if a field ends in "__"
         # Splitting will result in some funky stuff
         if field.endswith("_"):
-            raise exceptions.ValidationError(self.unknown_field_message(field))
+            raise exceptions.ValidationError(self.unknown_field_suggestions(field))
 
         # Base model for the project
         current_model = self.model
@@ -223,7 +224,7 @@ class FieldHandler:
             # If the current component is not known on the current model
             # Then add to unknown fields
             if component not in model_fields:
-                raise exceptions.ValidationError(self.unknown_field_message(field))
+                raise exceptions.ValidationError(self.unknown_field_suggestions(field))
 
             # Corresponding field instance for the component
             component_instance = model_fields[component]
@@ -261,7 +262,7 @@ class FieldHandler:
                 # Otherwise, it is unknown
                 break
 
-        raise exceptions.ValidationError(self.unknown_field_message(field))
+        raise exceptions.ValidationError(self.unknown_field_suggestions(field))
 
     def resolve_fields(
         self,

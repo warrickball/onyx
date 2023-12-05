@@ -34,9 +34,7 @@ class YearMonthField(serializers.Field):
 
 
 class ChoiceField(serializers.ChoiceField):
-    default_error_messages = {
-        "invalid_choice": _("Select a valid choice.{suggestions}")
-    }
+    default_error_messages = {"invalid_choice": _("{suggestions}")}
 
     def __init__(self, project, field, **kwargs):
         self.project = project
@@ -69,14 +67,15 @@ class ChoiceField(serializers.ChoiceField):
         try:
             return self.choice_strings_to_values[str(data)]
         except KeyError:
-            s = get_suggestions(data, self.choices, n=1)
-
-            if s:
-                suggestions = f" Perhaps you meant: {', '.join(s)}"
-            else:
-                suggestions = ""
-
-            self.fail("invalid_choice", suggestions=suggestions)
+            self.fail(
+                "invalid_choice",
+                suggestions=get_suggestions(
+                    data,
+                    options=self.choices,
+                    n=1,
+                    message_prefix="Select a valid choice.",
+                ),
+            )
 
 
 class HashField(serializers.CharField):

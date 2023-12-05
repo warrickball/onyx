@@ -83,26 +83,23 @@ class ProjectsView(APIView):
         List all projects that the user has allowed actions on.
         """
 
-        project_groups = []
-
-        # Filter user groups to determine all distinct (code, action) pairs
-        # Create list of available actions for each project
-        for project_action_scope in (
-            request.user.groups.filter(projectgroup__isnull=False)
+        # Filter user groups to determine all (project, action, scope) tuples
+        project_groups = [
+            {
+                "project": project_action_scope["projectgroup__project__code"],
+                "action": project_action_scope["projectgroup__action"],
+                "scope": project_action_scope["projectgroup__scope"],
+            }
+            for project_action_scope in request.user.groups.filter(
+                projectgroup__isnull=False
+            )
             .values(
                 "projectgroup__project__code",
                 "projectgroup__action",
                 "projectgroup__scope",
             )
             .distinct()
-        ):
-            project_groups.append(
-                {
-                    "project": project_action_scope["projectgroup__project__code"],
-                    "action": project_action_scope["projectgroup__action"],
-                    "scope": project_action_scope["projectgroup__scope"],
-                }
-            )
+        ]
 
         # Return list of allowed project groups
         return Response(project_groups)
