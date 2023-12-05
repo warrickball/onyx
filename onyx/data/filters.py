@@ -6,7 +6,8 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from utils.functions import get_suggestions, strtobool
-from .utils import OnyxType, FieldInfo
+from .types import OnyxType
+from .fields import OnyxField
 
 
 class HashFieldForm(forms.CharField):
@@ -299,25 +300,25 @@ FILTERS = {
 
 
 class OnyxFilter(filters.FilterSet):
-    def __init__(self, fields: dict[str, FieldInfo], *args, **kwargs):
+    def __init__(self, onyx_fields: dict[str, OnyxField], *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Constructing the filterset dynamically enables:
         # Checking whether the provided field_path and lookup can be used together
         # Validating the values provided by the user for the fields
         # Returning cleaned values from user inputs, using the filterset's underlying form
-        for field, field_info in fields.items():
-            filter = FILTERS[field_info.onyx_type][field_info.lookup]
+        for field_name, onyx_field in onyx_fields.items():
+            filter = FILTERS[onyx_field.onyx_type][onyx_field.lookup]
 
-            if field_info.onyx_type == OnyxType.CHOICE:
-                choices = [(x, x) for x in field_info.choices]
-                self.filters[field] = filter(
-                    field_name=field_info.field_path,
+            if onyx_field.onyx_type == OnyxType.CHOICE:
+                choices = [(x, x) for x in onyx_field.choices]
+                self.filters[field_name] = filter(
+                    field_name=onyx_field.field_path,
                     choices=choices,
-                    lookup_expr=field_info.lookup,
+                    lookup_expr=onyx_field.lookup,
                 )
             else:
-                self.filters[field] = filter(
-                    field_name=field_info.field_path,
-                    lookup_expr=field_info.lookup,
+                self.filters[field_name] = filter(
+                    field_name=onyx_field.field_path,
+                    lookup_expr=onyx_field.lookup,
                 )

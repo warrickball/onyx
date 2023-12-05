@@ -103,12 +103,12 @@ class IsProjectApproved(permissions.BasePermission):
             # Check the user's permission to perform action on the project + scope
             if not request.user.groups.filter(
                 projectgroup__project__code=project,
-                projectgroup__action=view.action,
+                projectgroup__action=view.project_action,
                 projectgroup__scope=scope,
             ).exists():
                 # If the user doesn't have permission, check they can view the project + scope
                 if (
-                    view.action != "view"
+                    view.project_action != "view"
                     and request.user.groups.filter(
                         projectgroup__project__code=project,
                         projectgroup__action="view",
@@ -116,7 +116,7 @@ class IsProjectApproved(permissions.BasePermission):
                     ).exists()
                 ):
                     # If the user has permission to view the project + scope, then tell them they require permission for the action
-                    self.message = f"You do not have permission to perform action '{view.action}' for scope '{scope}' on project '{project}'."
+                    self.message = f"You do not have permission to perform action '{view.project_action}' for scope '{scope}' on project '{project}'."
                     return False
                 else:
                     # If they do not have permission to view the project + scope, tell them the project / scope doesn't exist

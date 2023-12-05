@@ -13,7 +13,7 @@ from ..validators import (
     validate_choice_constraints,
     validate_conditional_required,
 )
-from ..utils import OnyxType
+from ..types import OnyxType
 
 
 # TODO: Works, but could be better
@@ -85,20 +85,24 @@ class BaseRecordSerializer(serializers.ModelSerializer):
 
             # Initialise serializers for relations
             for field, nested in relations.items():
-                relation_serializer = self.OnyxMeta.relations[field]
-                relation_options = self.OnyxMeta.relation_options.get(field, {})
+                relation_serializer = self.OnyxMeta.relations.get(field)
 
-                # Set allow_null to be opposite of required
-                # I.e. required = True means allow_null = False
-                # and required = False means allow_null = True
-                if relation_options.get("required"):
-                    relation_options["allow_null"] = not relation_options["required"]
+                if relation_serializer:
+                    relation_options = self.OnyxMeta.relation_options.get(field, {})
 
-                # Initialise the serializer
-                self.fields[field] = relation_serializer(
-                    fields=nested,
-                    **relation_options,
-                )
+                    # Set allow_null to be opposite of required
+                    # I.e. required = True means allow_null = False
+                    # and required = False means allow_null = True
+                    if relation_options.get("required"):
+                        relation_options["allow_null"] = not relation_options[
+                            "required"
+                        ]
+
+                    # Initialise the serializer
+                    self.fields[field] = relation_serializer(
+                        fields=nested,
+                        **relation_options,
+                    )
 
             # Drop any fields that are not specified in the fields argument.
             allowed = set(allowed)
