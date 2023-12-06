@@ -27,6 +27,9 @@ class OnyxType(Enum):
             "iendswith",
             "regex",
             "iregex",
+            "length",
+            "length__in",
+            "length__range",
         ],
     )
     CHOICE = (

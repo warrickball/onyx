@@ -1,9 +1,8 @@
 from django.db import models
-from django.db.models.lookups import BuiltinLookup
-from django.db.models.fields.related_lookups import RelatedLookupMixin
 from accounts.models import User
 
 
+@models.Field.register_lookup
 class NotEqual(models.Lookup):
     lookup_name = "ne"
 
@@ -14,36 +13,26 @@ class NotEqual(models.Lookup):
         return "%s <> %s" % (lhs, rhs), params
 
 
-class NotEqualRelated(RelatedLookupMixin, NotEqual):
-    pass
-
-
-class IsNull(BuiltinLookup):
-    lookup_name = "isnull"
-    prepare_rhs = False
+# Credit to tuatara for this lookup
+# https://gist.github.com/tuatara/6188a4c7bacab1f52c80
+@models.CharField.register_lookup
+@models.TextField.register_lookup
+class LengthLookup(models.Transform):
+    lookup_name = "length"
 
     def as_sql(self, compiler, connection):
-        # TODO: Understand why did I do this ?? With 0 and 1?
-        if str(self.rhs).lower() in ["0", "false"]:
-            self.rhs = False
+        lhs, params = compiler.compile(self.lhs)
+        return "CHAR_LENGTH(%s)" % lhs, params
 
-        elif str(self.rhs).lower() in ["1", "true"]:
-            self.rhs = True
+    # SQLite doesn't implement CHAR_LENGTH, but its implementation of LENGTH conforms
+    # with standard SQL CHAR_LENGTH (i.e. number of chars, not number of bytes)
+    def as_sqlite(self, compiler, connection):
+        lhs, params = compiler.compile(self.lhs)
+        return "LENGTH(%s)" % lhs, params
 
-        if not isinstance(self.rhs, bool):
-            raise ValueError(
-                "The QuerySet value for an isnull lookup must be True or False."
-            )
-
-        sql, params = compiler.compile(self.lhs)
-        if self.rhs:
-            return "%s IS NULL" % sql, params
-        else:
-            return "%s IS NOT NULL" % sql, params
-
-
-class IsNullRelated(RelatedLookupMixin, IsNull):
-    pass
+    @property
+    def output_field(self):
+        return models.IntegerField()
 
 
 class Request(models.Model):

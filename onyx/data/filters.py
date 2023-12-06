@@ -218,6 +218,9 @@ FILTERS = {
         "in": CharInFilter,
         "regex": RegexFilter,
         "iregex": RegexFilter,
+        "length": filters.NumberFilter,
+        "length__in": NumberInFilter,
+        "length__range": NumberRangeFilter,
     },
     OnyxType.CHOICE: {lookup: ChoiceFilter for lookup in OnyxType.CHOICE.lookups}
     | {
