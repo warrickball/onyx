@@ -4,6 +4,7 @@ from datetime import datetime
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from rest_framework.serializers import BooleanField
 from django_filters import rest_framework as filters
 from utils.functions import get_suggestions, strtobool
 from .types import OnyxType
@@ -176,25 +177,19 @@ class DateTimeRangeFilter(filters.BaseRangeFilter, DateTimeFilter):
     pass
 
 
+# Boolean choices in correct format for TypedChoiceField
+BOOLEAN_CHOICES = [
+    (choice, choice)
+    for choice in {
+        str(value).lower()
+        for value in BooleanField.TRUE_VALUES | BooleanField.FALSE_VALUES
+    }
+]
+
+
 class BooleanFieldForm(ChoiceFieldMixin, forms.TypedChoiceField):
     def __init__(self, **kwargs):
-        kwargs["choices"] = [
-            (x, x)
-            for x in [
-                "y",
-                "yes",
-                "t",
-                "true",
-                "on",
-                "1",
-                "n",
-                "no",
-                "f",
-                "false",
-                "off",
-                "0",
-            ]
-        ]
+        kwargs["choices"] = BOOLEAN_CHOICES
         kwargs["coerce"] = lambda x: strtobool(x)
         super().__init__(**kwargs)
 
