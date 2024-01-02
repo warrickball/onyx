@@ -221,10 +221,12 @@ FILTERS = {
         "length": filters.NumberFilter,
         "length__in": NumberInFilter,
         "length__range": NumberRangeFilter,
+        "isnull": BooleanFilter,
     },
     OnyxType.CHOICE: {lookup: ChoiceFilter for lookup in OnyxType.CHOICE.lookups}
     | {
         "in": ChoiceInFilter,
+        "isnull": BooleanFilter,
     },
     OnyxType.INTEGER: {
         lookup: filters.NumberFilter for lookup in OnyxType.INTEGER.lookups

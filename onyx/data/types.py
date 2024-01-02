@@ -30,6 +30,7 @@ class OnyxType(Enum):
             "length",
             "length__in",
             "length__range",
+            "isnull",
         ],
     )
     CHOICE = (
@@ -39,6 +40,7 @@ class OnyxType(Enum):
             "exact",
             "ne",
             "in",
+            "isnull",
         ],
     )
     INTEGER = (
@@ -48,12 +50,12 @@ class OnyxType(Enum):
             "exact",
             "ne",
             "in",
-            "isnull",
             "lt",
             "lte",
             "gt",
             "gte",
             "range",
+            "isnull",
         ],
     )
     DECIMAL = (
@@ -63,12 +65,12 @@ class OnyxType(Enum):
             "exact",
             "ne",
             "in",
-            "isnull",
             "lt",
             "lte",
             "gt",
             "gte",
             "range",
+            "isnull",
         ],
     )
     DATE_YYYY_MM = (
@@ -78,7 +80,6 @@ class OnyxType(Enum):
             "exact",
             "ne",
             "in",
-            "isnull",
             "lt",
             "lte",
             "gt",
@@ -87,6 +88,7 @@ class OnyxType(Enum):
             "year",
             "year__in",
             "year__range",
+            "isnull",
         ],
     )
     DATE_YYYY_MM_DD = (
@@ -96,7 +98,6 @@ class OnyxType(Enum):
             "exact",
             "ne",
             "in",
-            "isnull",
             "lt",
             "lte",
             "gt",
@@ -111,6 +112,7 @@ class OnyxType(Enum):
             "week",
             "week__in",
             "week__range",
+            "isnull",
         ],
     )
     DATETIME = (
@@ -120,7 +122,6 @@ class OnyxType(Enum):
             "exact",
             "ne",
             "in",
-            "isnull",
             "lt",
             "lte",
             "gt",
@@ -135,6 +136,7 @@ class OnyxType(Enum):
             "week",
             "week__in",
             "week__range",
+            "isnull",
         ],
     )
     BOOLEAN = (

@@ -35,6 +35,28 @@ class LengthLookup(models.Transform):
         return models.IntegerField()
 
 
+# Override of the default isnull lookup for CharField and TextField
+# Instead of checking for NULL, checks for the empty string
+@models.CharField.register_lookup
+@models.TextField.register_lookup
+class TextIsNull(models.Lookup):
+    lookup_name = "isnull"
+    prepare_rhs = False  # TODO: Needed this but I don't understand why
+
+    def as_sql(self, compiler, connection):
+        if not isinstance(self.rhs, bool):
+            raise ValueError(
+                "The QuerySet value for an isnull lookup must be True or False."
+            )
+
+        sql, params = self.process_lhs(compiler, connection)
+
+        if self.rhs:
+            return "%s = ''" % sql, params
+        else:
+            return "%s <> ''" % sql, params
+
+
 class Request(models.Model):
     endpoint = models.CharField(max_length=100, blank=True)
     method = models.CharField(max_length=10, blank=True)
