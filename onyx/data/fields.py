@@ -296,6 +296,20 @@ def generate_fields_spec(
     onyx_fields: dict[str, OnyxField],
     prefix: str | None = None,
 ) -> dict[str, Any]:
+    """
+    Annote `fields_dict` with information from `onyx_fields`.
+
+    This information includes the front-facing type name, required status, and restricted choices for each field.
+
+    Args:
+        fields_dict: The nested dictionary structure containing fields to annotate.
+        onyx_fields: The dictionary of `OnyxField` objects to use for annotation.
+        prefix: The prefix to use for the field paths.
+
+    Returns:
+        The annotated dictionary of fields.
+    """
+
     for field, nested in fields_dict.items():
         if prefix:
             field_path = f"{prefix}__{field}"
@@ -345,6 +359,12 @@ def generate_fields_spec(
 def flatten_fields(obj) -> list[str]:
     """
     Flatten a JSON-like `obj` into a list of dunderised keys.
+
+    Args:
+        obj: The JSON-like object to flatten.
+
+    Returns:
+        The flattened list of dunderised keys.
     """
 
     dunders = []
@@ -382,6 +402,16 @@ def flatten_fields(obj) -> list[str]:
 def unflatten_fields(
     fields: list[str],
 ) -> dict[str, Any]:
+    """
+    Unflatten `fields` by splitting on double underscores to form a nested dictionary.
+
+    Args:
+        fields: The list of fields to unflatten.
+
+    Returns:
+        The unflattened nested dictionary.
+    """
+
     fields_dict = {}
 
     for field in fields:
@@ -408,16 +438,32 @@ def include_exclude_fields(
     include: list[str] | None = None,
     exclude: list[str] | None = None,
 ) -> list[str]:
-    if include:
-        fields = [
-            field for field in fields if any(field.startswith(inc) for inc in include)
-        ]
+    """
+    Filters `fields` to only include/exclude those specified in `include`/`exclude`.
 
-    if exclude:
+    Args:
+        fields: The list of fields to filter.
+        include: The list of fields to include. If None, all fields are included.
+        exclude: The list of fields to exclude. If None, no fields are excluded.
+
+    Returns:
+        The filtered list of fields.
+    """
+
+    if include:
+        # Include fields that match or are connected by a double underscore to any of the provided inclusion values
         fields = [
             field
             for field in fields
-            if not any(field.startswith(exc) for exc in exclude)
+            if any(field == inc or field.startswith(inc + "__") for inc in include)
+        ]
+
+    if exclude:
+        # Exclude fields that match or are connected by a double underscore to any of the provided exclusion values
+        fields = [
+            field
+            for field in fields
+            if not any(field == exc or field.startswith(exc + "__") for exc in exclude)
         ]
 
     return fields
