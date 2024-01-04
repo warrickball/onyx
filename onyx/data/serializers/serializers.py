@@ -19,7 +19,7 @@ from ..types import OnyxType
 # TODO: Works, but could be better
 class SummarySerializer(serializers.Serializer):
     def __init__(self, *args, field_name: str, onyx_type: OnyxType, **kwargs):
-        if onyx_type in {OnyxType.HASH, OnyxType.CHOICE, OnyxType.TEXT}:
+        if onyx_type == OnyxType.TEXT or onyx_type == OnyxType.CHOICE:
             field = serializers.CharField()
         elif onyx_type == OnyxType.INTEGER:
             field = serializers.IntegerField()

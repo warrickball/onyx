@@ -2,7 +2,7 @@ import hashlib
 from datetime import date
 from rest_framework import serializers, exceptions
 from django.utils.translation import gettext_lazy as _
-from data.models import Choice
+from data.models import Choice, Anonymiser
 from utils.functions import get_suggestions
 
 
@@ -78,12 +78,19 @@ class ChoiceField(serializers.ChoiceField):
             )
 
 
-class HashField(serializers.CharField):
+class AnonymisedField(serializers.CharField):
+    def __init__(self, anonymiser_model: type[Anonymiser], **kwargs):
+        self.anonymiser_model = anonymiser_model
+        super().__init__(**kwargs)
+
     def to_internal_value(self, data):
-        data = super().to_internal_value(data).strip().lower()
+        value = super().to_internal_value(data).strip().lower()
 
         hasher = hashlib.sha256()
-        hasher.update(data.encode("utf-8"))
-        data = hasher.hexdigest()
+        hasher.update(value.encode("utf-8"))
+        value = hasher.hexdigest()
 
-        return data
+        anonymiser, _ = self.anonymiser_model.objects.get_or_create(hash=value)
+        value = anonymiser.identifier
+
+        return value

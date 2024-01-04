@@ -1,7 +1,5 @@
 ## Fields
 
-#### Hash
-
 #### Text
 
 #### Choice

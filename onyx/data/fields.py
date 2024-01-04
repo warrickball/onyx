@@ -2,11 +2,26 @@ from typing import Any
 from django.db import models
 from django.contrib.auth.models import Group
 from rest_framework import exceptions
-from utils.fields import HashField, ChoiceField, YearMonthField, TEXT_FIELDS
+from utils.fields import (
+    StrippedCharField,
+    LowerCharField,
+    UpperCharField,
+    ChoiceField,
+    YearMonthField,
+)
 from utils.functions import get_suggestions
 from accounts.models import User
 from .models import Choice, Project, ProjectRecord
 from .types import OnyxType
+
+
+TEXT_FIELDS = [
+    models.CharField,
+    models.TextField,
+    StrippedCharField,
+    LowerCharField,
+    UpperCharField,
+]
 
 
 ALL_LOOKUPS = set(lookup for onyx_type in OnyxType for lookup in onyx_type.lookups)
@@ -45,11 +60,7 @@ class OnyxField:
         self.field_instance = self.field_model._meta.get_field(self.field_name)
         self.field_type = type(self.field_instance)
 
-        if self.field_type == HashField:
-            self.onyx_type = OnyxType.HASH
-            self.required = not self.field_instance.blank
-
-        elif self.field_type in TEXT_FIELDS:
+        if self.field_type in TEXT_FIELDS:
             self.onyx_type = OnyxType.TEXT
             self.required = not self.field_instance.blank
 

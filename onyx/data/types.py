@@ -2,15 +2,6 @@ from enum import Enum
 
 
 class OnyxType(Enum):
-    HASH = (
-        "hash",
-        [
-            "",
-            "exact",
-            "ne",
-            "in",
-        ],
-    )
     TEXT = (
         "text",
         [

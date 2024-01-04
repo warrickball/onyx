@@ -1,5 +1,4 @@
 import re
-import hashlib
 from datetime import datetime
 from django import forms
 from django.core.exceptions import ValidationError
@@ -9,25 +8,6 @@ from django_filters import rest_framework as filters
 from utils.functions import get_suggestions, strtobool
 from .types import OnyxType
 from .fields import OnyxField
-
-
-class HashFieldForm(forms.CharField):
-    def clean(self, value):
-        value = super().clean(value).strip().lower()
-
-        hasher = hashlib.sha256()
-        hasher.update(value.encode("utf-8"))
-        value = hasher.hexdigest()
-
-        return value
-
-
-class HashFilter(filters.Filter):
-    field_class = HashFieldForm
-
-
-class HashInFilter(filters.BaseInFilter, HashFilter):
-    pass
 
 
 class CharInFilter(filters.BaseInFilter, filters.CharFilter):
@@ -204,10 +184,6 @@ class BooleanInFilter(filters.BaseInFilter, BooleanFilter):
 
 # Mappings from field type + lookup to filter
 FILTERS = {
-    OnyxType.HASH: {lookup: HashFilter for lookup in OnyxType.HASH.lookups}
-    | {
-        "in": HashInFilter,
-    },
     OnyxType.TEXT: {lookup: filters.CharFilter for lookup in OnyxType.TEXT.lookups}
     | {
         "in": CharInFilter,
