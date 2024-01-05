@@ -1,8 +1,10 @@
 # Data types in Onyx
 
 ## Text
-**OnyxType**: `OnyxType.TEXT`
+**OnyxType**: `OnyxType.TEXT` 
+
 **Label**: `text`
+
 **Lookups**:
 ```
 {
@@ -28,7 +30,9 @@
 
 ## Choice
 **OnyxType**: `OnyxType.CHOICE`
+
 **Label**: `choice`
+
 **Lookups**:
 ```
 {
@@ -42,7 +46,9 @@
 
 ## Integer
 **OnyxType**: `OnyxType.INTEGER`
+
 **Label**: `integer`
+
 **Lookups**:
 ```
 {
@@ -61,7 +67,9 @@
 
 ## Decimal
 **OnyxType**: `OnyxType.DECIMAL`
+
 **Label**: `decimal`
+
 **Lookups**:
 ```
 {
@@ -80,7 +88,9 @@
 
 ## Date (YYYY-MM)
 **OnyxType**: `OnyxType.DATE_YYYY_MM`
+
 **Label**: `date (YYYY-MM)`
+
 **Lookups**:
 ```
 {
@@ -108,7 +118,9 @@
 
 ## Date (YYYY-MM-DD)
 **OnyxType**: `OnyxType.DATE_YYYY_MM_DD`
+
 **Label**: `date (YYYY-MM-DD)`
+
 **Lookups**:
 ```
  {
@@ -136,7 +148,9 @@
 
 ## Datetime (YYYY-MM-DD HH:MM:SS)
 **OnyxType**: `OnyxType.DATETIME`
+
 **Label**: `date (YYYY-MM-DD HH:MM:SS)`
+
 **Lookups**:
 ```
 {
@@ -164,7 +178,9 @@
 
 ## Boolean
 **OnyxType**: `OnyxType.BOOLEAN`
+
 **Label**: `bool`
+
 **Lookups**:
 ```
 {
@@ -178,7 +194,9 @@
 
 ## Relation
 **OnyxType**: `OnyxType.RELATION`
+
 **Label**: `relation`
+
 **Lookups**:
 ```
 {
