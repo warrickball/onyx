@@ -1,0 +1,69 @@
+site_name: Onyx
+site_url: https://climb-tre.github.io/onyx/
+repo_url: https://github.com/CLIMB-TRE/onyx/
+repo_name: CLIMB-TRE/onyx
+site_author: CLIMB-TRE
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: purple
+      accent: purple
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+      
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    # - navigation.sections
+    # - navigation.top
+    # - toc.integrate
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            docstring_section_style: spacy
+            show_source: false
+            members_order: source
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+nav:
+  - Overview: index.md
+  - Documentation:
+    - Data types: data_types.md
+    - Permissions: permissions.md
+  - Deployment: 
+    - Server control: server_control.md
+    - Running tests: running_tests.md
+  - CLIMB-TRE: https://climb-tre.github.io

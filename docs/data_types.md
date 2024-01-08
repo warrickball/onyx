@@ -1,4 +1,4 @@
-# Data types in Onyx
+# Data types
 
 ## Text
 **OnyxType**: `OnyxType.TEXT` 
