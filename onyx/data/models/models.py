@@ -1,12 +1,16 @@
+from typing import Any
 import uuid
 from secrets import token_hex
 from django.db import models
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
+from django.core import checks
+from django.core.checks.messages import CheckMessage
 from accounts.models import Site, User
 from utils.fields import LowerCharField, UpperCharField
 from utils.constraints import unique_together
 from simple_history.models import HistoricalRecords
+from ..types import ALL_LOOKUPS
 
 
 class Project(models.Model):
@@ -122,6 +126,21 @@ class BaseRecord(models.Model):
     class Meta:
         default_permissions = []
         abstract = True
+
+    @classmethod
+    def check(cls, **kwargs: Any) -> list[CheckMessage]:
+        errors = super().check(**kwargs)
+
+        for field in cls._meta.get_fields():
+            if field.name in ALL_LOOKUPS:
+                errors.append(
+                    checks.Error(
+                        f"Field names must not match existing lookups.",
+                        obj=field,
+                    )
+                )
+
+        return errors
 
 
 class ProjectRecord(BaseRecord):
