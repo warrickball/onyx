@@ -68,7 +68,7 @@ class ProjectAPIView(APIView):
             query_params.pop("scope", None)
 
             # Used for summary aggregate in filter/query
-            self.summarise = query_params.get("summarise")
+            self.summarise = list(query_params.getlist("summarise"))
             query_params.pop("summarise", None)
 
 
@@ -253,16 +253,23 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         if not node.is_valid():
             raise exceptions.ValidationError(node.errors)
 
-        # Create the instance
         if not test:
+            # Create the instance
             instance = node.save()
-            assert isinstance(instance, ProjectRecord)
-            cid = instance.cid
+
+            # Serialize the result
+            serializer = self.serializer_cls(
+                instance,
+                fields=unflatten_fields(
+                    self.serializer_cls.OnyxMeta.action_success_fields,
+                ),
+            )
+            data = serializer.data
         else:
-            cid = None
+            data = {}
 
         # Return response indicating creation
-        return Response({"cid": cid}, status=status.HTTP_201_CREATED)
+        return Response(data, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request: Request, code: str, cid: str) -> Response:
         """
@@ -352,9 +359,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
 
         # Determine extra OnyxField objects for the include/exclude/summary fields
         # Lookups are not allowed for these
-        extra_fields = self.include + self.exclude
-        if self.summarise:
-            extra_fields.append(self.summarise)
+        extra_fields = self.include + self.exclude + self.summarise
 
         for extra_field in extra_fields:
             try:
@@ -407,27 +412,33 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             qs = qs.filter(q_object).distinct()
 
         if self.summarise:
-            summary_onyx_type = onyx_fields_extra[self.summarise].onyx_type
-            if summary_onyx_type == OnyxType.RELATION:
-                raise exceptions.ValidationError(
-                    {self.summarise: ["Cannot summarise over this field."]}
-                )
+            onyx_fields_summary = {
+                field_name: onyx_field
+                for field_name, onyx_field in onyx_fields_extra.items()
+                if field_name in self.summarise
+            }
 
-            qs_summary_values = qs.values(self.summarise)
+            summary_errors = {}
+            for field_name, onyx_field in onyx_fields_summary.items():
+                if onyx_field.onyx_type == OnyxType.RELATION:
+                    summary_errors.setdefault(field_name, []).append(
+                        "Cannot summarise over a relational field."
+                    )
+            if summary_errors:
+                raise exceptions.ValidationError(summary_errors)
+
+            qs_summary_values = qs.values(*self.summarise)
             if qs_summary_values.distinct().count() > 10000:
                 raise exceptions.ValidationError(
                     {
-                        self.summarise: [
-                            "The current summary would return too many distinct values."
-                        ]
+                        "detail": "The current summary would return too many distinct values."
                     }
                 )
 
             # Serialize the results
             serializer = SummarySerializer(
-                qs_summary_values.annotate(count=Count("*")),
-                field_name=self.summarise,
-                onyx_type=summary_onyx_type,
+                qs_summary_values.annotate(count=Count("*")).order_by(*self.summarise),
+                onyx_fields=onyx_fields_summary,
                 many=True,
             )
         else:
@@ -490,14 +501,23 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         if not node.is_valid(instance=instance):
             raise exceptions.ValidationError(node.errors)
 
-        # Update the instance
         if not test:
+            # Update the instance
             instance = node.save()
-            assert isinstance(instance, ProjectRecord)
-            cid = instance.cid
+
+            # Serialize the result
+            serializer = self.serializer_cls(
+                instance,
+                fields=unflatten_fields(
+                    self.serializer_cls.OnyxMeta.action_success_fields,
+                ),
+            )
+            data = serializer.data
+        else:
+            data = {}
 
         # Return response indicating update
-        return Response({"cid": cid})
+        return Response(data)
 
     def destroy(self, request: Request, code: str, cid: str) -> Response:
         """
@@ -519,5 +539,14 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Delete the instance
         instance.delete()
 
+        # Serialize the result
+        serializer = self.serializer_cls(
+            instance,
+            fields=unflatten_fields(
+                self.serializer_cls.OnyxMeta.action_success_fields,
+            ),
+        )
+        data = serializer.data
+
         # Return response indicating deletion
-        return Response({"cid": cid})
+        return Response(data)

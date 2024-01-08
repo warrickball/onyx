@@ -14,31 +14,31 @@ from ..validators import (
     validate_conditional_required,
 )
 from ..types import OnyxType
+from ..fields import OnyxField
 
 
-# TODO: Works, but could be better
+# Mapping of OnyxType to Django REST Framework serializer field
+FIELDS = {
+    OnyxType.TEXT: serializers.CharField,
+    OnyxType.CHOICE: serializers.CharField,
+    OnyxType.INTEGER: serializers.IntegerField,
+    OnyxType.DECIMAL: serializers.FloatField,
+    OnyxType.DATE_YYYY_MM: YearMonthField,
+    OnyxType.DATE_YYYY_MM_DD: serializers.DateField,
+    OnyxType.DATETIME: serializers.DateTimeField,
+    OnyxType.BOOLEAN: serializers.BooleanField,
+}
+
+
 class SummarySerializer(serializers.Serializer):
-    def __init__(self, *args, field_name: str, onyx_type: OnyxType, **kwargs):
-        if onyx_type == OnyxType.TEXT or onyx_type == OnyxType.CHOICE:
-            field = serializers.CharField()
-        elif onyx_type == OnyxType.INTEGER:
-            field = serializers.IntegerField()
-        elif onyx_type == OnyxType.DECIMAL:
-            field = serializers.FloatField()
-        elif onyx_type == OnyxType.DATE_YYYY_MM:
-            field = YearMonthField()
-        elif onyx_type == OnyxType.DATE_YYYY_MM_DD:
-            field = serializers.DateField()
-        elif onyx_type == OnyxType.DATETIME:
-            field = serializers.DateTimeField()
-        elif onyx_type == OnyxType.BOOLEAN:
-            field = serializers.BooleanField()
-        else:
-            raise NotImplementedError(
-                f"'{onyx_type}' did not match an accepted OnyxType."
-            )
+    """
+    Serializer for multi-field count aggregates.
+    """
 
-        self.fields[field_name] = field
+    def __init__(self, *args, onyx_fields: dict[str, OnyxField], **kwargs):
+        for field_name, onyx_field in onyx_fields.items():
+            self.fields[field_name] = FIELDS[onyx_field.onyx_type]()
+
         self.fields["count"] = serializers.IntegerField()
         super().__init__(*args, **kwargs)
 
@@ -205,6 +205,9 @@ class ProjectRecordSerializer(BaseRecordSerializer):
             "suppressed",
             "site_restricted",
         ]
+
+    class OnyxMeta(BaseRecordSerializer.OnyxMeta):
+        action_success_fields: list[str] = ["cid"]
 
 
 # TODO: Race condition testing + preventions.
