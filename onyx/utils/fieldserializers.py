@@ -78,7 +78,7 @@ class ChoiceField(serializers.ChoiceField):
             )
 
 
-class AnonymisedField(serializers.CharField):
+class AnonymiserField(serializers.CharField):
     def __init__(self, anonymiser_model: type[Anonymiser], **kwargs):
         self.anonymiser_model = anonymiser_model
         super().__init__(**kwargs)
