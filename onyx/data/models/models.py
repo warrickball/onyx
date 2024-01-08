@@ -66,32 +66,6 @@ class Choice(models.Model):
         ]
 
 
-# TODO: Separate dedicated system for country + county -> latitude/longitude?
-# Where to store this?
-# We also probably want a validate_country_county function
-# Just needs to check these match correctly
-# and then if they do, we can just add the corresponding latitude + longitude
-class Country(models.Model):
-    country = LowerCharField(max_length=100, unique=True)
-    latitude = models.FloatField()  # str better?
-    longitude = models.FloatField()
-
-
-class County(models.Model):
-    country = LowerCharField(max_length=100)
-    county = LowerCharField(max_length=100)
-    latitude = models.FloatField()
-    longitude = models.FloatField()
-
-    class Meta:
-        constraints = [
-            unique_together(
-                model_name="county",
-                fields=["country", "county"],
-            ),
-        ]
-
-
 def generate_cid():
     """
     Generate a random new CID.
