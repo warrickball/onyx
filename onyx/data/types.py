@@ -150,3 +150,6 @@ class OnyxType(Enum):
     def __init__(self, label, lookups) -> None:
         self.label = label
         self.lookups = lookups
+
+
+ALL_LOOKUPS = set(lookup for onyx_type in OnyxType for lookup in onyx_type.lookups)

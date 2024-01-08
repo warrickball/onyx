@@ -12,7 +12,7 @@ from utils.fields import (
 from utils.functions import get_suggestions
 from accounts.models import User
 from .models import Choice, Project, ProjectRecord
-from .types import OnyxType
+from .types import OnyxType, ALL_LOOKUPS
 
 
 TEXT_FIELDS = [
@@ -22,9 +22,6 @@ TEXT_FIELDS = [
     LowerCharField,
     UpperCharField,
 ]
-
-
-ALL_LOOKUPS = set(lookup for onyx_type in OnyxType for lookup in onyx_type.lookups)
 
 
 class OnyxField:
