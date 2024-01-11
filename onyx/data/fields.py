@@ -119,6 +119,14 @@ class OnyxField:
 
 
 class FieldHandler:
+    """
+    Class that does the following for a given project, action and user:
+
+    - Provide functions for retrieving fields that can be actioned on.
+    - Resolves fields (converts field strings into `OnyxField` objects).
+    - Checks whether the user has permission to action on the resolved fields.
+    """
+
     __slots__ = "code", "model", "app_label", "action", "user", "user_fields"
 
     def __init__(
@@ -141,6 +149,16 @@ class FieldHandler:
         self,
         scopes: list[str] | None = None,
     ) -> list[str]:
+        """
+        Get fields that can be actioned on within provided scopes.
+
+        Args:
+            scopes: The scopes to include fields from. If None, only the base scope is used.
+
+        Returns:
+            The list of fields that can be actioned on within provided scopes.
+        """
+
         if scopes:
             scopes = ["base"] + scopes
         else:
@@ -163,6 +181,13 @@ class FieldHandler:
     def get_user_fields(
         self,
     ) -> list[str]:
+        """
+        Get all fields that the user can action on within the project.
+
+        Returns:
+            The list of fields that the user can action on within the project.
+        """
+
         if not self.user_fields:
             groups = self.user.groups.filter(
                 projectgroup__project__code=self.code,
@@ -181,6 +206,18 @@ class FieldHandler:
         return self.user_fields
 
     def unknown_field_suggestions(self, field) -> str:
+        """
+        Get a suggestions message for an unknown field.
+
+        The suggestions are based on the fields that the user can action on.
+
+        Args:
+            field: The unknown field.
+
+        Returns:
+            The suggestions message.
+        """
+
         suggestions = get_suggestions(
             field,
             options=self.get_user_fields(),
@@ -189,16 +226,25 @@ class FieldHandler:
 
         return suggestions
 
-    def check_field_permissions(
-        self,
-        field: str,
-    ):
+    def check_field_permissions(self, onyx_field: OnyxField):
+        """
+        Check whether the user can perform the action on the field.
+
+        Args:
+            onyx_field: The `OnyxField` object to check user permissions for.
+        """
+
         # Check whether the user can perform the action on the field
-        field_action_permission = f"{self.app_label}.{self.action}_{self.code}__{field}"
+        # TODO: Refactor this to use model name rather than project code (more granular permissions).
+        field_action_permission = (
+            f"{self.app_label}.{self.action}_{self.code}__{onyx_field.field_path}"
+        )
 
         if not self.user.has_perm(field_action_permission):
             # If they do not have permission, check whether they can view the field
-            field_view_permission = f"{self.app_label}.view_{self.code}__{field}"
+            field_view_permission = (
+                f"{self.app_label}.view_{self.code}__{onyx_field.field_path}"
+            )
 
             if self.action != "view" and self.user.has_perm(field_view_permission):
                 # If the user has permission to view the field, return the action permission required
@@ -207,13 +253,28 @@ class FieldHandler:
                 )
             else:
                 # If the user does not have permission, tell them it is unknown
-                raise exceptions.ValidationError(self.unknown_field_suggestions(field))
+                raise exceptions.ValidationError(
+                    self.unknown_field_suggestions(onyx_field.field_path)
+                )
 
     def resolve_field(
         self,
         field: str,
         allow_lookup=False,
     ) -> OnyxField:
+        """
+        Resolve a provided `field`, determining which model it comes from.
+
+        This information is stored in an `OnyxField` object.
+
+        Args:
+            field: The field to resolve.
+            allow_lookup: Whether to allow a lookup to be specified.
+
+        Returns:
+            The resolved `OnyxField` object.
+        """
+
         # Check for trailing underscore
         # This is required because if a field ends in "__"
         # Splitting will result in some funky stuff
@@ -254,7 +315,7 @@ class FieldHandler:
 
                 # Check that the user can perform the given action on this field
                 # Raises a ValidationError if this is not the case
-                self.check_field_permissions(onyx_field.field_path)
+                self.check_field_permissions(onyx_field)
 
                 # Return OnyxField object
                 return onyx_field
@@ -281,6 +342,13 @@ class FieldHandler:
         Resolves provided `fields`, determining which models they come from.
 
         This information is stored in `OnyxField` objects.
+
+        Args:
+            fields: The fields to resolve.
+            allow_lookup: Whether to allow a lookup to be specified.
+
+        Returns:
+            Dictionary mapping input fields to `OnyxField` objects.
         """
 
         errors = {}

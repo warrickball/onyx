@@ -1,3 +1,5 @@
+from __future__ import annotations
+from pydantic import RootModel, ValidationError as PydanticValidationError
 from django.db.models import Count
 from rest_framework import status, exceptions
 from rest_framework.request import Request
@@ -6,7 +8,6 @@ from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSetMixin
 from accounts.permissions import Approved, ProjectApproved, ProjectAdmin
-from utils.functions import mutable
 from .models import Project, Choice, ProjectRecord
 from .serializers import ProjectSerializerMap, SerializerNode, SummarySerializer
 from .exceptions import CIDNotFound
@@ -22,12 +23,26 @@ from .fields import (
 )
 
 
+class RequestBody(RootModel):
+    """
+    Generic structure for the body of a request.
+
+    This is used to validate the body of POST and PATCH requests.
+    """
+
+    root: dict[str, RequestBody | list[RequestBody] | str | int | float | bool | None]
+
+
 class ProjectAPIView(APIView):
     """
     `APIView` with some additional initial setup for working with a specific project.
     """
 
     def initial(self, request: Request, *args, **kwargs):
+        """
+        Initial setup for working with project data.
+        """
+
         super().initial(request, *args, **kwargs)
 
         # Get the project
@@ -42,41 +57,62 @@ class ProjectAPIView(APIView):
         # Get the model's serializer
         self.serializer_cls = ProjectSerializerMap.get(self.model)
 
+        # Initialise field handler for the project, action and user
         self.handler = FieldHandler(
             project=self.project,
             action=self.project_action,  # type: ignore
             user=request.user,
         )
 
-        # Take out any special params from the request
-        with mutable(request.query_params) as query_params:
-            # Used for cursor pagination
-            self.cursor = query_params.get("cursor")
-            if self.cursor:
-                query_params.pop("cursor")
+        # Build request query parameters
+        self.query_params = [
+            {field: value}
+            for field in request.query_params
+            for value in request.query_params.getlist(field)
+            if field not in {"cursor", "include", "exclude", "scope", "summarise"}
+        ]
 
-            # Used for including fields in output of get/filter/query
-            self.include = list(query_params.getlist("include"))
-            query_params.pop("include", None)
+        # Build extra query parameters
+        # Cursor pagination
+        self.cursor = request.query_params.get("cursor")
 
-            # Used for excluding fields in output of get/filter/query
-            self.exclude = list(query_params.getlist("exclude"))
-            query_params.pop("exclude", None)
+        # Include fields in output of get/filter/query
+        self.include = list(request.query_params.getlist("include"))
 
-            # Used for specifying scopes of fields in get/filter/query
-            self.scopes = list(query_params.getlist("scope"))
-            query_params.pop("scope", None)
+        # Excluding fields in output of get/filter/query
+        self.exclude = list(request.query_params.getlist("exclude"))
 
-            # Used for summary aggregate in filter/query
-            self.summarise = list(query_params.getlist("summarise"))
-            query_params.pop("summarise", None)
+        # Specifying scopes of fields in get/filter/query
+        self.scopes = list(request.query_params.getlist("scope"))
+
+        # Summary aggregate in filter/query
+        self.summarise = list(request.query_params.getlist("summarise"))
+
+        # Build request body
+        try:
+            self.request_data = RequestBody.model_validate(request.data).model_dump(
+                mode="python"
+            )
+        except PydanticValidationError as e:
+            # Transform pydantic validation errors into DRF-style validation errors
+            errors = {}
+
+            for error in e.errors(
+                include_url=False, include_context=False, include_input=False
+            ):
+                if not error["loc"]:
+                    errors.setdefault("non_field_errors", []).append(error["msg"])
+                else:
+                    errors.setdefault(error["loc"][0], []).append(error["msg"])
+
+            for name, errs in errors.items():
+                errors[name] = list(set(errs))
+
+            raise exceptions.ValidationError(errors)
 
 
 class ProjectsView(APIView):
-    def get_permissions(self):
-        permission_classes = Approved
-
-        return [permission() for permission in permission_classes]
+    permission_classes = Approved
 
     def get(self, request: Request) -> Response:
         """
@@ -106,11 +142,8 @@ class ProjectsView(APIView):
 
 
 class FieldsView(ProjectAPIView):
-    def get_permissions(self):
-        permission_classes = ProjectApproved
-        self.project_action = "view"
-
-        return [permission() for permission in permission_classes]
+    permission_classes = ProjectApproved
+    project_action = "view"
 
     def get(self, request: Request, code: str) -> Response:
         """
@@ -137,11 +170,8 @@ class FieldsView(ProjectAPIView):
 
 
 class LookupsView(ProjectAPIView):
-    def get_permissions(self):
-        permission_classes = ProjectApproved
-        self.project_action = "view"
-
-        return [permission() for permission in permission_classes]
+    permission_classes = ProjectApproved
+    project_action = "view"
 
     def get(self, request: Request, code: str) -> Response:
         """
@@ -169,11 +199,8 @@ class LookupsView(ProjectAPIView):
 
 
 class ChoicesView(ProjectAPIView):
-    def get_permissions(self):
-        permission_classes = ProjectApproved
-        self.project_action = "view"
-
-        return [permission() for permission in permission_classes]
+    permission_classes = ProjectApproved
+    project_action = "view"
 
     def get(self, request: Request, code: str, field: str) -> Response:
         """
@@ -238,12 +265,12 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         """
 
         # Validate the request data fields
-        self.handler.resolve_fields(flatten_fields(request.data))
+        self.handler.resolve_fields(flatten_fields(self.request_data))
 
         # Validate the data
         node = SerializerNode(
             self.serializer_cls,
-            data=request.data,
+            data=self.request_data,
             context={
                 "project": self.project.code,
                 "request": self.request,
@@ -323,16 +350,11 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # If method == GET, then parameters were provided in the query_params
         # Convert these into the same format as the JSON provided when method == POST
         if request.method == "GET":
-            query = [
-                {field: value}
-                for field in request.query_params
-                for value in request.query_params.getlist(field)
-            ]
+            query = self.query_params
             if query:
                 query = {"&": query}
         else:
-            # TODO: Don't think its wise to be modifying original request.data
-            query = request.data
+            query = self.request_data
 
         # If a query was provided
         # Turn the value of each key-value pair in query into a 'QueryAtom' object
@@ -446,11 +468,6 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             self.paginator = CursorPagination()
             self.paginator.ordering = "created"
 
-            # Add the pagination cursor param back into the request
-            if self.cursor:
-                with mutable(request.query_params) as query_params:
-                    query_params[self.paginator.cursor_query_param] = self.cursor
-
             # Paginate the response
             instances = qs.order_by("id")
             result_page = self.paginator.paginate_queryset(instances, request)
@@ -473,7 +490,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         """
 
         # Validate the request data fields
-        self.handler.resolve_fields(flatten_fields(request.data))
+        self.handler.resolve_fields(flatten_fields(self.request_data))
 
         # Initial queryset
         qs = init_project_queryset(
@@ -491,7 +508,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Validate the data
         node = SerializerNode(
             self.serializer_cls,
-            data=request.data,
+            data=self.request_data,
             context={
                 "project": self.project.code,
                 "request": self.request,
