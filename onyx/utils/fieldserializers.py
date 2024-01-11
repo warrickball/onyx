@@ -42,6 +42,8 @@ class ChoiceField(serializers.ChoiceField):
         super().__init__([], **kwargs)
 
     def to_internal_value(self, data):
+        data = str(data).strip().lower()
+
         self.choices = list(
             Choice.objects.filter(
                 project_id=self.project,
@@ -54,18 +56,14 @@ class ChoiceField(serializers.ChoiceField):
         )
         self.choice_map = {choice.lower().strip(): choice for choice in self.choices}
 
-        if isinstance(data, str):
-            data = data.strip()
-            data_key = data.lower()
-
-            if data_key in self.choice_map:
-                data = self.choice_map[data_key]
+        if data in self.choice_map:
+            data = self.choice_map[data]
 
         if data == "" and self.allow_blank:
             return ""
 
         try:
-            return self.choice_strings_to_values[str(data)]
+            return self.choice_strings_to_values[data]
         except KeyError:
             self.fail(
                 "invalid_choice",
