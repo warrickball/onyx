@@ -60,7 +60,7 @@ class TestCreateView(OnyxTestCase):
 
     def test_basic(self):
         """
-        Test that a basic payload works.
+        Test creating a record.
         """
 
         payload = copy.deepcopy(default_payload)
@@ -70,6 +70,20 @@ class TestCreateView(OnyxTestCase):
         assert TestModelRecord.objects.count() == 2
         instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
         _test_record(self, payload, instance, created=True)
+
+    def test_basic_test(self):
+        """
+        Test the test creation of a record.
+        """
+
+        payload = copy.deepcopy(default_payload)
+        response = self.client.post(
+            reverse("data.project.test", kwargs={"code": "test"}), data=payload
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        assert TestModel.objects.count() == 0
+        assert TestModelRecord.objects.count() == 0
+        self.assertEqual(response.json()["data"], {})
 
     def test_bad_request(self):
         """

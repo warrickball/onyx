@@ -46,3 +46,30 @@ class TestUpdateView(OnyxTestCase):
         self.assertEqual(
             updated_instance.text_option_2, updated_values["text_option_2"]
         )
+
+    def test_basic_test(self):
+        """
+        Test the test update of a record by CID.
+        """
+
+        instance = TestModel.objects.get(cid=self.cid)
+        assert instance.tests is not None
+        original_values = {
+            "tests": instance.tests,
+            "text_option_2": instance.text_option_2,
+        }
+        updated_values = {
+            "tests": instance.tests + 1,
+            "text_option_2": instance.text_option_2 + "!",
+        }
+        response = self.client.patch(
+            reverse("data.project.test.cid", kwargs={"code": "test", "cid": self.cid}),
+            data=updated_values,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["data"], {})
+        updated_instance = TestModel.objects.get(cid=self.cid)
+        self.assertEqual(updated_instance.tests, original_values["tests"])
+        self.assertEqual(
+            updated_instance.text_option_2, original_values["text_option_2"]
+        )
