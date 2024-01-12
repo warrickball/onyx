@@ -1,7 +1,7 @@
 from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.reverse import reverse
-from ..utils import OnyxTestCase, generate_test_data, _test_record
+from ..utils import OnyxTestCase, generate_test_data
 from ...models.projects.test import TestModel
 
 
@@ -33,6 +33,7 @@ class TestUpdateView(OnyxTestCase):
         """
         Test update of a record by CID.
         """
+
         instance = TestModel.objects.get(cid=self.cid)
         assert instance.tests is not None
         updated_values = {

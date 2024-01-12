@@ -9,6 +9,10 @@ from ..utils import OnyxTestCase, generate_test_data
 
 class TestQueryView(OnyxTestCase):
     def setUp(self):
+        """
+        Create a user with the required permissions and create a set of test records.
+        """
+
         super().setUp()
         self.endpoint = reverse("data.project", kwargs={"code": "test"})
         self.user = self.setup_user(

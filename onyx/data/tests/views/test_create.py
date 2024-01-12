@@ -10,6 +10,7 @@ from ...models.projects.test import TestModel, TestModelRecord
 # TODO:
 # - Required field tests (i.e. no None/"" values)
 # - Investigate IntegerField/FloatField different handling of True/False
+# - Test validators/constraints for nested fields
 
 
 default_payload = {
@@ -127,8 +128,7 @@ class TestCreateView(OnyxTestCase):
 
     def test_unpermissioned_viewable_field(self):
         """
-        Test that a payload with a viewable field that the user does not have
-        permission to create fails.
+        Test that a payload with an unpermissioned viewable field fails.
         """
 
         payload = copy.deepcopy(default_payload)
@@ -140,8 +140,7 @@ class TestCreateView(OnyxTestCase):
 
     def test_unpermissioned_unviewable_field(self):
         """
-        Test that a payload with an unviewable field that the user does not
-        have permission to create fails.
+        Test that a payload with an unpermissioned unviewable field fails.
         """
 
         payload = copy.deepcopy(default_payload)
@@ -427,6 +426,46 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
+    def test_text(self):
+        """
+        Test creating a text field.
+        """
+
+        good_texts = [
+            ("hello", "hello"),
+            ("  hello  ", "hello"),
+            ("  ", ""),
+            (0, "0"),
+            (0.0, "0.0"),
+        ]
+
+        bad_texts = [
+            True,
+            False,
+            None,
+            [],
+            {},
+        ]
+
+        for good_text, expected in good_texts:
+            payload = copy.deepcopy(default_payload)
+            payload["text_option_1"] = good_text
+            response = self.client.post(self.endpoint, data=payload)
+            payload["text_option_1"] = expected
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            assert TestModel.objects.count() == 1
+            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            _test_record(self, payload, instance, created=True)
+            TestModel.objects.all().delete()
+
+        for bad_text in bad_texts:
+            payload = copy.deepcopy(default_payload)
+            payload["text_option_1"] = bad_text
+            response = self.client.post(self.endpoint, data=payload)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            assert TestModel.objects.count() == 0
+            assert TestModelRecord.objects.count() == 0
+
     def test_choice(self):
         """
         Test creating a choice field.
@@ -448,6 +487,8 @@ class TestCreateView(OnyxTestCase):
             True,
             False,
             None,
+            [],
+            {},
         ]
 
         for good_choice, expected in good_choices:
@@ -489,6 +530,8 @@ class TestCreateView(OnyxTestCase):
             2.345,
             True,
             False,
+            [],
+            {},
         ]
 
         for good_int, expected in good_ints:
@@ -529,6 +572,8 @@ class TestCreateView(OnyxTestCase):
             "goodbye",
             "",
             " ",
+            [],
+            {},
         ]
 
         for good_float, expected in good_floats:
@@ -575,6 +620,8 @@ class TestCreateView(OnyxTestCase):
             2.345,
             True,
             False,
+            [],
+            {},
         ]
 
         for good_yearmonth, expected in good_yearmonths:
@@ -621,6 +668,8 @@ class TestCreateView(OnyxTestCase):
             2.345,
             True,
             False,
+            [],
+            {},
         ]
 
         for good_date, expected in good_dates:
@@ -663,6 +712,8 @@ class TestCreateView(OnyxTestCase):
             "FalsE",
             " ",
             2.345,
+            [],
+            {},
         ]
 
         for good_bool, expected in good_bools:

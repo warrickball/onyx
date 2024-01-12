@@ -5,8 +5,10 @@ from ..utils import OnyxTestCase, generate_test_data
 from ...models.projects.test import TestModel
 
 
-# TODO: Test for filtering
-# Need to test summarise function, all OnyxTypes, and the effect of suppressing data
+# TODO:
+# - Test summarise function
+# - Test all OnyxTypes
+# - Test effect of suppressing data
 
 
 class TestFilterView(OnyxTestCase):
@@ -27,19 +29,33 @@ class TestFilterView(OnyxTestCase):
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
-    def assertEqualCids(self, records, qs):
+    def assertEqualCids(self, records, qs, allow_empty=False):
         """
         Assert that the CIDs in the records match the CIDs in the queryset.
         """
 
         record_values = sorted(record["cid"] for record in records)
         qs_values = sorted(qs.distinct().values_list("cid", flat=True))
-        self.assertTrue(record_values)
-        self.assertTrue(qs_values)
+
+        if not allow_empty:
+            self.assertTrue(record_values)
+            self.assertTrue(qs_values)
+
         self.assertEqual(
             record_values,
             qs_values,
         )
+
+    def _test_filter(self, field, value, expected, lookup="", allow_empty=False):
+        """
+        Test filtering a field with a value and lookup.
+        """
+
+        response = self.client.get(
+            self.endpoint, data={f"{field}__{lookup}" if lookup else field: value}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqualCids(response.json()["data"], expected, allow_empty=allow_empty)
 
     def test_basic(self):
         """
@@ -55,86 +71,435 @@ class TestFilterView(OnyxTestCase):
 
     def test_unknown_field(self):
         """
-        Test that filtering on an unknown field fails.
+        Test that a filter with an unknown field fails.
         """
 
         response = self.client.get(self.endpoint, data={"hello": ":)"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_choicefield(self):
+    def test_text(self):
         """
-        Test filtering on a choice field.
+        Test filtering a text field.
         """
 
-        response = self.client.get(self.endpoint, data={"country": "eng"})
+        for lookup, value, expected in [
+            ("", "run-1", TestModel.objects.filter(run_name="run-1")),
+            ("exact", "run-1", TestModel.objects.filter(run_name__exact="run-1")),
+            ("ne", "run-1", TestModel.objects.filter(run_name__ne="run-1")),
+            (
+                "in",
+                "run-1, run-2, run-3",
+                TestModel.objects.filter(run_name__in=["run-1", "run-2", "run-3"]),
+            ),
+            ("contains", "run", TestModel.objects.filter(run_name__contains="run")),
+            ("startswith", "run", TestModel.objects.filter(run_name__startswith="run")),
+            ("endswith", "n-1", TestModel.objects.filter(run_name__endswith="n-1")),
+            ("iexact", "RUN-1", TestModel.objects.filter(run_name__iexact="RUN-1")),
+            ("icontains", "RUN", TestModel.objects.filter(run_name__icontains="RUN")),
+            (
+                "istartswith",
+                "RUN",
+                TestModel.objects.filter(run_name__istartswith="RUN"),
+            ),
+            ("iendswith", "N-1", TestModel.objects.filter(run_name__iendswith="N-1")),
+            ("regex", "run-1", TestModel.objects.filter(run_name__regex="run-1")),
+            ("iregex", "RUN-1", TestModel.objects.filter(run_name__iregex="RUN-1")),
+        ]:
+            self._test_filter(
+                field="run_name",
+                value=value,
+                expected=expected,
+                lookup=lookup,
+            )
+
+    def test_text_blank(self):
+        """
+        Test filtering a text field with an empty value.
+        """
+
+        response = self.client.get(self.endpoint, data={"region": ""})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqualCids(
+            response.json()["data"], TestModel.objects.filter(region="")
+        )
+
+        response = self.client.get(self.endpoint, data={"region__ne": ""})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqualCids(
+            response.json()["data"], TestModel.objects.filter(region__ne="")
+        )
+
+    def test_text_invalid_lookup(self):
+        """
+        Test filtering a text field with an invalid lookup.
+        """
+
+        response = self.client.get(self.endpoint, data={"run_name__year": "2022"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_choice(self):
+        """
+        Test filtering a choice field.
+        """
+
+        for lookup, value, expected in [
+            ("", "eng", TestModel.objects.filter(country="eng")),
+            ("exact", "eng", TestModel.objects.filter(country__exact="eng")),
+            ("ne", "eng", TestModel.objects.exclude(country="eng")),
+            (
+                "in",
+                "eng, wales",
+                TestModel.objects.filter(country__in=["eng", "wales"]),
+            ),
+        ]:
+            self._test_filter(
+                field="country",
+                value=value,
+                expected=expected,
+                lookup=lookup,
+            )
+
+    def test_choice_isnull(self):
+        """
+        Test filtering a choice field with an isnull lookup.
+        """
+
+        response = self.client.get(self.endpoint, data={"country__isnull": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
             response.json()["data"],
-            TestModel.objects.filter(country="eng"),
+            TestModel.objects.filter(country__isnull=True),
         )
-
-        response = self.client.get(self.endpoint, data={"country": "ENG"})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"],
-            TestModel.objects.filter(country="eng"),
-        )
-
-    def test_choicefield_ne(self):
-        """
-        Test filtering on a choice field with the ne lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"country__ne": "eng"})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"],
-            TestModel.objects.filter(country__ne="eng"),
-        )
-
-    def test_choicefield_in(self):
-        """
-        Test filtering on a choice field with the in lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"country__in": "eng,wales"})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"],
-            TestModel.objects.filter(country__in=["eng", "wales"]),
-        )
-
-    def test_choicefield_empty(self):
-        """
-        Test filtering on a choice field with an empty value.
-        """
-
-        response = self.client.get(self.endpoint, data={"country": ""})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(
             response.json()["data"],
             TestModel.objects.filter(country=""),
         )
+        response_alt = self.client.get(self.endpoint, data={"country": ""})
+        self.assertEqual(response.json()["data"], response_alt.json()["data"])
+        self.assertEqualCids(
+            response_alt.json()["data"],
+            TestModel.objects.filter(country__isnull=True),
+        )
+        self.assertEqualCids(
+            response_alt.json()["data"],
+            TestModel.objects.filter(country=""),
+        )
+        response = self.client.get(self.endpoint, data={"country__isnull": False})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqualCids(
+            response.json()["data"],
+            TestModel.objects.filter(country__isnull=False),
+        )
+        self.assertEqualCids(
+            response.json()["data"],
+            TestModel.objects.filter(country__ne=""),
+        )
+        response_alt = self.client.get(self.endpoint, data={"country__ne": ""})
+        self.assertEqual(response.json()["data"], response_alt.json()["data"])
+        self.assertEqualCids(
+            response_alt.json()["data"],
+            TestModel.objects.filter(country__isnull=False),
+        )
+        self.assertEqualCids(
+            response_alt.json()["data"],
+            TestModel.objects.filter(country__ne=""),
+        )
 
-    def test_choicefield_wronglookup(self):
+        # Test the isnull lookup against invalid true/false values
+        for value in ["", " ", "invalid"]:
+            response = self.client.get(self.endpoint, data={"country__isnull": value})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_choice_invalid_lookup(self):
         """
-        Test filtering on a choice field with an invalid lookup.
+        Test filtering a choice field with an invalid lookup.
         """
 
         response = self.client.get(self.endpoint, data={"country__range": "eng,wales"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_choicefield_wrongchoice(self):
+    def test_choice_wrong_choice(self):
         """
-        Test filtering on a choice field with an invalid choice.
+        Test filtering a choice field with an invalid choice.
         """
 
         response = self.client.get(self.endpoint, data={"country": "ing"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_relation_isnull(self):
+    def test_integer(self):
         """
-        Test filtering on a relation field with the isnull lookup.
+        Test filtering an integer field.
+        """
+
+        for lookup, value, expected in [
+            ("", 1, TestModel.objects.filter(start=1)),
+            ("exact", 1, TestModel.objects.filter(start__exact=1)),
+            ("ne", 1, TestModel.objects.exclude(start=1)),
+            ("in", "1, 2, 3", TestModel.objects.filter(start__in=[1, 2, 3])),
+            ("lt", 3, TestModel.objects.filter(start__lt=3)),
+            ("lte", 3, TestModel.objects.filter(start__lte=3)),
+            ("gt", 2, TestModel.objects.filter(start__gt=2)),
+            ("gte", 2, TestModel.objects.filter(start__gte=2)),
+            ("range", "1, 3", TestModel.objects.filter(start__range=[1, 3])),
+        ]:
+            self._test_filter(
+                field="start",
+                value=value,
+                expected=expected,
+                lookup=lookup,
+            )
+
+    def test_decimal(self):
+        """
+        Test filtering a decimal field.
+        """
+
+        for lookup, value, expected in [
+            ("", 1.1, TestModel.objects.filter(score=1.1)),
+            ("exact", 1.1, TestModel.objects.filter(score__exact=1.1)),
+            ("ne", 1.1, TestModel.objects.exclude(score=1.1)),
+            (
+                "in",
+                "1.1, 2.2, 3.3",
+                TestModel.objects.filter(score__in=[1.1, 2.2, 3.3]),
+            ),
+            ("lt", 3.3, TestModel.objects.filter(score__lt=3.3)),
+            ("lte", 3.3, TestModel.objects.filter(score__lte=3.3)),
+            ("gt", 4.4, TestModel.objects.filter(score__gt=4.4)),
+            ("gte", 4.4, TestModel.objects.filter(score__gte=4.4)),
+            ("range", "1.1, 9.9", TestModel.objects.filter(score__range=[1.1, 9.9])),
+        ]:
+            self._test_filter(
+                field="score",
+                value=value,
+                expected=expected,
+                lookup=lookup,
+                allow_empty=True,
+            )
+
+    def test_yearmonth(self):
+        """
+        Test filtering a yearmonth field.
+        """
+
+        for lookup, value, expected in [
+            (
+                "",
+                "2022-01",
+                TestModel.objects.filter(collection_month="2022-01-01"),
+            ),
+            (
+                "exact",
+                "2022-01",
+                TestModel.objects.filter(collection_month__exact="2022-01-01"),
+            ),
+            (
+                "ne",
+                "2022-01",
+                TestModel.objects.exclude(collection_month="2022-01-01"),
+            ),
+            (
+                "in",
+                "2022-01, 2022-02, 2022-03",
+                TestModel.objects.filter(
+                    collection_month__in=["2022-01-01", "2022-02-01", "2022-03-01"]
+                ),
+            ),
+            (
+                "lt",
+                "2022-03",
+                TestModel.objects.filter(collection_month__lt="2022-03-01"),
+            ),
+            (
+                "lte",
+                "2022-03",
+                TestModel.objects.filter(collection_month__lte="2022-03-01"),
+            ),
+            (
+                "gt",
+                "2022-02",
+                TestModel.objects.filter(collection_month__gt="2022-02-01"),
+            ),
+            (
+                "gte",
+                "2022-02",
+                TestModel.objects.filter(collection_month__gte="2022-02-01"),
+            ),
+            (
+                "range",
+                "2022-01, 2022-03",
+                TestModel.objects.filter(
+                    collection_month__range=["2022-01-01", "2022-03-01"]
+                ),
+            ),
+            (
+                "year",
+                2022,
+                TestModel.objects.filter(collection_month__year=2022),
+            ),
+            (
+                "year__in",
+                "2022, 2023",
+                TestModel.objects.filter(collection_month__year__in=[2022, 2023]),
+            ),
+            (
+                "year__range",
+                "2022, 2023",
+                TestModel.objects.filter(collection_month__year__range=[2022, 2023]),
+            ),
+        ]:
+            self._test_filter(
+                field="collection_month",
+                value=value,
+                lookup=lookup,
+                expected=expected,
+                allow_empty=True,
+            )
+
+    def test_date(self):
+        """
+        Test filtering a date field.
+        """
+
+        for lookup, value, expected in [
+            (
+                "",
+                "2023-01-01",
+                TestModel.objects.filter(submission_date="2023-01-01"),
+            ),
+            (
+                "exact",
+                "2023-01-01",
+                TestModel.objects.filter(submission_date="2023-01-01"),
+            ),
+            (
+                "ne",
+                "2023-01-01",
+                TestModel.objects.exclude(submission_date="2023-01-01"),
+            ),
+            (
+                "in",
+                "2023-01-01, 2023-01-02, 2023-01-03",
+                TestModel.objects.filter(
+                    submission_date__in=["2023-01-01", "2023-01-02", "2023-01-03"]
+                ),
+            ),
+            (
+                "lt",
+                "2023-01-03",
+                TestModel.objects.filter(submission_date__lt="2023-01-03"),
+            ),
+            (
+                "lte",
+                "2023-01-03",
+                TestModel.objects.filter(submission_date__lte="2023-01-03"),
+            ),
+            (
+                "gt",
+                "2023-01-02",
+                TestModel.objects.filter(submission_date__gt="2023-01-02"),
+            ),
+            (
+                "gte",
+                "2023-01-02",
+                TestModel.objects.filter(submission_date__gte="2023-01-02"),
+            ),
+            (
+                "range",
+                "2023-01-01, 2023-06-03",
+                TestModel.objects.filter(
+                    submission_date__range=["2023-01-01", "2023-06-03"]
+                ),
+            ),
+            (
+                "year",
+                2023,
+                TestModel.objects.filter(submission_date__year=2023),
+            ),
+            (
+                "year__in",
+                "2023, 2024",
+                TestModel.objects.filter(submission_date__year__in=[2023, 2024]),
+            ),
+            (
+                "year__range",
+                "2023, 2024",
+                TestModel.objects.filter(submission_date__year__range=[2023, 2024]),
+            ),
+            (
+                "iso_year",
+                2023,
+                TestModel.objects.filter(submission_date__iso_year=2023),
+            ),
+            (
+                "iso_year__in",
+                "2023, 2024",
+                TestModel.objects.filter(submission_date__iso_year__in=[2023, 2024]),
+            ),
+            (
+                "iso_year__range",
+                "2023, 2024",
+                TestModel.objects.filter(submission_date__iso_year__range=[2023, 2024]),
+            ),
+            (
+                "week",
+                32,
+                TestModel.objects.filter(submission_date__week=32),
+            ),
+            (
+                "week__in",
+                "32, 33",
+                TestModel.objects.filter(submission_date__week__in=[32, 33]),
+            ),
+            (
+                "week__range",
+                "10, 33",
+                TestModel.objects.filter(submission_date__week__range=[10, 33]),
+            ),
+        ]:
+            self._test_filter(
+                field="submission_date",
+                value=value,
+                expected=expected,
+                lookup=lookup,
+                allow_empty=True,
+            )
+
+    def test_bool(self):
+        """
+        Test filtering a boolean field.
+        """
+
+        true_values = [True, 1, "1", "on", "true", "TRUE", "trUe", "t"]
+        false_values = [False, 0, "0", "off", "false", "FALSE", "faLse", "f"]
+
+        for lookup, value, expected in (
+            [
+                (l, x, TestModel.objects.filter(concern=True))
+                for l in ["", "exact"]
+                for x in true_values
+            ]
+            + [
+                (l, x, TestModel.objects.filter(concern=False))
+                for l in ["", "exact"]
+                for x in false_values
+            ]
+            + [("ne", x, TestModel.objects.filter(concern=False)) for x in true_values]
+            + [("ne", x, TestModel.objects.filter(concern=True)) for x in false_values]
+            + [
+                ("in", "True, False", TestModel.objects.all()),
+            ]
+        ):
+            self._test_filter(
+                field="concern",
+                value=value,
+                expected=expected,
+                lookup=lookup,
+            )
+
+    def test_relation(self):
+        """
+        Test filtering a relation field.
         """
 
         response = self.client.get(self.endpoint, data={"records__isnull": True})
@@ -151,94 +516,10 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(records__isnull=False),
         )
 
-    def test_relation_wronglookup(self):
+    def test_relation_invalid_lookup(self):
         """
-        Test filtering on a relation field with an invalid lookup.
+        Test filtering a relation field with an invalid lookup.
         """
 
         response = self.client.get(self.endpoint, data={"records": 1})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_charfield(self):
-        """
-        Test filtering on a text field.
-        """
-
-        response = self.client.get(self.endpoint, data={"run_name": "run-1"})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"],
-            TestModel.objects.filter(run_name="run-1"),
-        )
-
-    def test_charfield_ne(self):
-        """
-        Test filtering on a text field with the ne lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"run_name__ne": "run-1"})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"],
-            TestModel.objects.filter(run_name__ne="run-1"),
-        )
-
-    def test_charfield_in(self):
-        """
-        Test filtering on a text field with the in lookup.
-        """
-
-        response = self.client.get(
-            self.endpoint, data={"run_name__in": "run-1,run-2,run-3"}
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"],
-            TestModel.objects.filter(run_name__in=["run-1", "run-2", "run-3"]),
-        )
-
-    def test_charfield_blank(self):
-        """
-        Test filtering on a text field with an empty value.
-        """
-
-        response = self.client.get(self.endpoint, data={"region": ""})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"], TestModel.objects.filter(region="")
-        )
-
-        response = self.client.get(self.endpoint, data={"region__ne": ""})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"], TestModel.objects.filter(region__ne="")
-        )
-
-    def test_charfield_contains(self):
-        """
-        Test filtering on a text field with the contains lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"run_name__contains": "run"})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(response.json()["data"], TestModel.objects.all())
-
-    def test_charfield_badlookup(self):
-        """
-        Test filtering on a text field with an invalid lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"run_name__year": "2022"})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_integer(self):
-        """
-        Test filtering on a integer field.
-        """
-
-        response = self.client.get(self.endpoint, data={"start": 5})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
-            response.json()["data"],
-            TestModel.objects.filter(start=5),
-        )
