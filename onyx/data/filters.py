@@ -28,10 +28,6 @@ class RegexFilter(filters.Filter):
 
 
 class ChoiceFieldMixin:
-    default_error_messages = {
-        "invalid_choice": _("%(suggestions)s"),
-    }
-
     def clean(self, value):
         self.choice_map = {
             choice.lower().strip(): choice
@@ -59,11 +55,7 @@ class ChoiceFieldMixin:
                 message_prefix="Select a valid choice.",
             )
 
-            raise ValidationError(
-                self.error_messages["invalid_choice"],  #  type: ignore
-                code="invalid_choice",
-                params={"suggestions": suggestions},
-            )
+            raise ValidationError(suggestions)
 
 
 class ChoiceFieldForm(ChoiceFieldMixin, forms.ChoiceField):
@@ -182,6 +174,19 @@ class BooleanInFilter(filters.BaseInFilter, BooleanFilter):
     pass
 
 
+class IsNullForm(BooleanFieldForm):
+    def clean(self, value):
+        value = super().clean(value)
+        if value not in [True, False]:
+            raise ValidationError(f"Value must be True or False.")
+
+        return value
+
+
+class IsNullFilter(BooleanFilter):
+    field_class = IsNullForm
+
+
 # Mappings from field type + lookup to filter
 FILTERS = {
     OnyxType.TEXT: {lookup: filters.CharFilter for lookup in OnyxType.TEXT.lookups}
@@ -192,12 +197,12 @@ FILTERS = {
         "length": filters.NumberFilter,
         "length__in": NumberInFilter,
         "length__range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.CHOICE: {lookup: ChoiceFilter for lookup in OnyxType.CHOICE.lookups}
     | {
         "in": ChoiceInFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.INTEGER: {
         lookup: filters.NumberFilter for lookup in OnyxType.INTEGER.lookups
@@ -205,7 +210,7 @@ FILTERS = {
     | {
         "in": NumberInFilter,
         "range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DECIMAL: {
         lookup: filters.NumberFilter for lookup in OnyxType.DECIMAL.lookups
@@ -213,7 +218,7 @@ FILTERS = {
     | {
         "in": NumberInFilter,
         "range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DATE_YYYY_MM: {
         lookup: YearMonthFilter for lookup in OnyxType.DATE_YYYY_MM.lookups
@@ -230,7 +235,7 @@ FILTERS = {
         "week": filters.NumberFilter,
         "week__in": NumberInFilter,
         "week__range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DATE_YYYY_MM_DD: {
         lookup: DateFilter for lookup in OnyxType.DATE_YYYY_MM_DD.lookups
@@ -247,7 +252,7 @@ FILTERS = {
         "week": filters.NumberFilter,
         "week__in": NumberInFilter,
         "week__range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DATETIME: {lookup: DateTimeFilter for lookup in OnyxType.DATETIME.lookups}
     | {
@@ -262,15 +267,15 @@ FILTERS = {
         "week": filters.NumberFilter,
         "week__in": NumberInFilter,
         "week__range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.BOOLEAN: {lookup: BooleanFilter for lookup in OnyxType.BOOLEAN.lookups}
     | {
         "in": BooleanInFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.RELATION: {
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
 }
 
