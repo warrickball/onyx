@@ -7,6 +7,11 @@ from ..utils import OnyxTestCase, _test_record
 from ...models.projects.test import TestModel, TestModelRecord
 
 
+# TODO:
+# - Required field tests (i.e. no None/"" values)
+# - Investigate IntegerField/FloatField different handling of True/False
+
+
 default_payload = {
     "sample_id": "sample-1234",
     "run_name": "run-5678",
@@ -40,71 +45,6 @@ default_payload = {
     ],
 }
 
-bad_yearmonths = {
-    "0-0-0-0-",
-    "0000-01",
-    "209999999999-01",
-    "2023-01-01",
-    "2023-0",
-}
-
-bad_dates = {
-    "0-0-0-0-",
-    "0000-01",
-    "209999999999-01-01",
-    "2023-01",
-}
-
-# (submitted, coerced) format
-good_choices = {
-    ("nW", "nw"),
-    ("Nw", "nw"),
-    ("NW", "nw"),
-    (" nw", "nw"),
-    ("    ", ""),
-}
-
-bad_choices = [
-    "not a choice",
-]
-
-# (submitted, coerced) format
-good_bools = [(value, True) for value in BooleanField.TRUE_VALUES] + [
-    (value, False) for value in BooleanField.FALSE_VALUES
-]
-
-bad_bools = [
-    "tRUE",
-    "truE",
-    " True ",
-    "  False   ",
-    "fALSE",
-    "FalsE",
-]
-
-# (submitted, coerced) format
-good_ints = [
-    ("5", 5),
-    ("  7  ", 7),
-    ("1.", 1),
-]
-
-bad_ints = [
-    "2.45",
-    "hello",
-]
-
-good_floats = [
-    ("42.832", 42.832),
-    (" 55.873 ", 55.873),
-]
-
-bad_floats = [
-    "2.45.3",
-    "1/0",
-    "goodbye",
-]
-
 
 class TestCreateView(OnyxTestCase):
     def setUp(self):
@@ -118,7 +58,7 @@ class TestCreateView(OnyxTestCase):
             "testuser", roles=["is_staff"], groups=["test.add.base"]
         )
 
-    def test_basic_ok(self):
+    def test_basic(self):
         """
         Test that a basic payload works.
         """
@@ -131,9 +71,34 @@ class TestCreateView(OnyxTestCase):
         instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
         _test_record(self, payload, instance, created=True)
 
-    def test_nullables_ok(self):
+    def test_bad_request(self):
         """
-        Test that a payload with nullables works.
+        Test that an empty or badly structured payload fails.
+        """
+
+        for payload in [
+            None,
+            {},
+            "",
+            "hi",
+            0,
+            [],
+            {"records": ""},
+            {"records": "hi"},
+            {"records": 0},
+            {"records": {}},
+            {"sample_id": []},
+            {None: {}},
+            {"records": [[[[[[[[]]]]]]]]},
+        ]:
+            response = self.client.post(self.endpoint, data=payload)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            assert TestModel.objects.count() == 0
+            assert TestModelRecord.objects.count() == 0
+
+    def test_optional_fields(self):
+        """
+        Test that a payload with optional fields works.
         """
 
         payload = copy.deepcopy(default_payload)
@@ -146,7 +111,7 @@ class TestCreateView(OnyxTestCase):
         instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
         _test_record(self, payload, instance, created=True)
 
-    def test_unpermissioned_viewable_field_fail(self):
+    def test_unpermissioned_viewable_field(self):
         """
         Test that a payload with a viewable field that the user does not have
         permission to create fails.
@@ -159,7 +124,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_unpermissioned_unviewable_field_fail(self):
+    def test_unpermissioned_unviewable_field(self):
         """
         Test that a payload with an unviewable field that the user does not
         have permission to create fails.
@@ -172,7 +137,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_unknown_fields_fail(self):
+    def test_unknown_fields(self):
         """
         Test that a payload with unknown fields fails.
         """
@@ -185,7 +150,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_required_fields_fail(self):
+    def test_required_fields(self):
         """
         Test that a payload with missing required fields fails.
         """
@@ -197,7 +162,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_nested_required_fields_fail(self):
+    def test_nested_required_fields(self):
         """
         Test that a payload with missing required nested fields fails.
         """
@@ -209,7 +174,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_conditional_required_fields_fail(self):
+    def test_conditional_required_fields(self):
         """
         Test that a payload with missing conditionally required fields fails.
         """
@@ -221,10 +186,9 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_nested_conditional_required_fields_fail(self):
+    def test_nested_conditional_required_fields(self):
         """
-        Test that a payload with missing conditionally required nested fields
-        fails.
+        Test that a nested conditional required constraint works.
         """
 
         # We do not have all requirements for score_c
@@ -235,12 +199,6 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
-
-    def test_nested_conditional_required_fields_ok(self):
-        """
-        Test that a payload with missing conditionally required nested fields
-        works.
-        """
 
         # We have all requirements for score_c
         payload = copy.deepcopy(default_payload)
@@ -256,10 +214,8 @@ class TestCreateView(OnyxTestCase):
 
     def test_unique_together(self):
         """
-        Test that a payload with a unique together constraint works.
+        Test that a unique together constraint works.
         """
-
-        # TODO: Split out unique_together tests into ok and fail
 
         payload = copy.deepcopy(default_payload)
         response = self.client.post(self.endpoint, data=payload)
@@ -300,7 +256,7 @@ class TestCreateView(OnyxTestCase):
             TestModel.objects.filter(run_name=default_payload["run_name"]).count() == 2
         )
 
-    def test_nested_unique_together_fail(self):
+    def test_nested_unique_together(self):
         """
         Test that a payload which violates a nested unique together constraint fails.
         """
@@ -312,7 +268,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_optional_value_group_fail(self):
+    def test_optional_value_group(self):
         """
         Test that a payload which violates an optional value group constraint fails.
         """
@@ -338,7 +294,7 @@ class TestCreateView(OnyxTestCase):
                 assert TestModel.objects.count() == 0
                 assert TestModelRecord.objects.count() == 0
 
-    def test_nested_optional_value_group_fail(self):
+    def test_nested_optional_value_group(self):
         """
         Test that a payload which violates a nested optional value group constraint fails.
         """
@@ -351,7 +307,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_ordering_fail(self):
+    def test_ordering(self):
         """
         Test that a payload which violates an ordering constraint fails.
         """
@@ -376,7 +332,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_nested_ordering_fail(self):
+    def test_nested_ordering(self):
         """
         Test that a payload which violates a nested ordering constraint fails.
         """
@@ -389,102 +345,7 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_charfield_too_long_fail(self):
-        """
-        Test that a payload which violates a CharField length constraint fails.
-        """
-
-        payload = copy.deepcopy(default_payload)
-        payload["sample_id"] = "A" * 1000 + "H"
-        response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        assert TestModel.objects.count() == 0
-        assert TestModelRecord.objects.count() == 0
-
-    def test_bad_yearmonth_fail(self):
-        """
-        Test that a payload with invalid date (YYYY-MM) values fails.
-        """
-
-        for bad_yearmonth in bad_yearmonths:
-            payload = copy.deepcopy(default_payload)
-            payload["collection_month"] = bad_yearmonth
-            response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            assert TestModel.objects.count() == 0
-            assert TestModelRecord.objects.count() == 0
-
-    def test_future_yearmonth_fail(self):
-        """
-        Test that a payload with date (YYYY-MM) values in the future fails.
-        """
-
-        payload = copy.deepcopy(default_payload)
-        payload["collection_month"] = (datetime.today() + timedelta(days=60)).strftime(
-            "%Y-%m"
-        )
-        response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        assert TestModel.objects.count() == 0
-        assert TestModelRecord.objects.count() == 0
-
-    def test_bad_date_fail(self):
-        """
-        Test that a payload with invalid date (YYYY-MM-DD) values fails.
-        """
-
-        for bad_date in bad_dates:
-            payload = copy.deepcopy(default_payload)
-            payload["submission_date"] = bad_date
-            response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            assert TestModel.objects.count() == 0
-            assert TestModelRecord.objects.count() == 0
-
-    def test_future_date_fail(self):
-        """
-        Test that a payload with date (YYYY-MM-DD) values in the future fails.
-        """
-
-        payload = copy.deepcopy(default_payload)
-        payload["submission_date"] = (datetime.today() + timedelta(days=60)).strftime(
-            "%Y-%m-%d"
-        )
-        response = self.client.post(self.endpoint, data=payload)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        assert TestModel.objects.count() == 0
-        assert TestModelRecord.objects.count() == 0
-
-    def test_good_choice_ok(self):
-        """
-        Test that a payload with valid choices works.
-        """
-
-        for good_choice, expected in good_choices:
-            payload = copy.deepcopy(default_payload)
-            payload["region"] = good_choice
-            response = self.client.post(self.endpoint, data=payload)
-            payload["region"] = expected
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
-            _test_record(self, payload, instance, created=True)
-            TestModel.objects.all().delete()
-
-    def test_bad_choice_fail(self):
-        """
-        Test that a payload with invalid choices fails.
-        """
-
-        for bad_choice in bad_choices:
-            payload = copy.deepcopy(default_payload)
-            payload["region"] = bad_choice
-            response = self.client.post(self.endpoint, data=payload)
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            assert TestModel.objects.count() == 0
-            assert TestModelRecord.objects.count() == 0
-
-    def test_choice_constraint_fail(self):
+    def test_choice_constraint(self):
         """
         Test that a payload which violates a choice constraint fails.
         """
@@ -503,39 +364,118 @@ class TestCreateView(OnyxTestCase):
         assert TestModel.objects.count() == 0
         assert TestModelRecord.objects.count() == 0
 
-    def test_good_bool_ok(self):
+    def test_nested_choice_constraint(self):
         """
-        Test that a payload with valid booleans works.
+        Test that a payload which violates a nested choice constraint fails.
         """
 
-        for good_bool, expected in good_bools:
+        pass
+
+    def test_future_constraint(self):
+        """
+        Test that a payload which violates a future constraint fails.
+        """
+
+        payload = copy.deepcopy(default_payload)
+        payload["collection_month"] = (datetime.today() + timedelta(days=60)).strftime(
+            "%Y-%m"
+        )
+        response = self.client.post(self.endpoint, data=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        assert TestModel.objects.count() == 0
+        assert TestModelRecord.objects.count() == 0
+
+        payload = copy.deepcopy(default_payload)
+        payload["submission_date"] = (datetime.today() + timedelta(days=60)).strftime(
+            "%Y-%m-%d"
+        )
+        response = self.client.post(self.endpoint, data=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        assert TestModel.objects.count() == 0
+        assert TestModelRecord.objects.count() == 0
+
+    def test_nested_future_constraint(self):
+        """
+        Test that a payload which violates a nested future constraint fails.
+        """
+
+        pass
+
+    def test_charfield_too_long(self):
+        """
+        Test that a payload which violates a CharField length constraint fails.
+        """
+
+        payload = copy.deepcopy(default_payload)
+        payload["sample_id"] = "A" * 1000 + "H"
+        response = self.client.post(self.endpoint, data=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        assert TestModel.objects.count() == 0
+        assert TestModelRecord.objects.count() == 0
+
+    def test_choice(self):
+        """
+        Test creating a choice field.
+        """
+
+        good_choices = [
+            ("nW", "nw"),
+            ("Nw", "nw"),
+            ("NW", "nw"),
+            (" nw", "nw"),
+            ("    ", ""),
+        ]
+
+        bad_choices = [
+            "not a choice",
+            0,
+            1,
+            2.345,
+            True,
+            False,
+            None,
+        ]
+
+        for good_choice, expected in good_choices:
             payload = copy.deepcopy(default_payload)
-            payload["concern"] = good_bool
+            payload["region"] = good_choice
             response = self.client.post(self.endpoint, data=payload)
-            payload["concern"] = expected
+            payload["region"] = expected
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
             instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
-    def test_bad_bool_fail(self):
-        """
-        Test that a payload with invalid booleans fails.
-        """
-
-        for bad_bool in bad_bools:
+        for bad_choice in bad_choices:
             payload = copy.deepcopy(default_payload)
-            payload["concern"] = bad_bool
+            payload["region"] = bad_choice
             response = self.client.post(self.endpoint, data=payload)
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
-    def test_good_int_ok(self):
+    def test_int(self):
         """
-        Test that a payload with valid integers works.
+        Test creating an integer field.
         """
+
+        good_ints = [
+            ("5", 5),
+            ("  7  ", 7),
+            ("1.", 1),
+            (None, None),
+        ]
+
+        bad_ints = [
+            "2.45",
+            "hello",
+            "",
+            " ",
+            2.345,
+            True,
+            False,
+        ]
 
         for good_int, expected in good_ints:
             payload = copy.deepcopy(default_payload)
@@ -548,11 +488,6 @@ class TestCreateView(OnyxTestCase):
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
-    def test_bad_int_fail(self):
-        """
-        Test that a payload with invalid integers fails.
-        """
-
         for bad_int in bad_ints:
             payload = copy.deepcopy(default_payload)
             payload["tests"] = bad_int
@@ -561,10 +496,26 @@ class TestCreateView(OnyxTestCase):
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
-    def test_good_float_ok(self):
+    def test_float(self):
         """
-        Test that a payload with valid floats works.
+        Test creating a decimal field.
         """
+
+        good_floats = [
+            ("42.832", 42.832),
+            (" 55.873 ", 55.873),
+            (True, 1.0),
+            (False, 0.0),
+            (None, None),
+        ]
+
+        bad_floats = [
+            "2.45.3",
+            "1/0",
+            "goodbye",
+            "",
+            " ",
+        ]
 
         for good_float, expected in good_floats:
             payload = copy.deepcopy(default_payload)
@@ -577,11 +528,6 @@ class TestCreateView(OnyxTestCase):
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
-    def test_bad_float_fail(self):
-        """
-        Test that a payload with invalid floats fails.
-        """
-
         for bad_float in bad_floats:
             payload = copy.deepcopy(default_payload)
             payload["score"] = bad_float
@@ -590,34 +536,135 @@ class TestCreateView(OnyxTestCase):
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
-    def test_empty_request_fail(self):
+    def test_yearmonth(self):
         """
-        Test that an empty payload fails.
+        Test creating a yearmonth field.
         """
 
-        for payload in [None, {}]:
+        good_yearmonths = [
+            ("2023-01", datetime(2023, 1, 1)),
+            ("2022-12", datetime(2022, 12, 1)),
+            (None, None),
+        ]
+
+        bad_yearmonths = [
+            "0-0-0-0-",
+            "0000-01",
+            "209999999999-01",
+            "2023-01-01",
+            "2023-0",
+            " 2023-01 ",
+            "",
+            " ",
+            0,
+            1,
+            2.345,
+            True,
+            False,
+        ]
+
+        for good_yearmonth, expected in good_yearmonths:
+            payload = copy.deepcopy(default_payload)
+            payload["collection_month"] = good_yearmonth
+            response = self.client.post(self.endpoint, data=payload)
+            if expected is not None:
+                payload["collection_month"] = expected.strftime("%Y-%m")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            assert TestModel.objects.count() == 1
+            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            _test_record(self, payload, instance, created=True)
+            TestModel.objects.all().delete()
+
+        for bad_yearmonth in bad_yearmonths:
+            payload = copy.deepcopy(default_payload)
+            payload["collection_month"] = bad_yearmonth
             response = self.client.post(self.endpoint, data=payload)
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0
             assert TestModelRecord.objects.count() == 0
 
-    def test_bad_request_fail(self):
+    def test_date(self):
         """
-        Test that a badly structured payload fails.
+        Test creating a date field.
         """
 
-        for payload in [
+        good_dates = [
+            ("2023-01-01", datetime(2023, 1, 1)),
+            ("2022-12-31", datetime(2022, 12, 31)),
+            (None, None),
+        ]
+
+        bad_dates = [
+            "0-0-0-0-",
+            "0000-00-01",
+            "209999999999-01-01",
+            "2023-01",
+            "2023-01-0",
             "",
-            "hi",
+            " ",
             0,
-            [],
-            {"records": ""},
-            {"records": "hi"},
-            {"records": 0},
-            {"records": {}},
-            {"sample_id": []},
-            {None: {}},
-        ]:
+            1,
+            2.345,
+            True,
+            False,
+        ]
+
+        for good_date, expected in good_dates:
+            payload = copy.deepcopy(default_payload)
+            payload["submission_date"] = good_date
+            response = self.client.post(self.endpoint, data=payload)
+            if expected is not None:
+                payload["submission_date"] = expected.strftime("%Y-%m-%d")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            assert TestModel.objects.count() == 1
+            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            _test_record(self, payload, instance, created=True)
+            TestModel.objects.all().delete()
+
+        for bad_date in bad_dates:
+            payload = copy.deepcopy(default_payload)
+            payload["submission_date"] = bad_date
+            response = self.client.post(self.endpoint, data=payload)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            assert TestModel.objects.count() == 0
+            assert TestModelRecord.objects.count() == 0
+
+    def test_bool(self):
+        """
+        Test creating a boolean field.
+        """
+
+        good_bools = (
+            [(value, True) for value in BooleanField.TRUE_VALUES]
+            + [(value, False) for value in BooleanField.FALSE_VALUES]
+            + [(value, None) for value in BooleanField.NULL_VALUES]
+        )
+
+        bad_bools = [
+            "tRUE",
+            "truE",
+            " True ",
+            "  False   ",
+            "fALSE",
+            "FalsE",
+            " ",
+            2.345,
+        ]
+
+        for good_bool, expected in good_bools:
+            payload = copy.deepcopy(default_payload)
+            payload["concern"] = good_bool
+            response = self.client.post(self.endpoint, data=payload)
+            payload["concern"] = expected
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            assert TestModel.objects.count() == 1
+            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            _test_record(self, payload, instance, created=True)
+            TestModel.objects.all().delete()
+
+        for bad_bool in bad_bools:
+            payload = copy.deepcopy(default_payload)
+            payload["concern"] = bad_bool
             response = self.client.post(self.endpoint, data=payload)
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             assert TestModel.objects.count() == 0

@@ -175,26 +175,13 @@ class LookupsView(ProjectAPIView):
 
     def get(self, request: Request, code: str) -> Response:
         """
-        List all lookups for a given project.
+        List all lookups.
         """
 
-        # Get all viewable fields within requested scope
-        field_names = self.handler.get_fields(self.scopes)
+        # Build lookups structure with allowed lookups for each type
+        lookups = {onyx_type.label: onyx_type.lookups for onyx_type in OnyxType}
 
-        # Determine OnyxField objects for each field
-        onyx_fields = self.handler.resolve_fields(field_names)
-
-        # Get onyx types
-        onyx_types = {onyx_field.onyx_type for _, onyx_field in onyx_fields.items()}
-
-        # Build lookups structure
-        lookups = {
-            onyx_type.label: onyx_type.lookups
-            for onyx_type in OnyxType
-            if onyx_type in onyx_types
-        }
-
-        # Return response with allowed lookups for each type featured in the project
+        # Return the types and their lookups
         return Response(lookups)
 
 

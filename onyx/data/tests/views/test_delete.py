@@ -1,7 +1,7 @@
 from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.reverse import reverse
-from ..utils import OnyxTestCase, generate_test_data, _test_record
+from ..utils import OnyxTestCase, generate_test_data
 from ...models.projects.test import TestModel
 
 
@@ -29,7 +29,7 @@ class TestDeleteView(OnyxTestCase):
         self.cid = response.json()["data"]["cid"]
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
-    def test_basic_ok(self):
+    def test_basic(self):
         """
         Test deletion of a record by CID.
         """

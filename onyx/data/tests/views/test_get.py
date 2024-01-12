@@ -28,7 +28,7 @@ class TestGetView(OnyxTestCase):
         self.cid = response.json()["data"]["cid"]
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
-    def test_basic_ok(self):
+    def test_basic(self):
         """
         Test retrieval of a record by CID.
         """
@@ -37,7 +37,7 @@ class TestGetView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         _test_record(self, response.json()["data"], TestModel.objects.get(cid=self.cid))
 
-    def test_include_ok(self):
+    def test_include(self):
         """
         Test retrieval of a record by CID with included fields.
         """
@@ -60,7 +60,7 @@ class TestGetView(OnyxTestCase):
             },
         )
 
-    def test_exclude_ok(self):
+    def test_exclude(self):
         """
         Test retrieval of a record by CID with excluded fields.
         """
@@ -89,7 +89,7 @@ class TestGetView(OnyxTestCase):
             created=True,
         )
 
-    def test_not_found_fail(self):
+    def test_not_found(self):
         """
         Test failure to retrieve a record that does not exist.
         """
@@ -99,7 +99,7 @@ class TestGetView(OnyxTestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_suppressed_not_found_fail(self):
+    def test_suppressed_not_found(self):
         """
         Test failure to retrieve a record that has been suppressed.
         """

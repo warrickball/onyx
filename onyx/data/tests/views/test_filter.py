@@ -41,7 +41,7 @@ class TestFilterView(OnyxTestCase):
             qs_values,
         )
 
-    def test_basic_ok(self):
+    def test_basic(self):
         """
         Test basic retrieval of all records.
         """
@@ -53,7 +53,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.all(),
         )
 
-    def test_unknown_field_fail(self):
+    def test_unknown_field(self):
         """
         Test that filtering on an unknown field fails.
         """
@@ -61,7 +61,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"hello": ":)"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_choicefield_ok(self):
+    def test_choicefield(self):
         """
         Test filtering on a choice field.
         """
@@ -80,7 +80,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(country="eng"),
         )
 
-    def test_choicefield_ne_ok(self):
+    def test_choicefield_ne(self):
         """
         Test filtering on a choice field with the ne lookup.
         """
@@ -92,7 +92,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(country__ne="eng"),
         )
 
-    def test_choicefield_in_ok(self):
+    def test_choicefield_in(self):
         """
         Test filtering on a choice field with the in lookup.
         """
@@ -104,7 +104,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(country__in=["eng", "wales"]),
         )
 
-    def test_choicefield_empty_ok(self):
+    def test_choicefield_empty(self):
         """
         Test filtering on a choice field with an empty value.
         """
@@ -116,7 +116,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(country=""),
         )
 
-    def test_choicefield_wronglookup_fail(self):
+    def test_choicefield_wronglookup(self):
         """
         Test filtering on a choice field with an invalid lookup.
         """
@@ -124,7 +124,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"country__range": "eng,wales"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_choicefield_wrongchoice_fail(self):
+    def test_choicefield_wrongchoice(self):
         """
         Test filtering on a choice field with an invalid choice.
         """
@@ -132,7 +132,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"country": "ing"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_relation_isnull_ok(self):
+    def test_relation_isnull(self):
         """
         Test filtering on a relation field with the isnull lookup.
         """
@@ -151,7 +151,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(records__isnull=False),
         )
 
-    def test_relation_wronglookup_fail(self):
+    def test_relation_wronglookup(self):
         """
         Test filtering on a relation field with an invalid lookup.
         """
@@ -159,7 +159,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"records": 1})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_charfield_ok(self):
+    def test_charfield(self):
         """
         Test filtering on a text field.
         """
@@ -171,7 +171,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(run_name="run-1"),
         )
 
-    def test_charfield_ne_ok(self):
+    def test_charfield_ne(self):
         """
         Test filtering on a text field with the ne lookup.
         """
@@ -183,7 +183,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(run_name__ne="run-1"),
         )
 
-    def test_charfield_in_ok(self):
+    def test_charfield_in(self):
         """
         Test filtering on a text field with the in lookup.
         """
@@ -197,7 +197,7 @@ class TestFilterView(OnyxTestCase):
             TestModel.objects.filter(run_name__in=["run-1", "run-2", "run-3"]),
         )
 
-    def test_charfield_blank_ok(self):
+    def test_charfield_blank(self):
         """
         Test filtering on a text field with an empty value.
         """
@@ -214,7 +214,7 @@ class TestFilterView(OnyxTestCase):
             response.json()["data"], TestModel.objects.filter(region__ne="")
         )
 
-    def test_charfield_contains_ok(self):
+    def test_charfield_contains(self):
         """
         Test filtering on a text field with the contains lookup.
         """
@@ -223,7 +223,7 @@ class TestFilterView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqualCids(response.json()["data"], TestModel.objects.all())
 
-    def test_charfield_badlookup_fail(self):
+    def test_charfield_badlookup(self):
         """
         Test filtering on a text field with an invalid lookup.
         """
@@ -231,7 +231,7 @@ class TestFilterView(OnyxTestCase):
         response = self.client.get(self.endpoint, data={"run_name__year": "2022"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_integer_ok(self):
+    def test_integer(self):
         """
         Test filtering on a integer field.
         """

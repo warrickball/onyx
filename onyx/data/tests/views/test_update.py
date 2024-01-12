@@ -29,11 +29,12 @@ class TestUpdateView(OnyxTestCase):
         self.cid = response.json()["data"]["cid"]
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
-    def test_basic_ok(self):
+    def test_basic(self):
         """
         Test update of a record by CID.
         """
         instance = TestModel.objects.get(cid=self.cid)
+        assert instance.tests is not None
         updated_values = {
             "tests": instance.tests + 1,
             "text_option_2": instance.text_option_2 + "!",

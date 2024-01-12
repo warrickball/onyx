@@ -6,14 +6,9 @@ from data.models import Choice, Anonymiser
 from utils.functions import get_suggestions
 
 
+# TODO: Do we even need this?
 class YearMonthField(serializers.Field):
     def to_internal_value(self, data):
-        if not data:
-            if self.allow_null:
-                return None
-            else:
-                self.fail("null")
-
         try:
             year, month = str(data).split("-")
             if not (len(year) == 4 and 1 <= len(month) <= 2):
