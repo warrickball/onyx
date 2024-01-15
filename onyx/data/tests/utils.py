@@ -110,7 +110,7 @@ def _test_record(self, payload, instance, created=False):
 
     # Assert that the instance has the correct values as the payload
     if not created:
-        self.assertEqual(payload.get("cid", ""), instance.cid)
+        self.assertEqual(payload.get("climb_id", ""), instance.climb_id)
         self.assertEqual(
             payload.get("published_date"), instance.published_date.strftime("%Y-%m-%d")
         )

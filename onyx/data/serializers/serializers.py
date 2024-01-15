@@ -195,19 +195,19 @@ class ProjectRecordSerializer(BaseRecordSerializer):
     Serializer for the 'root' model of a project.
     """
 
-    cid = serializers.CharField(required=False)
+    climb_id = serializers.CharField(required=False)
 
     class Meta:
         model: models.Model | None = None
         fields = BaseRecordSerializer.Meta.fields + [
-            "cid",
+            "climb_id",
             "published_date",
             "suppressed",
             "site_restricted",
         ]
 
     class OnyxMeta(BaseRecordSerializer.OnyxMeta):
-        action_success_fields: list[str] = ["cid"]
+        action_success_fields: list[str] = ["climb_id"]
 
 
 # TODO: Race condition testing + preventions.

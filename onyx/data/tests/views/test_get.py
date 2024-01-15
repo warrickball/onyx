@@ -12,8 +12,8 @@ class TestGetView(OnyxTestCase):
         """
 
         super().setUp()
-        self.endpoint = lambda cid: reverse(
-            "data.project.cid", kwargs={"code": "test", "cid": cid}
+        self.endpoint = lambda climb_id: reverse(
+            "data.project.climb_id", kwargs={"code": "test", "climb_id": climb_id}
         )
         self.user = self.setup_user(
             "testuser", roles=["is_staff"], groups=["test.view.base"]
@@ -25,67 +25,75 @@ class TestGetView(OnyxTestCase):
             data=next(iter(generate_test_data(n=1))),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.cid = response.json()["data"]["cid"]
+        self.climb_id = response.json()["data"]["climb_id"]
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
     def test_basic(self):
         """
-        Test retrieval of a record by CID.
+        Test retrieval of a record by CLIMB ID.
         """
 
-        response = self.client.get(self.endpoint(self.cid))
+        response = self.client.get(self.endpoint(self.climb_id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        _test_record(self, response.json()["data"], TestModel.objects.get(cid=self.cid))
+        _test_record(
+            self, response.json()["data"], TestModel.objects.get(climb_id=self.climb_id)
+        )
 
     def test_include(self):
         """
-        Test retrieval of a record by CID with included fields.
+        Test retrieval of a record by CLIMB ID with included fields.
         """
 
-        response = self.client.get(self.endpoint(self.cid), data={"include": "cid"})
+        response = self.client.get(
+            self.endpoint(self.climb_id), data={"include": "climb_id"}
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["data"], {"cid": self.cid})
+        self.assertEqual(response.json()["data"], {"climb_id": self.climb_id})
 
         response = self.client.get(
-            self.endpoint(self.cid), data={"include": ["cid", "published_date"]}
+            self.endpoint(self.climb_id),
+            data={"include": ["climb_id", "published_date"]},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.json()["data"],
             {
-                "cid": self.cid,
+                "climb_id": self.climb_id,
                 "published_date": TestModel.objects.get(
-                    cid=self.cid
+                    climb_id=self.climb_id
                 ).published_date.strftime("%Y-%m-%d"),
             },
         )
 
     def test_exclude(self):
         """
-        Test retrieval of a record by CID with excluded fields.
+        Test retrieval of a record by CLIMB ID with excluded fields.
         """
 
-        response = self.client.get(self.endpoint(self.cid), data={"exclude": "cid"})
+        response = self.client.get(
+            self.endpoint(self.climb_id), data={"exclude": "climb_id"}
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotIn("cid", response.json()["data"])
+        self.assertNotIn("climb_id", response.json()["data"])
 
         _test_record(
             self,
             response.json()["data"],
-            TestModel.objects.get(cid=self.cid),
+            TestModel.objects.get(climb_id=self.climb_id),
             created=True,
         )
 
         response = self.client.get(
-            self.endpoint(self.cid), data={"exclude": ["cid", "published_date"]}
+            self.endpoint(self.climb_id),
+            data={"exclude": ["climb_id", "published_date"]},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotIn("cid", response.json()["data"])
+        self.assertNotIn("climb_id", response.json()["data"])
         self.assertNotIn("published_date", response.json()["data"])
         _test_record(
             self,
             response.json()["data"],
-            TestModel.objects.get(cid=self.cid),
+            TestModel.objects.get(climb_id=self.climb_id),
             created=True,
         )
 
@@ -95,7 +103,7 @@ class TestGetView(OnyxTestCase):
         """
 
         response = self.client.get(
-            self.endpoint(f"C-{self.cid.removeprefix('C-')[::-1]}")
+            self.endpoint(f"C-{self.climb_id.removeprefix('C-')[::-1]}")
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -104,9 +112,9 @@ class TestGetView(OnyxTestCase):
         Test failure to retrieve a record that has been suppressed.
         """
 
-        instance = TestModel.objects.get(cid=self.cid)
+        instance = TestModel.objects.get(climb_id=self.climb_id)
         instance.suppressed = True
         instance.save()
 
-        response = self.client.get(self.endpoint(self.cid))
+        response = self.client.get(self.endpoint(self.climb_id))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
