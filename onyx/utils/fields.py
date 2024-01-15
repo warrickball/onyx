@@ -44,17 +44,3 @@ class YearMonthField(models.DateField):
 
 class ChoiceField(models.TextField):
     pass
-
-
-class HashField(models.TextField):
-    pass
-
-
-# All text field types
-TEXT_FIELDS = [
-    models.CharField,
-    models.TextField,
-    StrippedCharField,
-    LowerCharField,
-    UpperCharField,
-]

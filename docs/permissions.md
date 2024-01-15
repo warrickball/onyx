@@ -1,5 +1,5 @@
-## Permissions
+# Permissions
 
-#### Projects, Actions \& Scopes
+## Groups
 
-#### Roles
+## Roles

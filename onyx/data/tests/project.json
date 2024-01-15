@@ -30,7 +30,6 @@
         },
         "view": {
             "base": [
-                "site",
                 "cid",
                 "published_date",
                 "sample_id",

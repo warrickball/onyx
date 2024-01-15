@@ -1,31 +1,13 @@
 import re
-import hashlib
 from datetime import datetime
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from rest_framework.serializers import BooleanField
 from django_filters import rest_framework as filters
 from utils.functions import get_suggestions, strtobool
-from .utils import OnyxType, FieldInfo
-
-
-class HashFieldForm(forms.CharField):
-    def clean(self, value):
-        value = super().clean(value).strip().lower()
-
-        hasher = hashlib.sha256()
-        hasher.update(value.encode("utf-8"))
-        value = hasher.hexdigest()
-
-        return value
-
-
-class HashFilter(filters.Filter):
-    field_class = HashFieldForm
-
-
-class HashInFilter(filters.BaseInFilter, HashFilter):
-    pass
+from .types import OnyxType
+from .fields import OnyxField
 
 
 class CharInFilter(filters.BaseInFilter, filters.CharFilter):
@@ -46,10 +28,6 @@ class RegexFilter(filters.Filter):
 
 
 class ChoiceFieldMixin:
-    default_error_messages = {
-        "invalid_choice": _("Select a valid choice.%(suggestions)s"),
-    }
-
     def clean(self, value):
         self.choice_map = {
             choice.lower().strip(): choice
@@ -70,18 +48,14 @@ class ChoiceFieldMixin:
 
         if value and not self.valid_value(value):  #  type: ignore
             choices = [str(x) for (_, x) in self.choices]  #  type: ignore
-            s = get_suggestions(value, choices, n=1)
-
-            if s:
-                suggestions = f" Perhaps you meant: {', '.join(s)}"
-            else:
-                suggestions = ""
-
-            raise ValidationError(
-                self.error_messages["invalid_choice"],  #  type: ignore
-                code="invalid_choice",
-                params={"suggestions": suggestions},
+            suggestions = get_suggestions(
+                value,
+                options=choices,
+                n=1,
+                message_prefix="Select a valid choice.",
             )
+
+            raise ValidationError(suggestions)
 
 
 class ChoiceFieldForm(ChoiceFieldMixin, forms.ChoiceField):
@@ -175,25 +149,19 @@ class DateTimeRangeFilter(filters.BaseRangeFilter, DateTimeFilter):
     pass
 
 
+# Boolean choices in correct format for TypedChoiceField
+BOOLEAN_CHOICES = [
+    (choice, choice)
+    for choice in {
+        str(value).lower()
+        for value in BooleanField.TRUE_VALUES | BooleanField.FALSE_VALUES
+    }
+]
+
+
 class BooleanFieldForm(ChoiceFieldMixin, forms.TypedChoiceField):
     def __init__(self, **kwargs):
-        kwargs["choices"] = [
-            (x, x)
-            for x in [
-                "y",
-                "yes",
-                "t",
-                "true",
-                "on",
-                "1",
-                "n",
-                "no",
-                "f",
-                "false",
-                "off",
-                "0",
-            ]
-        ]
+        kwargs["choices"] = BOOLEAN_CHOICES
         kwargs["coerce"] = lambda x: strtobool(x)
         super().__init__(**kwargs)
 
@@ -206,21 +174,35 @@ class BooleanInFilter(filters.BaseInFilter, BooleanFilter):
     pass
 
 
+class IsNullForm(BooleanFieldForm):
+    def clean(self, value):
+        value = super().clean(value)
+        if value not in [True, False]:
+            raise ValidationError(f"Value must be True or False.")
+
+        return value
+
+
+class IsNullFilter(BooleanFilter):
+    field_class = IsNullForm
+
+
 # Mappings from field type + lookup to filter
 FILTERS = {
-    OnyxType.HASH: {lookup: HashFilter for lookup in OnyxType.HASH.lookups}
-    | {
-        "in": HashInFilter,
-    },
     OnyxType.TEXT: {lookup: filters.CharFilter for lookup in OnyxType.TEXT.lookups}
     | {
         "in": CharInFilter,
         "regex": RegexFilter,
         "iregex": RegexFilter,
+        "length": filters.NumberFilter,
+        "length__in": NumberInFilter,
+        "length__range": NumberRangeFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.CHOICE: {lookup: ChoiceFilter for lookup in OnyxType.CHOICE.lookups}
     | {
         "in": ChoiceInFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.INTEGER: {
         lookup: filters.NumberFilter for lookup in OnyxType.INTEGER.lookups
@@ -228,7 +210,7 @@ FILTERS = {
     | {
         "in": NumberInFilter,
         "range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DECIMAL: {
         lookup: filters.NumberFilter for lookup in OnyxType.DECIMAL.lookups
@@ -236,7 +218,7 @@ FILTERS = {
     | {
         "in": NumberInFilter,
         "range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DATE_YYYY_MM: {
         lookup: YearMonthFilter for lookup in OnyxType.DATE_YYYY_MM.lookups
@@ -253,7 +235,7 @@ FILTERS = {
         "week": filters.NumberFilter,
         "week__in": NumberInFilter,
         "week__range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DATE_YYYY_MM_DD: {
         lookup: DateFilter for lookup in OnyxType.DATE_YYYY_MM_DD.lookups
@@ -270,7 +252,7 @@ FILTERS = {
         "week": filters.NumberFilter,
         "week__in": NumberInFilter,
         "week__range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.DATETIME: {lookup: DateTimeFilter for lookup in OnyxType.DATETIME.lookups}
     | {
@@ -285,39 +267,39 @@ FILTERS = {
         "week": filters.NumberFilter,
         "week__in": NumberInFilter,
         "week__range": NumberRangeFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.BOOLEAN: {lookup: BooleanFilter for lookup in OnyxType.BOOLEAN.lookups}
     | {
         "in": BooleanInFilter,
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
     OnyxType.RELATION: {
-        "isnull": BooleanFilter,
+        "isnull": IsNullFilter,
     },
 }
 
 
 class OnyxFilter(filters.FilterSet):
-    def __init__(self, fields: dict[str, FieldInfo], *args, **kwargs):
+    def __init__(self, onyx_fields: dict[str, OnyxField], *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Constructing the filterset dynamically enables:
         # Checking whether the provided field_path and lookup can be used together
         # Validating the values provided by the user for the fields
         # Returning cleaned values from user inputs, using the filterset's underlying form
-        for field, field_info in fields.items():
-            filter = FILTERS[field_info.onyx_type][field_info.lookup]
+        for field_name, onyx_field in onyx_fields.items():
+            filter = FILTERS[onyx_field.onyx_type][onyx_field.lookup]
 
-            if field_info.onyx_type == OnyxType.CHOICE:
-                choices = [(x, x) for x in field_info.choices]
-                self.filters[field] = filter(
-                    field_name=field_info.field_path,
+            if onyx_field.onyx_type == OnyxType.CHOICE:
+                choices = [(x, x) for x in onyx_field.choices]
+                self.filters[field_name] = filter(
+                    field_name=onyx_field.field_path,
                     choices=choices,
-                    lookup_expr=field_info.lookup,
+                    lookup_expr=onyx_field.lookup,
                 )
             else:
-                self.filters[field] = filter(
-                    field_name=field_info.field_path,
-                    lookup_expr=field_info.lookup,
+                self.filters[field_name] = filter(
+                    field_name=onyx_field.field_path,
+                    lookup_expr=onyx_field.lookup,
                 )

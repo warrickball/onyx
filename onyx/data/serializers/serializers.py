@@ -13,32 +13,32 @@ from ..validators import (
     validate_choice_constraints,
     validate_conditional_required,
 )
-from ..utils import OnyxType
+from ..types import OnyxType
+from ..fields import OnyxField
 
 
-# TODO: Works, but could be better
+# Mapping of OnyxType to Django REST Framework serializer field
+FIELDS = {
+    OnyxType.TEXT: serializers.CharField,
+    OnyxType.CHOICE: serializers.CharField,
+    OnyxType.INTEGER: serializers.IntegerField,
+    OnyxType.DECIMAL: serializers.FloatField,
+    OnyxType.DATE_YYYY_MM: YearMonthField,
+    OnyxType.DATE_YYYY_MM_DD: serializers.DateField,
+    OnyxType.DATETIME: serializers.DateTimeField,
+    OnyxType.BOOLEAN: serializers.BooleanField,
+}
+
+
 class SummarySerializer(serializers.Serializer):
-    def __init__(self, *args, field_name: str, onyx_type: OnyxType, **kwargs):
-        if onyx_type in {OnyxType.HASH, OnyxType.CHOICE, OnyxType.TEXT}:
-            field = serializers.CharField()
-        elif onyx_type == OnyxType.INTEGER:
-            field = serializers.IntegerField()
-        elif onyx_type == OnyxType.DECIMAL:
-            field = serializers.FloatField()
-        elif onyx_type == OnyxType.DATE_YYYY_MM:
-            field = YearMonthField()
-        elif onyx_type == OnyxType.DATE_YYYY_MM_DD:
-            field = serializers.DateField()
-        elif onyx_type == OnyxType.DATETIME:
-            field = serializers.DateTimeField()
-        elif onyx_type == OnyxType.BOOLEAN:
-            field = serializers.BooleanField()
-        else:
-            raise NotImplementedError(
-                f"'{onyx_type}' did not match an accepted OnyxType."
-            )
+    """
+    Serializer for multi-field count aggregates.
+    """
 
-        self.fields[field_name] = field
+    def __init__(self, *args, onyx_fields: dict[str, OnyxField], **kwargs):
+        for field_name, onyx_field in onyx_fields.items():
+            self.fields[field_name] = FIELDS[onyx_field.onyx_type]()
+
         self.fields["count"] = serializers.IntegerField()
         super().__init__(*args, **kwargs)
 
@@ -85,20 +85,24 @@ class BaseRecordSerializer(serializers.ModelSerializer):
 
             # Initialise serializers for relations
             for field, nested in relations.items():
-                relation_serializer = self.OnyxMeta.relations[field]
-                relation_options = self.OnyxMeta.relation_options.get(field, {})
+                relation_serializer = self.OnyxMeta.relations.get(field)
 
-                # Set allow_null to be opposite of required
-                # I.e. required = True means allow_null = False
-                # and required = False means allow_null = True
-                if relation_options.get("required"):
-                    relation_options["allow_null"] = not relation_options["required"]
+                if relation_serializer:
+                    relation_options = self.OnyxMeta.relation_options.get(field, {})
 
-                # Initialise the serializer
-                self.fields[field] = relation_serializer(
-                    fields=nested,
-                    **relation_options,
-                )
+                    # Set allow_null to be opposite of required
+                    # I.e. required = True means allow_null = False
+                    # and required = False means allow_null = True
+                    if relation_options.get("required"):
+                        relation_options["allow_null"] = not relation_options[
+                            "required"
+                        ]
+
+                    # Initialise the serializer
+                    self.fields[field] = relation_serializer(
+                        fields=nested,
+                        **relation_options,
+                    )
 
             # Drop any fields that are not specified in the fields argument.
             allowed = set(allowed)
@@ -201,6 +205,9 @@ class ProjectRecordSerializer(BaseRecordSerializer):
             "suppressed",
             "site_restricted",
         ]
+
+    class OnyxMeta(BaseRecordSerializer.OnyxMeta):
+        action_success_fields: list[str] = ["cid"]
 
 
 # TODO: Race condition testing + preventions.

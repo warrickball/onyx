@@ -1,42 +1,41 @@
 import difflib
-from contextlib import contextmanager
 
 
-@contextmanager
-def mutable(obj):
+def get_suggestions(
+    unknown: str,
+    options: list[str],
+    n=3,
+    cutoff=0.4,
+    message_prefix: str | None = None,
+) -> str:
     """
-    If the provided `obj` has a `_mutable` property, this context manager temporarily sets it to `True`.
-    """
+    Performs a case-insensitive comparison of an `unknown` against a list of `options`.
 
-    _mutable = getattr(obj, "_mutable", None)
-    if _mutable is not None:
-        obj._mutable = True
-
-    try:
-        yield obj
-    finally:
-        # Reset object's mutability
-        if _mutable is not None:
-            obj._mutable = _mutable
-
-
-def get_suggestions(unknown: str, suggestions: list[str], n=4, cutoff=0.4) -> list[str]:
-    """
-    Performs a case-insensitive comparison of an `unknown` against a list of `suggestions`, and returns the closest matches.
+    Returns a message containing the suggestions.
     """
 
-    suggestions_map = {
-        suggestion.lower().strip(): suggestion for suggestion in suggestions
-    }
+    options_map = {option.lower().strip(): option for option in options}
 
     close_matches = difflib.get_close_matches(
         word=unknown.lower().strip(),
-        possibilities=suggestions_map.keys(),
+        possibilities=options_map.keys(),
         n=n,
         cutoff=cutoff,
     )
 
-    return [suggestions_map[close_match] for close_match in close_matches]
+    suggestions = [options_map[close_match] for close_match in close_matches]
+
+    if message_prefix:
+        message = message_prefix
+    else:
+        message = ""
+
+    if suggestions:
+        message += (
+            f"{' ' if message else ''}Perhaps you meant: {', '.join(suggestions)}"
+        )
+
+    return message
 
 
 def strtobool(val):

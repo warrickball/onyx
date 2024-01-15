@@ -1,22 +1,21 @@
 # Server Control
 
-**Start the server:**
+## Start the server
 ```
-$ cd onyx/
-$ gunicorn -c onyx.gunicorn.py
-```
-
-**Stop the server:**
-```
-$ pkill -f onyx.gunicorn.py
+$ ./scripts/start.sh
 ```
 
-**View access logs:**
+## Stop the server
 ```
-$ tail -f logs/access.log
+$ ./scripts/stop.sh
 ```
 
-**View error logs:**
+## View access logs
 ```
-$ tail -f logs/error.log
+$ tail -f access.log
+```
+
+## View error logs
+```
+$ tail -f error.log
 ```

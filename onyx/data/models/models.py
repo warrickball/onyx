@@ -1,12 +1,16 @@
+from typing import Any
 import uuid
 from secrets import token_hex
 from django.db import models
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
+from django.core import checks
+from django.core.checks.messages import CheckMessage
 from accounts.models import Site, User
 from utils.fields import LowerCharField, UpperCharField
 from utils.constraints import unique_together
 from simple_history.models import HistoricalRecords
+from ..types import ALL_LOOKUPS
 
 
 class Project(models.Model):
@@ -62,35 +66,9 @@ class Choice(models.Model):
         ]
 
 
-# TODO: Separate dedicated system for country + county -> latitude/longitude?
-# Where to store this?
-# We also probably want a validate_country_county function
-# Just needs to check these match correctly
-# and then if they do, we can just add the corresponding latitude + longitude
-class Country(models.Model):
-    country = LowerCharField(max_length=100, unique=True)
-    latitude = models.FloatField()  # str better?
-    longitude = models.FloatField()
-
-
-class County(models.Model):
-    country = LowerCharField(max_length=100)
-    county = LowerCharField(max_length=100)
-    latitude = models.FloatField()
-    longitude = models.FloatField()
-
-    class Meta:
-        constraints = [
-            unique_together(
-                model_name="county",
-                fields=["country", "county"],
-            ),
-        ]
-
-
 def generate_cid():
     """
-    Simple function that generates a random new CID.
+    Generate a random new CID.
 
     The CID consists of the prefix `C-` followed by 10 random hex digits.
 
@@ -122,6 +100,21 @@ class BaseRecord(models.Model):
     class Meta:
         default_permissions = []
         abstract = True
+
+    @classmethod
+    def check(cls, **kwargs: Any) -> list[CheckMessage]:
+        errors = super().check(**kwargs)
+
+        for field in cls._meta.get_fields():
+            if field.name in ALL_LOOKUPS:
+                errors.append(
+                    checks.Error(
+                        f"Field names must not match existing lookups.",
+                        obj=field,
+                    )
+                )
+
+        return errors
 
 
 class ProjectRecord(BaseRecord):
@@ -159,5 +152,43 @@ class ProjectRecord(BaseRecord):
         if not self.pk:
             cid = CID.objects.create()
             self.cid = cid.cid
+
+        super().save(*args, **kwargs)
+
+
+class Anonymiser(models.Model):
+    hash = models.TextField(unique=True)
+    identifier = UpperCharField(unique=True, max_length=12)
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def get_identifier_prefix(cls) -> str:
+        """
+        Get the prefix for the identifier.
+        """
+        raise NotImplementedError("A prefix is required.")
+
+    @classmethod
+    def generate_identifier(cls) -> str:
+        """
+        Generate a random new identifier on the given `model`.
+
+        The identifier consists of the given `prefix`, followed by a `-`, followed by 10 random hex digits.
+
+        This means there are `16^10 = 1,099,511,627,776` identifiers to choose from for a given `model` and `prefix`.
+        """
+
+        identifier = cls.get_identifier_prefix() + "-" + "".join(token_hex(5).upper())
+
+        if cls.objects.filter(identifier=identifier).exists():
+            identifier = cls.generate_identifier()
+
+        return identifier
+
+    def save(self, *args, **kwargs):
+        if not self.identifier:
+            self.identifier = self.generate_identifier()
 
         super().save(*args, **kwargs)

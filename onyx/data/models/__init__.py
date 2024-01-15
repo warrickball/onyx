@@ -4,4 +4,5 @@ from .models import (
     Choice,
     BaseRecord,
     ProjectRecord,
+    Anonymiser,
 )

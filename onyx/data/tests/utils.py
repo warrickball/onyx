@@ -12,6 +12,10 @@ directory = os.path.dirname(os.path.abspath(__file__))
 
 class OnyxTestCase(APITestCase):
     def setUp(self):
+        """
+        Set up test case.
+        """
+
         logging.disable(logging.CRITICAL)
 
         # Set up site and test project
@@ -26,19 +30,10 @@ class OnyxTestCase(APITestCase):
         )
 
     def setup_user(self, username, roles=None, groups=None):
-        # first_name = username[-1]
-        # last_name = username[0:-1]
-        # response = self.client.post(
-        #     "/accounts/register/",
-        #     data={
-        #         "first_name": first_name,
-        #         "last_name": last_name,
-        #         "password": "pass123456",
-        #         "email": f"{username}@test.com",
-        #         "site": self.site.code,
-        #     },
-        # )
-        # self.assertEqual(response.status_code, 201)
+        """
+        Create a user with the given username and roles/groups.
+        """
+
         user, _ = User.objects.get_or_create(
             username=f"onyx-{username}", site=self.site
         )
@@ -56,7 +51,11 @@ class OnyxTestCase(APITestCase):
         return user
 
 
-def test_data(n=100):
+def generate_test_data(n=100):
+    """
+    Generate test data.
+    """
+
     data = []
     for i in range(n):
         country_region_group = random.randint(0, 4)
@@ -102,3 +101,64 @@ def test_data(n=100):
             ]
         data.append(x)
     return data
+
+
+def _test_record(self, payload, instance, created=False):
+    """
+    Test that a payload's values match an instance.
+    """
+
+    # Assert that the instance has the correct values as the payload
+    if not created:
+        self.assertEqual(payload.get("cid", ""), instance.cid)
+        self.assertEqual(
+            payload.get("published_date"), instance.published_date.strftime("%Y-%m-%d")
+        )
+
+    self.assertEqual(payload.get("sample_id", ""), instance.sample_id)
+    self.assertEqual(payload.get("run_name", ""), instance.run_name)
+    self.assertEqual(
+        payload.get("collection_month"),
+        instance.collection_month.strftime("%Y-%m")
+        if instance.collection_month
+        else None,
+    )
+    self.assertEqual(
+        payload.get("received_month"),
+        instance.received_month.strftime("%Y-%m") if instance.received_month else None,
+    )
+    self.assertEqual(
+        payload.get("submission_date"),
+        instance.submission_date.strftime("%Y-%m-%d")
+        if instance.submission_date
+        else None,
+    )
+    self.assertEqual(payload.get("country", ""), instance.country)
+    self.assertEqual(payload.get("region", ""), instance.region)
+    self.assertEqual(payload.get("concern"), instance.concern)
+    self.assertEqual(payload.get("tests"), instance.tests)
+    self.assertEqual(payload.get("score"), instance.score)
+
+    # If the payload has nested records, check the correctness of these
+    if payload.get("records"):
+        self.assertEqual(len(payload["records"]), instance.records.count())
+
+        for subrecord in payload["records"]:
+            subinstance = instance.records.get(test_id=subrecord.get("test_id"))
+            self.assertEqual(subrecord.get("test_id"), subinstance.test_id)
+            self.assertEqual(subrecord.get("test_pass"), subinstance.test_pass)
+            self.assertEqual(
+                subrecord.get("test_start"),
+                subinstance.test_start.strftime("%Y-%m")
+                if subinstance.test_start
+                else None,
+            )
+            self.assertEqual(
+                subrecord.get("test_end"),
+                subinstance.test_end.strftime("%Y-%m")
+                if subinstance.test_end
+                else None,
+            )
+            self.assertEqual(subrecord.get("score_a"), subinstance.score_a)
+            self.assertEqual(subrecord.get("score_b"), subinstance.score_b)
+            self.assertEqual(subrecord.get("score_c"), subinstance.score_c)
