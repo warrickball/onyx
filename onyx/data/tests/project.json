@@ -1,5 +1,7 @@
 {
-    "name": "test",
+    "code": "test",
+    "name": "Test Project",
+    "description": "This is a test project",
     "content_type": "data.testmodel",
     "groups": {
         "add": {
@@ -30,7 +32,7 @@
         },
         "view": {
             "base": [
-                "cid",
+                "climb_id",
                 "published_date",
                 "sample_id",
                 "run_name",

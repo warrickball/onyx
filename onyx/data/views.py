@@ -10,7 +10,7 @@ from rest_framework.viewsets import ViewSetMixin
 from accounts.permissions import Approved, ProjectApproved, ProjectAdmin
 from .models import Project, Choice, ProjectRecord
 from .serializers import ProjectSerializerMap, SerializerNode, SummarySerializer
-from .exceptions import CIDNotFound
+from .exceptions import ClimbIDNotFound
 from .query import make_atoms, validate_atoms, make_query
 from .queryset import init_project_queryset, prefetch_nested
 from .types import OnyxType
@@ -165,8 +165,15 @@ class FieldsView(ProjectAPIView):
             onyx_fields=onyx_fields,
         )
 
-        # Return response with project fields and version
-        return Response({"version": self.model.version(), "fields": fields_spec})
+        # Return response with project information and fields
+        return Response(
+            {
+                "name": self.project.name,
+                "description": self.project.description,
+                "version": self.model.version(),
+                "fields": fields_spec,
+            }
+        )
 
 
 class LookupsView(ProjectAPIView):
@@ -285,9 +292,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return response indicating creation
         return Response(data, status=status.HTTP_201_CREATED)
 
-    def retrieve(self, request: Request, code: str, cid: str) -> Response:
+    def retrieve(self, request: Request, code: str, climb_id: str) -> Response:
         """
-        Use the `cid` to retrieve an instance for the given project `code`.
+        Use the `climb_id` to retrieve an instance for the given project `code`.
         """
 
         # Validate the include/exclude fields
@@ -316,9 +323,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Get the instance
         # If the instance does not exist, return 404
         try:
-            instance = qs.get(cid=cid)
+            instance = qs.get(climb_id=climb_id)
         except self.model.DoesNotExist:
-            raise CIDNotFound
+            raise ClimbIDNotFound
 
         # Serialize the result
         serializer = self.serializer_cls(
@@ -470,10 +477,10 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         return Response(serializer.data)
 
     def partial_update(
-        self, request: Request, code: str, cid: str, test: bool = False
+        self, request: Request, code: str, climb_id: str, test: bool = False
     ) -> Response:
         """
-        Use the `cid` to update an instance for the given project `code`.
+        Use the `climb_id` to update an instance for the given project `code`.
         """
 
         # Validate the request data fields
@@ -488,9 +495,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Get the instance to be updated
         # If the instance does not exist, return 404
         try:
-            instance = qs.get(cid=cid)
+            instance = qs.get(climb_id=climb_id)
         except self.model.DoesNotExist:
-            raise CIDNotFound
+            raise ClimbIDNotFound
 
         # Validate the data
         node = SerializerNode(
@@ -523,9 +530,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Return response indicating update
         return Response(data)
 
-    def destroy(self, request: Request, code: str, cid: str) -> Response:
+    def destroy(self, request: Request, code: str, climb_id: str) -> Response:
         """
-        Use the `cid` to permanently delete an instance of the given project `code`.
+        Use the `climb_id` to permanently delete an instance of the given project `code`.
         """
         # Initial queryset
         qs = init_project_queryset(
@@ -536,9 +543,9 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Get the instance to be deleted
         # If the instance does not exist, return 404
         try:
-            instance = qs.get(cid=cid)
+            instance = qs.get(climb_id=climb_id)
         except self.model.DoesNotExist:
-            raise CIDNotFound
+            raise ClimbIDNotFound
 
         # Delete the instance
         instance.delete()

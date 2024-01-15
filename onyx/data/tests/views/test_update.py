@@ -13,8 +13,8 @@ class TestUpdateView(OnyxTestCase):
         """
 
         super().setUp()
-        self.endpoint = lambda cid: reverse(
-            "data.project.cid", kwargs={"code": "test", "cid": cid}
+        self.endpoint = lambda climb_id: reverse(
+            "data.project.climb_id", kwargs={"code": "test", "climb_id": climb_id}
         )
         self.user = self.setup_user(
             "testuser", roles=["is_staff"], groups=["test.change.base"]
@@ -26,23 +26,23 @@ class TestUpdateView(OnyxTestCase):
             data=next(iter(generate_test_data(n=1))),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.cid = response.json()["data"]["cid"]
+        self.climb_id = response.json()["data"]["climb_id"]
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
     def test_basic(self):
         """
-        Test update of a record by CID.
+        Test update of a record by CLIMB ID.
         """
 
-        instance = TestModel.objects.get(cid=self.cid)
+        instance = TestModel.objects.get(climb_id=self.climb_id)
         assert instance.tests is not None
         updated_values = {
             "tests": instance.tests + 1,
             "text_option_2": instance.text_option_2 + "!",
         }
-        response = self.client.patch(self.endpoint(self.cid), data=updated_values)
+        response = self.client.patch(self.endpoint(self.climb_id), data=updated_values)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        updated_instance = TestModel.objects.get(cid=self.cid)
+        updated_instance = TestModel.objects.get(climb_id=self.climb_id)
         self.assertEqual(updated_instance.tests, updated_values["tests"])
         self.assertEqual(
             updated_instance.text_option_2, updated_values["text_option_2"]
@@ -50,10 +50,10 @@ class TestUpdateView(OnyxTestCase):
 
     def test_basic_test(self):
         """
-        Test the test update of a record by CID.
+        Test the test update of a record by CLIMB ID.
         """
 
-        instance = TestModel.objects.get(cid=self.cid)
+        instance = TestModel.objects.get(climb_id=self.climb_id)
         assert instance.tests is not None
         original_values = {
             "tests": instance.tests,
@@ -64,12 +64,15 @@ class TestUpdateView(OnyxTestCase):
             "text_option_2": instance.text_option_2 + "!",
         }
         response = self.client.patch(
-            reverse("data.project.test.cid", kwargs={"code": "test", "cid": self.cid}),
+            reverse(
+                "data.project.test.climb_id",
+                kwargs={"code": "test", "climb_id": self.climb_id},
+            ),
             data=updated_values,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["data"], {})
-        updated_instance = TestModel.objects.get(cid=self.cid)
+        updated_instance = TestModel.objects.get(climb_id=self.climb_id)
         self.assertEqual(updated_instance.tests, original_values["tests"])
         self.assertEqual(
             updated_instance.text_option_2, original_values["text_option_2"]

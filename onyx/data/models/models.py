@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import checks
 from django.core.checks.messages import CheckMessage
 from accounts.models import Site, User
-from utils.fields import LowerCharField, UpperCharField
+from utils.fields import StrippedCharField, LowerCharField, UpperCharField
 from utils.constraints import unique_together
 from simple_history.models import HistoricalRecords
 from ..types import ALL_LOOKUPS
@@ -15,6 +15,8 @@ from ..types import ALL_LOOKUPS
 
 class Project(models.Model):
     code = LowerCharField(max_length=50, unique=True)
+    name = StrippedCharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
 
 
@@ -66,24 +68,24 @@ class Choice(models.Model):
         ]
 
 
-def generate_cid():
+def generate_climb_id():
     """
-    Generate a random new CID.
+    Generate a random new CLIMB ID.
 
-    The CID consists of the prefix `C-` followed by 10 random hex digits.
+    The CLIMB ID consists of the prefix `C-` followed by 10 random hexadecimal numbers.
 
-    This means there are `16^10 = 1,099,511,627,776` CIDs to choose from.
+    This means there are `16^10 = 1,099,511,627,776` CLIMB IDs to choose from.
     """
-    cid = "C-" + "".join(token_hex(5).upper())
+    climb_id = "C-" + "".join(token_hex(5).upper())
 
-    if CID.objects.filter(cid=cid).exists():
-        cid = generate_cid()
+    if ClimbID.objects.filter(climb_id=climb_id).exists():
+        climb_id = generate_climb_id()
 
-    return cid
+    return climb_id
 
 
-class CID(models.Model):
-    cid = UpperCharField(default=generate_cid, max_length=12, unique=True)
+class ClimbID(models.Model):
+    climb_id = UpperCharField(default=generate_climb_id, max_length=12, unique=True)
 
 
 class BaseRecord(models.Model):
@@ -122,7 +124,7 @@ class ProjectRecord(BaseRecord):
     def version(cls):
         raise NotImplementedError("A version number is required.")
 
-    cid = UpperCharField(
+    climb_id = UpperCharField(
         max_length=12,
         unique=True,
         help_text="Unique identifier for a project record. Set by Onyx.",
@@ -150,8 +152,8 @@ class ProjectRecord(BaseRecord):
 
     def save(self, *args, **kwargs):
         if not self.pk:
-            cid = CID.objects.create()
-            self.cid = cid.cid
+            climb_id = ClimbID.objects.create()
+            self.climb_id = climb_id.climb_id
 
         super().save(*args, **kwargs)
 
@@ -175,7 +177,7 @@ class Anonymiser(models.Model):
         """
         Generate a random new identifier on the given `model`.
 
-        The identifier consists of the given `prefix`, followed by a `-`, followed by 10 random hex digits.
+        The identifier consists of the given `prefix`, followed by a `-`, followed by 10 random hexadecimal numbers.
 
         This means there are `16^10 = 1,099,511,627,776` identifiers to choose from for a given `model` and `prefix`.
         """

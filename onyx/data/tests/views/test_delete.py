@@ -13,8 +13,8 @@ class TestDeleteView(OnyxTestCase):
         """
 
         super().setUp()
-        self.endpoint = lambda cid: reverse(
-            "data.project.cid", kwargs={"code": "test", "cid": cid}
+        self.endpoint = lambda climb_id: reverse(
+            "data.project.climb_id", kwargs={"code": "test", "climb_id": climb_id}
         )
         self.user = self.setup_user(
             "testuser", roles=["is_staff"], groups=["test.delete.base"]
@@ -26,14 +26,14 @@ class TestDeleteView(OnyxTestCase):
             data=next(iter(generate_test_data(n=1))),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.cid = response.json()["data"]["cid"]
+        self.climb_id = response.json()["data"]["climb_id"]
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
     def test_basic(self):
         """
-        Test deletion of a record by CID.
+        Test deletion of a record by CLIMB ID.
         """
 
-        response = self.client.delete(self.endpoint(self.cid))
+        response = self.client.delete(self.endpoint(self.climb_id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertFalse(TestModel.objects.filter(cid=self.cid).exists())
+        self.assertFalse(TestModel.objects.filter(climb_id=self.climb_id).exists())

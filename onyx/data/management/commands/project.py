@@ -23,7 +23,12 @@ class Command(base.BaseCommand):
         with open(options["project_config"]) as project_config_file:
             project_config = json.load(project_config_file)
 
-            self.set_project(project_config["name"], project_config.get("content_type"))
+            self.set_project(
+                code=project_config["code"],
+                name=project_config.get("name"),
+                description=project_config.get("description"),
+                content_type_name=project_config.get("content_type"),
+            )
 
             if project_config.get("groups"):
                 self.set_groups(project_config["groups"])
@@ -34,18 +39,41 @@ class Command(base.BaseCommand):
             if project_config.get("choice_constraints"):
                 self.set_choice_constraints(project_config["choice_constraints"])
 
-    def set_project(self, project_code: str, content_type_name: Optional[str] = None):
+    def set_project(
+        self,
+        code: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        content_type_name: Optional[str] = None,
+    ):
+        """
+        Create/update the project details.
+        """
+
+        # If no name was provided, use the code
+        if not name:
+            name = code
+
+        # If no description was provided, set as empty
+        if not description:
+            description = ""
+
         # If a {app}.{model} was provided, use it to get the content_type
         # Otherwise, assume that app = data and that the model has the same name as the project
         if content_type_name:
             app, _, model = content_type_name.partition(".")
         else:
-            app, model = "data", project_code
+            app, model = "data", code
 
         content_type = ContentType.objects.get(app_label=app, model=model)
 
         self.project, p_created = Project.objects.update_or_create(
-            code=project_code, defaults={"content_type": content_type}
+            code=code,
+            defaults={
+                "name": name,
+                "description": description,
+                "content_type": content_type,
+            },
         )
 
         if p_created:
@@ -53,10 +81,15 @@ class Command(base.BaseCommand):
         else:
             self.print(f"Updated project: {self.project.code}")
 
+        self.print("Name:", self.project.name)
+        self.print("Description:", self.project.description)
         self.print("Model:", self.project.content_type.model_class())
 
     def set_groups(self, data: Dict[str, Dict[str, List[str]]]):
-        # Create / update each group for the project
+        """
+        Create/update the groups for the project.
+        """
+
         groups = {}
         for action, scopes in data.items():
             for scope, fields in scopes.items():
@@ -108,6 +141,10 @@ class Command(base.BaseCommand):
                 )
 
     def set_choices(self, data: Dict[str, List[str]]):
+        """
+        Create/update the choices for the project.
+        """
+
         # TODO: Issue with reactivate/deactivate choices if you provide them in uppercase in the json
         # Upgrade Choices management command to DELETE inactive choices if a new one comes in with the same characters but a different case
         # E.g. if a new choice Swab comes in, DELETE the old choice swab
@@ -153,6 +190,10 @@ class Command(base.BaseCommand):
                     )
 
     def set_choice_constraints(self, data: Dict[str, Dict[str, Dict[str, List[str]]]]):
+        """
+        Create/update the choice constraints for the project.
+        """
+
         # TODO: Case insensitivity in constraint handling
 
         # Empty constraints for the project

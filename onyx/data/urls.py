@@ -14,11 +14,11 @@ urlpatterns = [
         name="data.project",
     ),
     re_path(
-        r"^(?P<code>[a-zA-Z_]*)/(?P<cid>[cC]-[a-zA-Z0-9]{10})/$",
+        r"^(?P<code>[a-zA-Z_]*)/(?P<climb_id>[cC]-[a-zA-Z0-9]{10})/$",
         views.ProjectRecordsViewSet.as_view(
             {"get": "retrieve", "patch": "partial_update", "delete": "destroy"}
         ),
-        name="data.project.cid",
+        name="data.project.climb_id",
     ),
     re_path(
         r"^(?P<code>[a-zA-Z_]*)/test/$",
@@ -27,9 +27,9 @@ urlpatterns = [
         kwargs={"test": True},
     ),
     re_path(
-        r"^(?P<code>[a-zA-Z_]*)/test/(?P<cid>[cC]-[a-zA-Z0-9]{10})/$",
+        r"^(?P<code>[a-zA-Z_]*)/test/(?P<climb_id>[cC]-[a-zA-Z0-9]{10})/$",
         views.ProjectRecordsViewSet.as_view({"patch": "partial_update"}),
-        name="data.project.test.cid",
+        name="data.project.test.climb_id",
         kwargs={"test": True},
     ),
     re_path(

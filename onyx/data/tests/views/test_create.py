@@ -70,7 +70,7 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         assert TestModel.objects.count() == 1
         assert TestModelRecord.objects.count() == 2
-        instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+        instance = TestModel.objects.get(climb_id=response.json()["data"]["climb_id"])
         _test_record(self, payload, instance, created=True)
 
     def test_basic_test(self):
@@ -124,7 +124,7 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         assert TestModel.objects.count() == 1
         assert TestModelRecord.objects.count() == 2
-        instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+        instance = TestModel.objects.get(climb_id=response.json()["data"]["climb_id"])
         _test_record(self, payload, instance, created=True)
 
     def test_unpermissioned_viewable_field(self):
@@ -133,7 +133,7 @@ class TestCreateView(OnyxTestCase):
         """
 
         payload = copy.deepcopy(default_payload)
-        payload["cid"] = "helloooo"
+        payload["climb_id"] = "helloooo"
         response = self.client.post(self.endpoint, data=payload)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert TestModel.objects.count() == 0
@@ -223,7 +223,7 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         assert TestModel.objects.count() == 1
         assert TestModelRecord.objects.count() == 2
-        instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+        instance = TestModel.objects.get(climb_id=response.json()["data"]["climb_id"])
         _test_record(self, payload, instance, created=True)
 
     def test_unique_together(self):
@@ -236,7 +236,7 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         assert TestModel.objects.count() == 1
         assert TestModelRecord.objects.count() == 2
-        instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+        instance = TestModel.objects.get(climb_id=response.json()["data"]["climb_id"])
         _test_record(self, payload, instance, created=True)
 
         payload = copy.deepcopy(default_payload)
@@ -245,7 +245,7 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         assert TestModel.objects.count() == 2
         assert TestModelRecord.objects.count() == 4
-        instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+        instance = TestModel.objects.get(climb_id=response.json()["data"]["climb_id"])
         _test_record(self, payload, instance, created=True)
 
         payload = copy.deepcopy(default_payload)
@@ -254,7 +254,7 @@ class TestCreateView(OnyxTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         assert TestModel.objects.count() == 3
         assert TestModelRecord.objects.count() == 6
-        instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+        instance = TestModel.objects.get(climb_id=response.json()["data"]["climb_id"])
         _test_record(self, payload, instance, created=True)
 
         payload = copy.deepcopy(default_payload)
@@ -455,7 +455,9 @@ class TestCreateView(OnyxTestCase):
             payload["text_option_1"] = expected
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            instance = TestModel.objects.get(
+                climb_id=response.json()["data"]["climb_id"]
+            )
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
@@ -499,7 +501,9 @@ class TestCreateView(OnyxTestCase):
             payload["region"] = expected
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            instance = TestModel.objects.get(
+                climb_id=response.json()["data"]["climb_id"]
+            )
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
@@ -542,7 +546,9 @@ class TestCreateView(OnyxTestCase):
             payload["tests"] = expected
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            instance = TestModel.objects.get(
+                climb_id=response.json()["data"]["climb_id"]
+            )
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
@@ -584,7 +590,9 @@ class TestCreateView(OnyxTestCase):
             payload["score"] = expected
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            instance = TestModel.objects.get(
+                climb_id=response.json()["data"]["climb_id"]
+            )
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
@@ -633,7 +641,9 @@ class TestCreateView(OnyxTestCase):
                 payload["collection_month"] = expected.strftime("%Y-%m")
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            instance = TestModel.objects.get(
+                climb_id=response.json()["data"]["climb_id"]
+            )
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
@@ -681,7 +691,9 @@ class TestCreateView(OnyxTestCase):
                 payload["submission_date"] = expected.strftime("%Y-%m-%d")
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            instance = TestModel.objects.get(
+                climb_id=response.json()["data"]["climb_id"]
+            )
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
@@ -724,7 +736,9 @@ class TestCreateView(OnyxTestCase):
             payload["concern"] = expected
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
-            instance = TestModel.objects.get(cid=response.json()["data"]["cid"])
+            instance = TestModel.objects.get(
+                climb_id=response.json()["data"]["climb_id"]
+            )
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 

@@ -29,13 +29,13 @@ class TestFilterView(OnyxTestCase):
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
-    def assertEqualCids(self, records, qs, allow_empty=False):
+    def assertEqualClimbIDs(self, records, qs, allow_empty=False):
         """
-        Assert that the CIDs in the records match the CIDs in the queryset.
+        Assert that the ClimbIDs in the records match the ClimbIDs in the queryset.
         """
 
-        record_values = sorted(record["cid"] for record in records)
-        qs_values = sorted(qs.distinct().values_list("cid", flat=True))
+        record_values = sorted(record["climb_id"] for record in records)
+        qs_values = sorted(qs.distinct().values_list("climb_id", flat=True))
 
         if not allow_empty:
             self.assertTrue(record_values)
@@ -55,7 +55,7 @@ class TestFilterView(OnyxTestCase):
             self.endpoint, data={f"{field}__{lookup}" if lookup else field: value}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(response.json()["data"], qs, allow_empty=allow_empty)
+        self.assertEqualClimbIDs(response.json()["data"], qs, allow_empty=allow_empty)
 
     def test_basic(self):
         """
@@ -64,7 +64,7 @@ class TestFilterView(OnyxTestCase):
 
         response = self.client.get(self.endpoint)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"],
             TestModel.objects.all(),
         )
@@ -119,13 +119,13 @@ class TestFilterView(OnyxTestCase):
 
         response = self.client.get(self.endpoint, data={"region": ""})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"], TestModel.objects.filter(region="")
         )
 
         response = self.client.get(self.endpoint, data={"region__ne": ""})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"], TestModel.objects.filter(region__ne="")
         )
 
@@ -179,41 +179,41 @@ class TestFilterView(OnyxTestCase):
 
         response = self.client.get(self.endpoint, data={"country__isnull": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"],
             TestModel.objects.filter(country__isnull=True),
         )
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"],
             TestModel.objects.filter(country=""),
         )
         response_alt = self.client.get(self.endpoint, data={"country": ""})
         self.assertEqual(response.json()["data"], response_alt.json()["data"])
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response_alt.json()["data"],
             TestModel.objects.filter(country__isnull=True),
         )
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response_alt.json()["data"],
             TestModel.objects.filter(country=""),
         )
         response = self.client.get(self.endpoint, data={"country__isnull": False})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"],
             TestModel.objects.filter(country__isnull=False),
         )
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"],
             TestModel.objects.filter(country__ne=""),
         )
         response_alt = self.client.get(self.endpoint, data={"country__ne": ""})
         self.assertEqual(response.json()["data"], response_alt.json()["data"])
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response_alt.json()["data"],
             TestModel.objects.filter(country__isnull=False),
         )
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response_alt.json()["data"],
             TestModel.objects.filter(country__ne=""),
         )
@@ -517,14 +517,14 @@ class TestFilterView(OnyxTestCase):
 
         response = self.client.get(self.endpoint, data={"records__isnull": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"],
             TestModel.objects.filter(records__isnull=True),
         )
 
         response = self.client.get(self.endpoint, data={"records__isnull": False})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(
+        self.assertEqualClimbIDs(
             response.json()["data"],
             TestModel.objects.filter(records__isnull=False),
         )
