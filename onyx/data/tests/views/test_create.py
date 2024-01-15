@@ -11,6 +11,7 @@ from ...models.projects.test import TestModel, TestModelRecord
 # - Required field tests (i.e. no None/"" values)
 # - Investigate IntegerField/FloatField different handling of True/False
 # - Test validators/constraints for nested fields
+# - Test Anonymiser
 
 
 default_payload = {

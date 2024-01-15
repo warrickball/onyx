@@ -46,7 +46,7 @@ class TestFilterView(OnyxTestCase):
             qs_values,
         )
 
-    def _test_filter(self, field, value, expected, lookup="", allow_empty=False):
+    def _test_filter(self, field, value, qs, lookup="", allow_empty=False):
         """
         Test filtering a field with a value and lookup.
         """
@@ -55,7 +55,7 @@ class TestFilterView(OnyxTestCase):
             self.endpoint, data={f"{field}__{lookup}" if lookup else field: value}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualCids(response.json()["data"], expected, allow_empty=allow_empty)
+        self.assertEqualCids(response.json()["data"], qs, allow_empty=allow_empty)
 
     def test_basic(self):
         """
@@ -82,7 +82,7 @@ class TestFilterView(OnyxTestCase):
         Test filtering a text field.
         """
 
-        for lookup, value, expected in [
+        for lookup, value, qs in [
             ("", "run-1", TestModel.objects.filter(run_name="run-1")),
             ("exact", "run-1", TestModel.objects.filter(run_name__exact="run-1")),
             ("ne", "run-1", TestModel.objects.filter(run_name__ne="run-1")),
@@ -108,7 +108,7 @@ class TestFilterView(OnyxTestCase):
             self._test_filter(
                 field="run_name",
                 value=value,
-                expected=expected,
+                qs=qs,
                 lookup=lookup,
             )
 
@@ -142,20 +142,33 @@ class TestFilterView(OnyxTestCase):
         Test filtering a choice field.
         """
 
-        for lookup, value, expected in [
-            ("", "eng", TestModel.objects.filter(country="eng")),
-            ("exact", "eng", TestModel.objects.filter(country__exact="eng")),
-            ("ne", "eng", TestModel.objects.exclude(country="eng")),
-            (
-                "in",
-                "eng, wales",
-                TestModel.objects.filter(country__in=["eng", "wales"]),
-            ),
-        ]:
+        choice_1_values = ["eng", "ENG", "Eng", "enG"]
+        choice_2_values = ["wales", "WALES", "Wales", "wAleS"]
+        choice_values = choice_1_values + choice_2_values
+
+        for lookup, value, qs in (
+            [
+                (l, x, TestModel.objects.filter(country=x.lower()))
+                for l in ["", "exact"]
+                for x in choice_values
+            ]
+            + [
+                ("ne", x, TestModel.objects.exclude(country=x.lower()))
+                for x in choice_values
+            ]
+            + [
+                (
+                    "in",
+                    ", ".join(x),
+                    TestModel.objects.filter(country__in=[y.lower() for y in x]),
+                )
+                for x in zip(choice_1_values, choice_2_values)
+            ]
+        ):
             self._test_filter(
                 field="country",
                 value=value,
-                expected=expected,
+                qs=qs,
                 lookup=lookup,
             )
 
@@ -231,7 +244,7 @@ class TestFilterView(OnyxTestCase):
         Test filtering an integer field.
         """
 
-        for lookup, value, expected in [
+        for lookup, value, qs in [
             ("", 1, TestModel.objects.filter(start=1)),
             ("exact", 1, TestModel.objects.filter(start__exact=1)),
             ("ne", 1, TestModel.objects.exclude(start=1)),
@@ -245,7 +258,7 @@ class TestFilterView(OnyxTestCase):
             self._test_filter(
                 field="start",
                 value=value,
-                expected=expected,
+                qs=qs,
                 lookup=lookup,
             )
 
@@ -254,7 +267,7 @@ class TestFilterView(OnyxTestCase):
         Test filtering a decimal field.
         """
 
-        for lookup, value, expected in [
+        for lookup, value, qs in [
             ("", 1.1, TestModel.objects.filter(score=1.1)),
             ("exact", 1.1, TestModel.objects.filter(score__exact=1.1)),
             ("ne", 1.1, TestModel.objects.exclude(score=1.1)),
@@ -272,7 +285,7 @@ class TestFilterView(OnyxTestCase):
             self._test_filter(
                 field="score",
                 value=value,
-                expected=expected,
+                qs=qs,
                 lookup=lookup,
                 allow_empty=True,
             )
@@ -282,7 +295,7 @@ class TestFilterView(OnyxTestCase):
         Test filtering a yearmonth field.
         """
 
-        for lookup, value, expected in [
+        for lookup, value, qs in [
             (
                 "",
                 "2022-01",
@@ -352,7 +365,7 @@ class TestFilterView(OnyxTestCase):
                 field="collection_month",
                 value=value,
                 lookup=lookup,
-                expected=expected,
+                qs=qs,
                 allow_empty=True,
             )
 
@@ -361,7 +374,7 @@ class TestFilterView(OnyxTestCase):
         Test filtering a date field.
         """
 
-        for lookup, value, expected in [
+        for lookup, value, qs in [
             (
                 "",
                 "2023-01-01",
@@ -460,7 +473,7 @@ class TestFilterView(OnyxTestCase):
             self._test_filter(
                 field="submission_date",
                 value=value,
-                expected=expected,
+                qs=qs,
                 lookup=lookup,
                 allow_empty=True,
             )
@@ -473,7 +486,7 @@ class TestFilterView(OnyxTestCase):
         true_values = [True, 1, "1", "on", "true", "TRUE", "trUe", "t"]
         false_values = [False, 0, "0", "off", "false", "FALSE", "faLse", "f"]
 
-        for lookup, value, expected in (
+        for lookup, value, qs in (
             [
                 (l, x, TestModel.objects.filter(concern=True))
                 for l in ["", "exact"]
@@ -493,7 +506,7 @@ class TestFilterView(OnyxTestCase):
             self._test_filter(
                 field="concern",
                 value=value,
-                expected=expected,
+                qs=qs,
                 lookup=lookup,
             )
 
