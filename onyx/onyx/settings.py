@@ -101,8 +101,8 @@ DATABASES = {
     }
 }
 
-# TODO: Use Postgres for Github Actions
-if os.environ.get("GITHUB_WORKFLOW") and "test" in sys.argv:
+# TODO: Use Postgres for CI testing instead of SQLite
+if os.environ.get("CI") and "test" in sys.argv:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": "testdb",
