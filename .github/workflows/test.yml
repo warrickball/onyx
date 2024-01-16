@@ -26,9 +26,10 @@ jobs:
         poetry config virtualenvs.in-project true
         poetry env use ${{ matrix.python-version }}
         poetry install --with test
-    - name: Set up database
+    - name: Create Database
       run: |
         sudo systemctl start postgresql.service
+        sudo -u postgres psql -c "CREATE ROLE root WITH CREATEDB"
         sudo -u postgres psql -c "CREATE DATABASE onyx OWNER root;"
 
     - name: Run Tests
