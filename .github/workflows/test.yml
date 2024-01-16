@@ -11,13 +11,6 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
-    services:
-      postgres:
-        image: postgres:14.10
-        ports:
-          # Maps tcp port 5432 on service container to the host
-          - 5432:5432
-
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -33,6 +26,11 @@ jobs:
         poetry config virtualenvs.in-project true
         poetry env use ${{ matrix.python-version }}
         poetry install --with test
+    - name: Set up database
+      run: |
+        sudo systemctl start postgresql.service
+        sudo -u postgres psql -c "CREATE DATABASE onyx;"
+
     - name: Run Tests
       env:
         SECRET_KEY: super-duper-secret-key
