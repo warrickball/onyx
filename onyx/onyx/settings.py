@@ -101,14 +101,6 @@ DATABASES = {
     }
 }
 
-# TODO: A bit hacky but okay for now
-# In the long run we should probably use postgres for tests as well
-if "test" in sys.argv:
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": "testdb",
-    }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators

@@ -2,10 +2,10 @@
 .venv
 .env
 .coverage
+.stuff
 **.log
 __pycache__
 migrations
-stuff
 onyx/data/models/projects/*
 !onyx/data/models/projects/__init__.py
 !onyx/data/models/projects/test.py

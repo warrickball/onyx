@@ -11,6 +11,16 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
+    services:
+      postgres:
+        image: postgres:14.10
+        env:
+          POSTGRES_DB: onyx
+          POSTGRES_USER: onyx
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -30,8 +40,8 @@ jobs:
       env:
         SECRET_KEY: super-duper-secret-key
         HOST_NAME: localhost
-        DATABASE_NAME: db-not-found
-        DATABASE_USER: user-not-found
+        DATABASE_NAME: onyx
+        DATABASE_USER: onyx
       working-directory: ./onyx
       run: |
         poetry run coverage run --source='.' manage.py test -v 2
