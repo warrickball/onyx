@@ -15,8 +15,8 @@ jobs:
       postgres:
         image: postgres:14
         env:
-          POSTGRES_USER: onyx
-          POSTGRES_PASSWORD: onyx
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: onyx
         ports:
           - 5432:5432
@@ -43,7 +43,7 @@ jobs:
         SECRET_KEY: super-duper-secret-key
         HOST_NAME: localhost
         DATABASE_NAME: onyx
-        DATABASE_USER: onyx
+        DATABASE_USER: postgres
       working-directory: ./onyx
       run: |
         poetry run coverage run --source='.' manage.py test -v 2
