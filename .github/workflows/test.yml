@@ -11,6 +11,18 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: onyx
+          POSTGRES_PASSWORD: onyx
+          POSTGRES_DB: onyx
+        ports:
+          - 5432:5432
+        # needed because the postgres container does not provide a healthcheck
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -26,18 +38,12 @@ jobs:
         poetry config virtualenvs.in-project true
         poetry env use ${{ matrix.python-version }}
         poetry install --with test
-    - name: Create Database
-      run: |
-        sudo systemctl start postgresql.service
-        sudo -u postgres psql -c "CREATE ROLE root WITH CREATEDB"
-        sudo -u postgres psql -c "CREATE DATABASE onyx OWNER root;"
-
     - name: Run Tests
       env:
         SECRET_KEY: super-duper-secret-key
         HOST_NAME: localhost
         DATABASE_NAME: onyx
-        DATABASE_USER: root
+        DATABASE_USER: onyx
       working-directory: ./onyx
       run: |
         poetry run coverage run --source='.' manage.py test -v 2
