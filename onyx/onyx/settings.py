@@ -101,9 +101,8 @@ DATABASES = {
     }
 }
 
-# TODO: A bit hacky but okay for now
-# In the long run we should probably use postgres for tests as well
-if "test" in sys.argv:
+# TODO: Use Postgres for CI testing instead of SQLite
+if os.environ.get("CI") and "test" in sys.argv:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": "testdb",
