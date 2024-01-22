@@ -392,38 +392,36 @@ def generate_fields_spec(
         else:
             field_path = field
 
-        if nested:
-            onyx_type = onyx_fields[field_path].onyx_type
-            required = onyx_fields[field_path].required
+        onyx_type = onyx_fields[field_path].onyx_type
+        field_instance = onyx_fields[field_path].field_instance
+        required = onyx_fields[field_path].required
+
+        if onyx_type == OnyxType.RELATION:
             generate_fields_spec(
                 fields_dict=nested,
                 onyx_fields=onyx_fields,
                 prefix=field_path,
             )
             fields_dict[field] = {
+                "description": field_instance.field.help_text,  #  type: ignore
                 "type": onyx_type.label,
                 "required": required,
                 "fields": nested,
             }
+        elif onyx_type == OnyxType.CHOICE:
+            choices = onyx_fields[field_path].choices
+            fields_dict[field] = {
+                "description": field_instance.help_text,
+                "type": onyx_type.label,
+                "required": required,
+                "values": choices,
+            }
         else:
-            onyx_type = onyx_fields[field_path].onyx_type
-            field_instance = onyx_fields[field_path].field_instance
-            required = onyx_fields[field_path].required
-
-            if onyx_type == OnyxType.CHOICE:
-                choices = onyx_fields[field_path].choices
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": onyx_type.label,
-                    "required": required,
-                    "values": choices,
-                }
-            else:
-                fields_dict[field] = {
-                    "description": field_instance.help_text,
-                    "type": onyx_type.label,
-                    "required": required,
-                }
+            fields_dict[field] = {
+                "description": field_instance.help_text,
+                "type": onyx_type.label,
+                "required": required,
+            }
 
     return fields_dict
 

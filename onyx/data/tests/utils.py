@@ -56,6 +56,10 @@ def generate_test_data(n=100):
     Generate test data.
     """
 
+    # TODO: Better generation of test data
+    # - Empty values for testing isnull without requiring allow_empty = True
+    # - More distinct float, dates etc for testing exact filter matches without requiring allow_empty = True
+
     data = []
     for i in range(n):
         country_region_group = random.randint(0, 4)

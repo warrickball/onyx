@@ -444,7 +444,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
                 raise exceptions.ValidationError(summary_errors)
 
             qs_summary_values = qs.values(*self.summarise)
-            if qs_summary_values.distinct().count() > 10000:
+            if qs_summary_values.distinct().count() > 100000:
                 raise exceptions.ValidationError(
                     {
                         "detail": "The current summary would return too many distinct values."
@@ -463,8 +463,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             self.paginator.ordering = "created"
 
             # Paginate the response
-            instances = qs.order_by("id")
-            result_page = self.paginator.paginate_queryset(instances, request)
+            result_page = self.paginator.paginate_queryset(qs, request)
 
             # Serialize the results
             serializer = self.serializer_cls(

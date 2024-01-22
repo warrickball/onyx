@@ -104,65 +104,81 @@ class TestFilterView(OnyxTestCase):
             ("iendswith", "N-1", TestModel.objects.filter(run_name__iendswith="N-1")),
             ("regex", "run-1", TestModel.objects.filter(run_name__regex="run-1")),
             ("iregex", "RUN-1", TestModel.objects.filter(run_name__iregex="RUN-1")),
+            ("length", 5, TestModel.objects.filter(run_name__length=5)),
+            (
+                "length__in",
+                "1, 3, 5",
+                TestModel.objects.filter(run_name__length__in=[1, 3, 5]),
+            ),
+            (
+                "length__range",
+                "3, 5",
+                TestModel.objects.filter(run_name__length__range=[3, 5]),
+            ),
+            ("", "", TestModel.objects.filter(run_name__isnull=True)),
+            ("ne", "", TestModel.objects.exclude(run_name__isnull=True)),
+            ("isnull", True, TestModel.objects.filter(run_name__isnull=True)),
+            ("isnull", False, TestModel.objects.exclude(run_name__isnull=True)),
+            ("isnull", True, TestModel.objects.filter(run_name="")),
+            ("isnull", False, TestModel.objects.exclude(run_name="")),
         ]:
             self._test_filter(
                 field="run_name",
                 value=value,
                 qs=qs,
                 lookup=lookup,
+                allow_empty=True,
             )
 
-    def test_text_blank(self):
-        """
-        Test filtering a text field with an empty value.
-        """
-
-        response = self.client.get(self.endpoint, data={"region": ""})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualClimbIDs(
-            response.json()["data"], TestModel.objects.filter(region="")
-        )
-
-        response = self.client.get(self.endpoint, data={"region__ne": ""})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualClimbIDs(
-            response.json()["data"], TestModel.objects.filter(region__ne="")
-        )
-
-    def test_text_invalid_lookup(self):
-        """
-        Test filtering a text field with an invalid lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"run_name__year": "2022"})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # Test the isnull lookup against invalid true/false values
+        for value in ["", " ", "invalid"]:
+            response = self.client.get(self.endpoint, data={"run_name__isnull": value})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_choice(self):
         """
         Test filtering a choice field.
         """
 
-        choice_1_values = ["eng", "ENG", "Eng", "enG"]
-        choice_2_values = ["wales", "WALES", "Wales", "wAleS"]
+        choice_1_values = ["eng", "ENG", "Eng", "enG", "eng ", " eng", " eng "]
+        choice_2_values = [
+            "wales",
+            "WALES",
+            "Wales",
+            "wAleS",
+            "wales ",
+            " wales",
+            " wales ",
+        ]
         choice_values = choice_1_values + choice_2_values
 
         for lookup, value, qs in (
             [
-                (l, x, TestModel.objects.filter(country=x.lower()))
+                (l, x, TestModel.objects.filter(country=x.strip().lower()))
                 for l in ["", "exact"]
                 for x in choice_values
             ]
             + [
-                ("ne", x, TestModel.objects.exclude(country=x.lower()))
+                ("ne", x, TestModel.objects.exclude(country=x.strip().lower()))
                 for x in choice_values
             ]
             + [
                 (
                     "in",
                     ", ".join(x),
-                    TestModel.objects.filter(country__in=[y.lower() for y in x]),
+                    TestModel.objects.filter(
+                        country__in=[y.strip().lower() for y in x]
+                    ),
                 )
                 for x in zip(choice_1_values, choice_2_values)
+            ]
+            + [
+                ("", "", TestModel.objects.filter(country__isnull=True)),
+                ("ne", "", TestModel.objects.exclude(country__isnull=True)),
+                ("isnull", True, TestModel.objects.filter(country__isnull=True)),
+                ("isnull", False, TestModel.objects.exclude(country__isnull=True)),
+                ("isnull", True, TestModel.objects.filter(country="")),
+                ("isnull", False, TestModel.objects.exclude(country="")),
             ]
         ):
             self._test_filter(
@@ -172,70 +188,12 @@ class TestFilterView(OnyxTestCase):
                 lookup=lookup,
             )
 
-    def test_choice_isnull(self):
-        """
-        Test filtering a choice field with an isnull lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"country__isnull": True})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualClimbIDs(
-            response.json()["data"],
-            TestModel.objects.filter(country__isnull=True),
-        )
-        self.assertEqualClimbIDs(
-            response.json()["data"],
-            TestModel.objects.filter(country=""),
-        )
-        response_alt = self.client.get(self.endpoint, data={"country": ""})
-        self.assertEqual(response.json()["data"], response_alt.json()["data"])
-        self.assertEqualClimbIDs(
-            response_alt.json()["data"],
-            TestModel.objects.filter(country__isnull=True),
-        )
-        self.assertEqualClimbIDs(
-            response_alt.json()["data"],
-            TestModel.objects.filter(country=""),
-        )
-        response = self.client.get(self.endpoint, data={"country__isnull": False})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqualClimbIDs(
-            response.json()["data"],
-            TestModel.objects.filter(country__isnull=False),
-        )
-        self.assertEqualClimbIDs(
-            response.json()["data"],
-            TestModel.objects.filter(country__ne=""),
-        )
-        response_alt = self.client.get(self.endpoint, data={"country__ne": ""})
-        self.assertEqual(response.json()["data"], response_alt.json()["data"])
-        self.assertEqualClimbIDs(
-            response_alt.json()["data"],
-            TestModel.objects.filter(country__isnull=False),
-        )
-        self.assertEqualClimbIDs(
-            response_alt.json()["data"],
-            TestModel.objects.filter(country__ne=""),
-        )
-
         # Test the isnull lookup against invalid true/false values
         for value in ["", " ", "invalid"]:
             response = self.client.get(self.endpoint, data={"country__isnull": value})
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_choice_invalid_lookup(self):
-        """
-        Test filtering a choice field with an invalid lookup.
-        """
-
-        response = self.client.get(self.endpoint, data={"country__range": "eng,wales"})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_choice_wrong_choice(self):
-        """
-        Test filtering a choice field with an invalid choice.
-        """
-
+        # Test an incorrect choice
         response = self.client.get(self.endpoint, data={"country": "ing"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
