@@ -100,7 +100,6 @@ class BaseRecord(models.Model):
     # site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
 
     class Meta:
-        default_permissions = []
         abstract = True
 
     @classmethod
@@ -143,12 +142,7 @@ class ProjectRecord(BaseRecord):
     )
 
     class Meta:
-        default_permissions = []
         abstract = True
-        indexes = [
-            models.Index(fields=["published_date"]),
-            models.Index(fields=["suppressed"]),
-        ]
 
     def save(self, *args, **kwargs):
         if not self.pk:
