@@ -34,6 +34,11 @@ class BaseTestModel(ProjectRecord):
     class Meta:
         default_permissions = []
         indexes = [
+            models.Index(fields=["created"]),
+            models.Index(fields=["climb_id"]),
+            models.Index(fields=["published_date"]),
+            models.Index(fields=["suppressed"]),
+            models.Index(fields=["site_restricted"]),
             models.Index(fields=["sample_id", "run_name"]),
             models.Index(fields=["sample_id"]),
             models.Index(fields=["run_name"]),
@@ -54,7 +59,9 @@ class BaseTestModel(ProjectRecord):
                 fields=["text_option_1", "text_option_2"],
             ),
             conditional_required(
-                model_name="basetestmodel", field="region", required=["country"]
+                model_name="basetestmodel",
+                field="region",
+                required=["country"],
             ),
         ]
 
@@ -78,17 +85,21 @@ class TestModelRecord(BaseRecord):
 
     class Meta:
         default_permissions = []
+        indexes = [
+            models.Index(fields=["created"]),
+            models.Index(fields=["link", "test_id"]),
+        ]
         constraints = [
             unique_together(
-                model_name="testmodelrecords",
+                model_name="testmodelrecord",
                 fields=["link", "test_id"],
             ),
             optional_value_group(
-                model_name="testmodelrecords",
+                model_name="testmodelrecord",
                 fields=["score_a", "score_b"],
             ),
             conditional_required(
-                model_name="testmodelrecords",
+                model_name="testmodelrecord",
                 field="score_c",
                 required=["score_a", "score_b"],
             ),
