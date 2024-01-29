@@ -413,14 +413,6 @@ def generate_fields_spec(
                 "required": onyx_fields[field_path].required,
                 "fields": nested,
             }
-        elif onyx_type == OnyxType.CHOICE:
-            choices = onyx_fields[field_path].choices
-            fields_dict[field] = {
-                "description": field_instance.help_text,
-                "type": onyx_type.label,
-                "required": required,
-                "values": choices,
-            }
         else:
             values = []
             if field_instance.default != models.NOT_PROVIDED:
