@@ -15,15 +15,6 @@ from .models import Choice, Project, ProjectRecord
 from .types import OnyxType, ALL_LOOKUPS
 
 
-TEXT_FIELDS = [
-    models.CharField,
-    models.TextField,
-    StrippedCharField,
-    LowerCharField,
-    UpperCharField,
-]
-
-
 class OnyxField:
     """
     Class for storing information on a field (and lookup) requested by a user.
@@ -38,6 +29,7 @@ class OnyxField:
         "field_type",
         "onyx_type",
         "required",
+        "description",
         "choices",
         "lookup",
     )
@@ -57,13 +49,18 @@ class OnyxField:
         self.field_instance = self.field_model._meta.get_field(self.field_name)
         self.field_type = type(self.field_instance)
 
-        if self.field_type in TEXT_FIELDS:
+        # Determine the OnyxType for the field
+        if self.field_type in {
+            models.CharField,
+            models.TextField,
+            StrippedCharField,
+            LowerCharField,
+            UpperCharField,
+        }:
             self.onyx_type = OnyxType.TEXT
-            self.required = not self.field_instance.blank
 
         elif self.field_type == ChoiceField:
             self.onyx_type = OnyxType.CHOICE
-            self.required = not self.field_instance.blank
             self.choices = Choice.objects.filter(
                 project=self.project,
                 field=self.field_name,
@@ -71,37 +68,48 @@ class OnyxField:
 
         elif self.field_type == models.IntegerField:
             self.onyx_type = OnyxType.INTEGER
-            self.required = not self.field_instance.null
 
         elif self.field_type == models.FloatField:
             self.onyx_type = OnyxType.DECIMAL
-            self.required = not self.field_instance.null
 
         elif self.field_type == YearMonthField:
             self.onyx_type = OnyxType.DATE_YYYY_MM
-            self.required = not self.field_instance.null
 
         elif self.field_type == models.DateField:
             self.onyx_type = OnyxType.DATE_YYYY_MM_DD
-            self.required = not self.field_instance.null
 
         elif self.field_type == models.DateTimeField:
             self.onyx_type = OnyxType.DATETIME
-            self.required = not self.field_instance.null
 
         elif self.field_type == models.BooleanField:
             self.onyx_type = OnyxType.BOOLEAN
-            self.required = not self.field_instance.null
 
         elif self.field_instance.is_relation:
             self.onyx_type = OnyxType.RELATION
-            self.required = not self.field_instance.null
 
         else:
             raise NotImplementedError(
                 f"Field {self.field_type} did not match an OnyxType."
             )
 
+        # Determine the field description
+        if isinstance(self.field_instance, models.ManyToOneRel):
+            self.description = self.field_instance.field.help_text
+        else:
+            self.description = self.field_instance.help_text
+
+        # Determine the field's required status
+        if self.onyx_type == OnyxType.TEXT or self.onyx_type == OnyxType.CHOICE:
+            self.required = (
+                not self.field_instance.blank
+                and self.field_instance.default == models.NOT_PROVIDED
+            )
+        else:
+            self.required = (
+                not self.field_instance.null
+            ) and self.field_instance.default == models.NOT_PROVIDED
+
+        # Validate the lookup
         if not allow_lookup and lookup:
             raise exceptions.ValidationError("Lookups are not allowed.")
 
@@ -159,9 +167,7 @@ class FieldHandler:
             The list of fields that can be actioned on within provided scopes.
         """
 
-        if scopes:
-            scopes = ["base"] + scopes
-        else:
+        if not scopes:
             scopes = ["base"]
 
         groups = Group.objects.filter(
@@ -394,7 +400,6 @@ def generate_fields_spec(
 
         onyx_type = onyx_fields[field_path].onyx_type
         field_instance = onyx_fields[field_path].field_instance
-        required = onyx_fields[field_path].required
 
         if onyx_type == OnyxType.RELATION:
             generate_fields_spec(
@@ -403,25 +408,32 @@ def generate_fields_spec(
                 prefix=field_path,
             )
             fields_dict[field] = {
-                "description": field_instance.field.help_text,  #  type: ignore
+                "description": onyx_fields[field_path].description,
                 "type": onyx_type.label,
-                "required": required,
+                "required": onyx_fields[field_path].required,
                 "fields": nested,
             }
-        elif onyx_type == OnyxType.CHOICE:
-            choices = onyx_fields[field_path].choices
-            fields_dict[field] = {
-                "description": field_instance.help_text,
-                "type": onyx_type.label,
-                "required": required,
-                "values": choices,
-            }
         else:
-            fields_dict[field] = {
-                "description": field_instance.help_text,
+            values = []
+            if field_instance.default != models.NOT_PROVIDED:
+                values.append(f"Default: {field_instance.default}")
+
+            if onyx_type == OnyxType.TEXT and field_instance.max_length:
+                values.append(f"Max length: {field_instance.max_length}")
+
+            if onyx_type == OnyxType.CHOICE and onyx_fields[field_path].choices:
+                values.extend(onyx_fields[field_path].choices)
+
+            field_dict = {
+                "description": onyx_fields[field_path].description,
                 "type": onyx_type.label,
-                "required": required,
+                "required": onyx_fields[field_path].required,
             }
+
+            if values:
+                field_dict["values"] = values
+
+            fields_dict[field] = field_dict
 
     return fields_dict
 
