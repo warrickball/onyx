@@ -101,13 +101,16 @@ DATABASES = {
     }
 }
 
-# TODO: Use Postgres for CI testing instead of SQLite
+# In CI, Django has to connect differently to the Postgres container,
+# and we have to provide a host name and password
 if os.environ.get("CI") and "test" in sys.argv:
     DATABASES["default"] = {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": "testdb",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ["DATABASE_NAME"],
+        "USER": os.environ["DATABASE_USER"],
+        "PASSWORD": os.environ["DATABASE_PASSWORD"],
+        "HOST": os.environ["DATABASE_HOST"],
     }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
