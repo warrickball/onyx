@@ -11,6 +11,18 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: onyx
+        ports:
+          - 5432:5432
+        # needed because the postgres container does not provide a healthcheck
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -31,8 +43,11 @@ jobs:
         SECRET_KEY: super-duper-secret-key
         HOST_NAME: localhost
         DATABASE_NAME: onyx
-        DATABASE_USER: onyx
+        DATABASE_USER: postgres
+        DATABASE_PASSWORD: postgres
+        DATABASE_HOST: localhost
       working-directory: ./onyx
       run: |
+        poetry run python manage.py makemigrations accounts data internal
         poetry run coverage run --source='.' manage.py test -v 2
         poetry run coverage report
