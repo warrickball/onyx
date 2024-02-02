@@ -400,6 +400,11 @@ def generate_fields_spec(
 
         onyx_type = onyx_fields[field_path].onyx_type
         field_instance = onyx_fields[field_path].field_instance
+        field_dict = {
+            "description": onyx_fields[field_path].description,
+            "type": onyx_type.label,
+            "required": onyx_fields[field_path].required,
+        }
 
         if onyx_type == OnyxType.RELATION:
             generate_fields_spec(
@@ -407,33 +412,20 @@ def generate_fields_spec(
                 onyx_fields=onyx_fields,
                 prefix=field_path,
             )
-            fields_dict[field] = {
-                "description": onyx_fields[field_path].description,
-                "type": onyx_type.label,
-                "required": onyx_fields[field_path].required,
-                "fields": nested,
-            }
+            field_dict["fields"] = nested
         else:
-            values = []
             if field_instance.default != models.NOT_PROVIDED:
-                values.append(f"Default: {field_instance.default}")
+                field_dict["default"] = field_instance.default
 
             if onyx_type == OnyxType.TEXT and field_instance.max_length:
-                values.append(f"Max length: {field_instance.max_length}")
+                field_dict["restrictions"] = [
+                    f"Max length: {field_instance.max_length}"
+                ]
 
             if onyx_type == OnyxType.CHOICE and onyx_fields[field_path].choices:
-                values.extend(onyx_fields[field_path].choices)
+                field_dict["values"] = onyx_fields[field_path].choices
 
-            field_dict = {
-                "description": onyx_fields[field_path].description,
-                "type": onyx_type.label,
-                "required": onyx_fields[field_path].required,
-            }
-
-            if values:
-                field_dict["values"] = values
-
-            fields_dict[field] = field_dict
+        fields_dict[field] = field_dict
 
     return fields_dict
 
