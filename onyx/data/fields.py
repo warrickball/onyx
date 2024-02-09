@@ -1,6 +1,5 @@
 from typing import Any
 from django.db import models
-from django.contrib.auth.models import Group
 from rest_framework import exceptions
 from utils.fields import (
     StrippedCharField,
@@ -9,10 +8,11 @@ from utils.fields import (
     ChoiceField,
     YearMonthField,
 )
-from utils.functions import get_suggestions
+from utils.functions import get_suggestions, get_permission, parse_permission
 from accounts.models import User
 from .models import Choice, Project, ProjectRecord
 from .types import OnyxType, ALL_LOOKUPS
+from .actions import Actions
 
 
 class OnyxField:
@@ -135,7 +135,7 @@ class FieldHandler:
     - Checks whether the user has permission to action on the resolved fields.
     """
 
-    __slots__ = "code", "model", "app_label", "action", "user", "user_fields"
+    __slots__ = "code", "model", "app_label", "action", "user", "fields"
 
     def __init__(
         self,
@@ -151,65 +151,31 @@ class FieldHandler:
         self.app_label = project.content_type.app_label
         self.action = action
         self.user = user
-        self.user_fields = None
+        self.fields = None
 
     def get_fields(
         self,
-        scopes: list[str] | None = None,
     ) -> list[str]:
         """
-        Get fields that can be actioned on within provided scopes.
-
-        Args:
-            scopes: The scopes to include fields from. If None, only the base scope is used.
+        Get all fields that can be actioned on.
 
         Returns:
-            The list of fields that can be actioned on within provided scopes.
+            The list of fields that the user can action on.
         """
 
-        if not scopes:
-            scopes = ["base"]
+        # If fields have not been cached, retrieve them
+        if self.fields is None:
+            fields = []
 
-        groups = Group.objects.filter(
-            projectgroup__project__code=self.code,
-            projectgroup__action=self.action,
-            projectgroup__scope__in=scopes,
-        )
+            for permission in self.user.get_all_permissions():
+                _, action, project, field = parse_permission(permission)
 
-        permissions = [
-            permission for group in groups for permission in group.permissions.all()
-        ]
+                if action == self.action and project == self.code and field:
+                    fields.append(field)
 
-        fields = [permission.codename.partition("__")[2] for permission in permissions]
+            self.fields = fields
 
-        return fields
-
-    def get_user_fields(
-        self,
-    ) -> list[str]:
-        """
-        Get all fields that the user can action on within the project.
-
-        Returns:
-            The list of fields that the user can action on within the project.
-        """
-
-        if not self.user_fields:
-            groups = self.user.groups.filter(
-                projectgroup__project__code=self.code,
-                projectgroup__action=self.action,
-            )
-
-            permissions = [
-                permission for group in groups for permission in group.permissions.all()
-            ]
-
-            fields = [
-                permission.codename.partition("__")[2] for permission in permissions
-            ]
-            self.user_fields = fields
-
-        return self.user_fields
+        return self.fields
 
     def unknown_field_suggestions(self, field) -> str:
         """
@@ -226,7 +192,7 @@ class FieldHandler:
 
         suggestions = get_suggestions(
             field,
-            options=self.get_user_fields(),
+            options=self.get_fields(),
             message_prefix="This field is unknown.",
         )
 
@@ -240,28 +206,33 @@ class FieldHandler:
             onyx_field: The `OnyxField` object to check user permissions for.
         """
 
-        # Check whether the user can perform the action on the field
-        # TODO: Refactor this to use model name rather than project code (more granular permissions).
-        field_action_permission = (
-            f"{self.app_label}.{self.action}_{self.code}__{onyx_field.field_path}"
+        # TODO: Refactor this to use model name rather than project code?
+
+        # Check the user's permission to access the field
+        # If the user does not have permission, tell them it is unknown
+        field_access_permission = get_permission(
+            app_label=self.app_label,
+            action="access",
+            code=self.code,
+            field=onyx_field.field_path,
+        )
+
+        if not self.user.has_perm(field_access_permission):
+            raise exceptions.ValidationError(
+                self.unknown_field_suggestions(onyx_field.field_path)
+            )
+
+        # Check the user's permission to perform action on the field
+        # If the user does not have permission, tell them it is not allowed
+        field_action_permission = get_permission(
+            app_label=self.app_label,
+            action=self.action,
+            code=self.code,
+            field=onyx_field.field_path,
         )
 
         if not self.user.has_perm(field_action_permission):
-            # If they do not have permission, check whether they can view the field
-            field_view_permission = (
-                f"{self.app_label}.view_{self.code}__{onyx_field.field_path}"
-            )
-
-            if self.action != "view" and self.user.has_perm(field_view_permission):
-                # If the user has permission to view the field, return the action permission required
-                raise exceptions.ValidationError(
-                    f"You cannot {self.action} this field."
-                )
-            else:
-                # If the user does not have permission, tell them it is unknown
-                raise exceptions.ValidationError(
-                    self.unknown_field_suggestions(onyx_field.field_path)
-                )
+            raise exceptions.ValidationError(f"You cannot {self.action} this field.")
 
     def resolve_field(
         self,
@@ -376,58 +347,124 @@ class FieldHandler:
 def generate_fields_spec(
     fields_dict: dict,
     onyx_fields: dict[str, OnyxField],
+    actions_map: dict[str, str],
+    serializer,  # TODO: Can't type this as it's a circular import
     prefix: str | None = None,
 ) -> dict[str, Any]:
     """
-    Annote `fields_dict` with information from `onyx_fields`.
+    Generate the fields specification for a project from the provided `fields_dict`, `onyx_fields`, `actions_map`, and `serializer`.
 
-    This information includes the front-facing type name, required status, and restricted choices for each field.
+    For each field, this information includes:
+    * The front-facing type name
+    * Required status
+    * Available actions
+    * Choices
+    * Default value
+    * Additional restrictions (e.g. max length, optional value groups)
 
     Args:
-        fields_dict: The nested dictionary structure containing fields to annotate.
+        fields_dict: The dictionary containing fields to annotate.
         onyx_fields: The dictionary of `OnyxField` objects to use for annotation.
+        actions_map: The dictionary of field paths to their available actions.
+        serializer: The serializer to use for annotation.
         prefix: The prefix to use for the field paths.
 
     Returns:
         The annotated dictionary of fields.
     """
 
-    for field, nested in fields_dict.items():
+    fields_spec = {}
+
+    # Handle serializer fields
+    for field in serializer.Meta.fields:
+        # Skip fields that are not in the fields_dict
+        if field not in fields_dict:
+            continue
+
+        # If a prefix is provided, use it to create the field path
         if prefix:
             field_path = f"{prefix}__{field}"
         else:
             field_path = field
 
+        # Get the field's OnyxType and field instance
         onyx_type = onyx_fields[field_path].onyx_type
         field_instance = onyx_fields[field_path].field_instance
-        field_dict = {
+
+        # Generate initial spec for the field
+        field_spec = {
             "description": onyx_fields[field_path].description,
             "type": onyx_type.label,
             "required": onyx_fields[field_path].required,
+            "actions": [
+                action.value
+                for action in Actions
+                if action.value in actions_map[field_path]
+            ],
         }
 
-        if onyx_type == OnyxType.RELATION:
-            generate_fields_spec(
-                fields_dict=nested,
-                onyx_fields=onyx_fields,
-                prefix=field_path,
-            )
-            field_dict["fields"] = nested
+        # Add default value if it exists
+        if field_instance.default != models.NOT_PROVIDED:
+            field_spec["default"] = field_instance.default
+
+        # Add choices if the field is a choice field
+        if onyx_type == OnyxType.CHOICE and onyx_fields[field_path].choices:
+            field_spec["values"] = onyx_fields[field_path].choices
+
+        # Add additional restrictions
+        restrictions = []
+        if onyx_type == OnyxType.TEXT and field_instance.max_length:
+            restrictions.append(f"Max length: {field_instance.max_length}")
+
+        for optional_value_group in serializer.OnyxMeta.optional_value_groups:
+            if field in optional_value_group:
+                restrictions.append(
+                    f"At least one required: {', '.join(optional_value_group)}"
+                )
+
+        if restrictions:
+            field_spec["restrictions"] = restrictions
+
+        # Add the field spec to the fields spec
+        fields_spec[field] = field_spec
+
+    # Handle serializer relations
+    for field, nested_serializer in serializer.OnyxMeta.relations.items():
+        # Skip fields that are not in the fields_dict
+        if field not in fields_dict:
+            continue
+
+        # If a prefix is provided, use it to create the field path
+        if prefix:
+            field_path = f"{prefix}__{field}"
         else:
-            if field_instance.default != models.NOT_PROVIDED:
-                field_dict["default"] = field_instance.default
+            field_path = field
 
-            if onyx_type == OnyxType.TEXT and field_instance.max_length:
-                field_dict["restrictions"] = [
-                    f"Max length: {field_instance.max_length}"
-                ]
+        # Get the field's OnyxType and field instance
+        onyx_type = onyx_fields[field_path].onyx_type
+        field_instance = onyx_fields[field_path].field_instance
 
-            if onyx_type == OnyxType.CHOICE and onyx_fields[field_path].choices:
-                field_dict["values"] = onyx_fields[field_path].choices
+        # Generate spec for the field
+        fields_spec[field] = {
+            "description": onyx_fields[field_path].description,
+            "type": onyx_type.label,
+            "required": onyx_fields[field_path].required,
+            "actions": [
+                action.value
+                for action in Actions
+                if action.value in actions_map[field_path]
+            ],
+            # Recursively generate fields spec for the nested serializer
+            "fields": generate_fields_spec(
+                fields_dict=fields_dict[field],
+                onyx_fields=onyx_fields,
+                actions_map=actions_map,
+                serializer=nested_serializer,
+                prefix=field_path,
+            ),
+        }
 
-        fields_dict[field] = field_dict
-
-    return fields_dict
+    return fields_spec
 
 
 # TODO: This function feels very hacky.
