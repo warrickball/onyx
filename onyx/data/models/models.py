@@ -1,5 +1,6 @@
 from typing import Any
 import uuid
+from datetime import datetime
 from secrets import token_hex
 from django.db import models
 from django.contrib.auth.models import Group
@@ -20,10 +21,6 @@ class Project(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
 
 
-# TODO: Finalise and test
-# This is just on the brink of exactly what I was after: a singular model for linking project, action, scope, group.
-# Assuming speed not a problem, from this we can search groups by scope, action, project, without needing a group naming convention
-# We do have the issue though that deleting a project will not cascade delete the groups, but I guess this is not an issue (?)
 class ProjectGroup(models.Model):
     group = models.OneToOneField(
         Group,
@@ -31,28 +28,13 @@ class ProjectGroup(models.Model):
         primary_key=True,
     )
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    action = LowerCharField(
-        max_length=10,
-        choices=[
-            (x, x)
-            for x in [
-                "add",
-                "view",
-                "filter",
-                "summarise",
-                "identify",
-                "change",
-                "delete",
-            ]
-        ],
-    )
-    scope = LowerCharField(max_length=50, default="base")
+    scope = LowerCharField(max_length=50)
+    actions = models.TextField(blank=True)
 
     class Meta:
         constraints = [
             unique_together(
-                model_name="projectgroup",
-                fields=["project", "scope", "action"],
+                fields=["project", "scope"],
             ),
         ]
 
@@ -73,7 +55,6 @@ class Choice(models.Model):
         ]
         constraints = [
             unique_together(
-                model_name="choice",
                 fields=["project", "field", "choice"],
             ),
         ]
@@ -137,17 +118,21 @@ class ProjectRecord(BaseRecord):
     climb_id = UpperCharField(
         max_length=12,
         unique=True,
-        help_text="Unique identifier for a project record. Set by Onyx.",
+        help_text="Unique identifier for a project record in Onyx.",
+    )
+    is_published = models.BooleanField(
+        default=True,
+        help_text="Indicator for whether a project record has been published.",
     )
     published_date = models.DateField(
-        auto_now_add=True,
-        help_text="The date the project record was published. Set by Onyx.",
+        null=True,
+        help_text="The date the project record was published in Onyx.",
     )
-    suppressed = models.BooleanField(
+    is_suppressed = models.BooleanField(
         default=False,
         help_text="Indicator for whether a project record has been hidden from users.",
     )
-    site_restricted = models.BooleanField(
+    is_site_restricted = models.BooleanField(
         default=False,
         help_text="Indicator for whether a project record has been hidden from users not within the record's site.",
     )
@@ -159,6 +144,9 @@ class ProjectRecord(BaseRecord):
         if not self.pk:
             climb_id = ClimbID.objects.create()
             self.climb_id = climb_id.climb_id
+
+        if self.published_date is None and self.is_published:
+            self.published_date = datetime.today().date()
 
         super().save(*args, **kwargs)
 

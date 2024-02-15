@@ -38,6 +38,44 @@ def get_suggestions(
     return message
 
 
+def get_permission(
+    app_label: str,
+    action: str,
+    code: str,
+    field: str | None = None,
+):
+    """
+    Returns a permission string for a given `app_label`, `action`, `code`, and `field`.
+
+    The permission string is in the format:
+
+    `<app_label>.<action>_<code>`
+
+    If `field` is provided, the permission string will be in the format:
+
+    `<app_label>.<action>_<code>__<field>`
+    """
+
+    if field:
+        return f"{app_label}.{action}_{code}__{field}"
+    else:
+        return f"{app_label}.{action}_{code}"
+
+
+def parse_permission(permission: str) -> tuple[str, str, str, str]:
+    """
+    Parses a permission string into its components.
+
+    Returns a tuple containing the `app_label`, `action`, `code`, and `field`.
+    """
+
+    app_label, codename = permission.split(".")
+    action_project, _, field_path = codename.partition("__")
+    action, project = action_project.split("_")
+
+    return app_label, action, project, field_path
+
+
 def strtobool(val):
     """
     Convert a string representation of truth to True or False.

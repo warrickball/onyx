@@ -1,7 +1,8 @@
 from rest_framework import permissions
 from rest_framework.request import Request
-from .exceptions import ProjectNotFound, ScopeNotFound
-from utils.functions import get_suggestions
+from .exceptions import ProjectNotFound
+from utils.functions import get_suggestions, get_permission
+from data.models import Project
 
 
 class AllowAny(permissions.AllowAny):
@@ -91,69 +92,50 @@ class IsObjectSite(permissions.BasePermission):
 
 class IsProjectApproved(permissions.BasePermission):
     """
-    Allows access only to users who can perform action on the project + scopes they are accessing.
+    Allows access only to users who can perform the view's `project_action` on the project they are accessing.
     """
 
     def has_permission(self, request: Request, view):
-        project = view.kwargs["code"].lower()
-        scopes = ["base"] + [
-            code.lower() for code in request.query_params.getlist("scope")
-        ]
+        # Function for getting project suggestions based on the project_action and input project code
+        project_suggestions = lambda: get_suggestions(
+            view.kwargs["code"],
+            options=(
+                request.user.groups.filter(
+                    projectgroup__actions__icontains=view.project_action
+                )
+                .values_list("projectgroup__project__code", flat=True)
+                .distinct()
+            ),
+            n=1,
+            message_prefix="Project not found.",
+        )
 
-        for scope in scopes:
-            # Check the user's permission to perform action on the project + scope
-            if not request.user.groups.filter(
-                projectgroup__project__code=project,
-                projectgroup__action=view.project_action,
-                projectgroup__scope=scope,
-            ).exists():
-                # If the user doesn't have permission, check they can view the project + scope
-                if (
-                    view.project_action != "view"
-                    and request.user.groups.filter(
-                        projectgroup__project__code=project,
-                        projectgroup__action="view",
-                        projectgroup__scope=scope,
-                    ).exists()
-                ):
-                    # If the user has permission to view the project + scope, then tell them they require permission for the action
-                    self.message = f"You do not have permission to perform action '{view.project_action}' for scope '{scope}' on project '{project}'."
-                    return False
-                else:
-                    # If they do not have permission to view the project + scope, tell them the project / scope doesn't exist
-                    if scope == "base":
-                        suggestions = get_suggestions(
-                            project,
-                            options=(
-                                request.user.groups.filter(
-                                    projectgroup__action=view.project_action,
-                                    projectgroup__scope=scope,
-                                )
-                                .values_list("projectgroup__project__code", flat=True)
-                                .distinct()
-                            ),
-                            n=1,
-                            message_prefix="Project not found.",
-                        )
+        # Get the project
+        try:
+            project = Project.objects.get(code__iexact=view.kwargs["code"])
+        except Project.DoesNotExist:
+            raise ProjectNotFound(project_suggestions())
 
-                        raise ProjectNotFound(suggestions)
-                    else:
-                        suggestions = get_suggestions(
-                            scope,
-                            options=(
-                                request.user.groups.filter(
-                                    projectgroup__project__code=project,
-                                    projectgroup__action=view.project_action,
-                                )
-                                .values_list("projectgroup__scope", flat=True)
-                                .distinct()
-                            ),
-                            n=1,
-                            message_prefix="Scope not found.",
-                        )
+        # Check the user's permission to access the project
+        project_access_permission = get_permission(
+            app_label=project.content_type.app_label,
+            action="access",
+            code=project.code,
+        )
+        if not request.user.has_perm(project_access_permission):
+            raise ProjectNotFound(project_suggestions())
 
-                        raise ScopeNotFound(suggestions)
+        # Check the user's permission to perform action on the project
+        project_action_permission = get_permission(
+            app_label=project.content_type.app_label,
+            action=view.project_action,
+            code=project.code,
+        )
+        if not request.user.has_perm(project_action_permission):
+            self.message = f"You do not have permission to {view.project_action} on the {project.name} project."
+            return False
 
+        # If the user has permission to access and perform the action on the project, then they have permission
         return True
 
 

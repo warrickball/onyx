@@ -9,6 +9,7 @@ from rest_framework.pagination import CursorPagination
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSetMixin
 from utils.fieldserializers import AnonymiserField
+from utils.functions import parse_permission
 from accounts.permissions import Approved, ProjectApproved, ProjectAdmin
 from .models import Project, Choice, ProjectRecord
 from .serializers import (
@@ -21,6 +22,7 @@ from .exceptions import ClimbIDNotFound, IdentifierNotFound
 from .query import make_atoms, validate_atoms, make_query
 from .queryset import init_project_queryset, prefetch_nested
 from .types import OnyxType
+from .actions import Actions
 from .fields import (
     FieldHandler,
     generate_fields_spec,
@@ -76,7 +78,7 @@ class ProjectAPIView(APIView):
             {field: value}
             for field in request.query_params
             for value in request.query_params.getlist(field)
-            if field not in {"cursor", "include", "exclude", "scope", "summarise"}
+            if field not in {"cursor", "include", "exclude", "summarise"}
         ]
 
         # Build extra query parameters
@@ -88,9 +90,6 @@ class ProjectAPIView(APIView):
 
         # Excluding fields in output of get/filter/query
         self.exclude = list(request.query_params.getlist("exclude"))
-
-        # Specifying scopes of fields in get/filter/query
-        self.scopes = list(request.query_params.getlist("scope"))
 
         # Summary aggregate in filter/query
         self.summarise = list(request.query_params.getlist("summarise"))
@@ -126,23 +125,28 @@ class ProjectsView(APIView):
         List all projects that the user has allowed actions on.
         """
 
-        # Filter user groups to determine all (project, action, scope) tuples
-        project_groups = [
-            {
-                "project": project_action_scope["projectgroup__project__code"],
-                "action": project_action_scope["projectgroup__action"],
-                "scope": project_action_scope["projectgroup__scope"],
-            }
-            for project_action_scope in request.user.groups.filter(
-                projectgroup__isnull=False
-            )
-            .values(
+        # Filter user groups to determine all (project, scope, actions) tuples
+        project_groups = []
+        for project, scope, actions_str in (
+            request.user.groups.filter(projectgroup__isnull=False)
+            .values_list(
                 "projectgroup__project__code",
-                "projectgroup__action",
                 "projectgroup__scope",
+                "projectgroup__actions",
             )
             .distinct()
-        ]
+        ):
+            project_groups.append(
+                {
+                    "project": project,
+                    "scope": scope,
+                    "actions": [
+                        action.value
+                        for action in Actions
+                        if action.value in actions_str
+                    ],
+                }
+            )
 
         # Return list of allowed project groups
         return Response(project_groups)
@@ -150,15 +154,27 @@ class ProjectsView(APIView):
 
 class FieldsView(ProjectAPIView):
     permission_classes = ProjectApproved
-    project_action = "view"
+    project_action = "access"
 
     def get(self, request: Request, code: str) -> Response:
         """
         List all fields for a given project.
         """
 
-        # Get all viewable fields within requested scope
-        field_names = self.handler.get_fields(self.scopes)
+        # Get all accessible fields
+        field_names = self.handler.get_fields()
+
+        # Get all actions for each field (excluding access)
+        actions_map = {}
+        for permission in request.user.get_all_permissions():
+            _, action, project, field = parse_permission(permission)
+
+            if (
+                action != "access"
+                and project == self.project.code
+                and field in field_names
+            ):
+                actions_map.setdefault(field, []).append(action)
 
         # Determine OnyxField objects for each field
         onyx_fields = self.handler.resolve_fields(field_names)
@@ -170,6 +186,8 @@ class FieldsView(ProjectAPIView):
         fields_spec = generate_fields_spec(
             fields_dict=fields_dict,
             onyx_fields=onyx_fields,
+            actions_map=actions_map,
+            serializer=self.serializer_cls,
         )
 
         # Return response with project information and fields
@@ -185,7 +203,7 @@ class FieldsView(ProjectAPIView):
 
 class LookupsView(ProjectAPIView):
     permission_classes = ProjectApproved
-    project_action = "view"
+    project_action = "access"
 
     def get(self, request: Request, code: str) -> Response:
         """
@@ -201,7 +219,7 @@ class LookupsView(ProjectAPIView):
 
 class ChoicesView(ProjectAPIView):
     permission_classes = ProjectApproved
-    project_action = "view"
+    project_action = "access"
 
     def get(self, request: Request, code: str, field: str) -> Response:
         """
@@ -216,7 +234,7 @@ class ChoicesView(ProjectAPIView):
 
         if onyx_field.onyx_type != OnyxType.CHOICE:
             raise exceptions.ValidationError(
-                {"detail": [f"This field is not a '{OnyxType.CHOICE.label}' field."]}
+                {"detail": [f"This field is not a {OnyxType.CHOICE.label} field."]}
             )
 
         # Obtain choices for the field
@@ -281,28 +299,34 @@ class IdentifyView(ProjectAPIView):
 
 class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
     def get_permissions(self):
-        if self.request.method == "POST":
-            if self.action == "list":
-                permission_classes = ProjectApproved
-                self.project_action = "view"
-            else:
+        match (self.request.method, self.action):
+
+            case ("POST", "create"):
                 permission_classes = ProjectAdmin
                 self.project_action = "add"
 
-        elif self.request.method == "GET":
-            permission_classes = ProjectApproved
-            self.project_action = "view"
+            case ("POST", "list"):
+                permission_classes = ProjectApproved
+                self.project_action = "list"
 
-        elif self.request.method == "PATCH":
-            permission_classes = ProjectAdmin
-            self.project_action = "change"
+            case ("GET", "retrieve"):
+                permission_classes = ProjectApproved
+                self.project_action = "get"
 
-        elif self.request.method == "DELETE":
-            permission_classes = ProjectAdmin
-            self.project_action = "delete"
+            case ("GET", "list"):
+                permission_classes = ProjectApproved
+                self.project_action = "list"
 
-        else:
-            raise exceptions.MethodNotAllowed(self.request.method)
+            case ("PATCH", "partial_update"):
+                permission_classes = ProjectAdmin
+                self.project_action = "change"
+
+            case ("DELETE", "destroy"):
+                permission_classes = ProjectAdmin
+                self.project_action = "delete"
+
+            case _:
+                raise exceptions.MethodNotAllowed(self.request.method)
 
         return [permission() for permission in permission_classes]
 
@@ -353,8 +377,8 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Validate the include/exclude fields
         self.handler.resolve_fields(self.include + self.exclude)
 
-        # Get all viewable fields within requested scope
-        fields = self.handler.get_fields(self.scopes)
+        # Get all viewable fields
+        fields = self.handler.get_fields()
 
         # Initial queryset
         qs = init_project_queryset(
@@ -413,28 +437,38 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
 
         # Validate fields
         field_errors = {}
-        onyx_fields = {}
-        onyx_fields_extra = {}
+        filter_fields = {}
+        summary_fields = {}
+        filter_handler = FieldHandler(
+            project=self.project,
+            action="filter",
+            user=request.user,
+        )
 
-        # Determine OnyxField objects for the fields used for filtering
+        # Validate filter fields and determine OnyxField objects
         # Lookups are allowed for these
         for atom in atoms:
             try:
-                onyx_fields[atom.key] = self.handler.resolve_field(
+                filter_fields[atom.key] = filter_handler.resolve_field(
                     atom.key, allow_lookup=True
                 )
             except exceptions.ValidationError as e:
                 field_errors.setdefault(atom.key, []).append(e.args[0])
 
-        # Determine extra OnyxField objects for the include/exclude/summary fields
-        # Lookups are not allowed for these
-        extra_fields = self.include + self.exclude + self.summarise
-
-        for extra_field in extra_fields:
+        # Validate summarise fields and determine OnyxField objects
+        for field in self.summarise:
             try:
-                onyx_fields_extra[extra_field] = self.handler.resolve_field(extra_field)
+                summary_fields[field] = filter_handler.resolve_field(field)
             except exceptions.ValidationError as e:
-                field_errors.setdefault(extra_field, []).append(e.args[0])
+                field_errors.setdefault(field, []).append(e.args[0])
+
+        # Validate include/exclude fields
+        include_exclude = self.include + self.exclude
+        for field in include_exclude:
+            try:
+                self.handler.resolve_field(field)
+            except exceptions.ValidationError as e:
+                field_errors.setdefault(field, []).append(e.args[0])
 
         if field_errors:
             raise exceptions.ValidationError(field_errors)
@@ -442,30 +476,40 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Validate and clean the provided key-value pairs
         # This is done by first building a FilterSet
         # And then checking the underlying form is valid
-        validate_atoms(self.model, atoms, onyx_fields)
+        validate_atoms(self.model, atoms, filter_fields)
 
-        # Get all viewable fields within requested scope
-        fields = self.handler.get_fields(self.scopes)
+        # All viewable fields
+        v_fields = self.handler.get_fields()
+
+        # All viewable + filterable fields
+        vf_fields = v_fields + filter_handler.get_fields()
 
         # Initial queryset
         qs = init_project_queryset(
             model=self.model,
             user=request.user,
-            fields=fields,
+            fields=v_fields,
         )
 
         # Apply include/exclude rules to the fields
         # Unflatten list of fields into nested fields_dict
-        fields_dict = unflatten_fields(
+        v_fields_dict = unflatten_fields(
             include_exclude_fields(
-                fields=fields,
+                fields=v_fields,
+                include=self.include,
+                exclude=self.exclude,
+            )
+        )
+        vf_fields_dict = unflatten_fields(
+            include_exclude_fields(
+                fields=vf_fields,
                 include=self.include,
                 exclude=self.exclude,
             )
         )
 
         # Prefetch any nested fields within scope
-        qs = prefetch_nested(qs=qs, fields_dict=fields_dict)
+        qs = prefetch_nested(qs=qs, fields_dict=vf_fields_dict)
 
         # If data was provided, then it has now been validated
         # So we form the Q object, and filter the queryset with it
@@ -481,14 +525,8 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             qs = qs.filter(q_object).distinct()
 
         if self.summarise:
-            onyx_fields_summary = {
-                field_name: onyx_field
-                for field_name, onyx_field in onyx_fields_extra.items()
-                if field_name in self.summarise
-            }
-
             summary_errors = {}
-            for field_name, onyx_field in onyx_fields_summary.items():
+            for field_name, onyx_field in summary_fields.items():
                 if onyx_field.onyx_type == OnyxType.RELATION:
                     summary_errors.setdefault(field_name, []).append(
                         "Cannot summarise over a relational field."
@@ -507,7 +545,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             # Serialize the results
             serializer = SummarySerializer(
                 qs_summary_values.annotate(count=Count("*")).order_by(*self.summarise),
-                onyx_fields=onyx_fields_summary,
+                onyx_fields=summary_fields,
                 many=True,
             )
         else:
@@ -522,7 +560,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             serializer = self.serializer_cls(
                 result_page,
                 many=True,
-                fields=fields_dict,
+                fields=v_fields_dict,
             )
 
         # Return response with either filtered set of data, or summarised values
@@ -542,6 +580,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         qs = init_project_queryset(
             model=self.model,
             user=request.user,
+            fields=self.handler.get_fields(),
         )
 
         # Get the instance to be updated
@@ -586,10 +625,24 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         """
         Use the `climb_id` to permanently delete an instance of the given project `code`.
         """
+
+        if not request.user.is_staff:
+            # TODO: # This logic is currently unused as only staff members can access this endpoint
+            # If its opened to non-staff, the IsObjectSite permission will need to be added
+
+            # If the user is not staff, they can only delete instances if:
+            # The instance is published
+            # The instance is not suppressed
+            # The instance is not site restricted to a different site
+            fields = []
+        else:
+            fields = ["is_published", "is_suppressed", "is_site_restricted"]
+
         # Initial queryset
         qs = init_project_queryset(
             model=self.model,
             user=request.user,
+            fields=fields,
         )
 
         # Get the instance to be deleted

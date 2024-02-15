@@ -158,25 +158,22 @@ def list_users():
             value = getattr(user, role)
             attrs[role.removeprefix("is_").lower()] = value
 
-        groups = []
-
-        # Filter user groups to determine all distinct (code, action, scope) pairs
-        for project_action_scope in (
-            user.groups.filter(projectgroup__isnull=False)
-            .values(
-                "projectgroup__project__code",
-                "projectgroup__action",
-                "projectgroup__scope",
+        # Filter user groups to determine all distinct code[scope] values
+        project_groups = [
+            f"{project}[{scope}]"
+            for project, scope in (
+                user.groups.filter(projectgroup__isnull=False)
+                .values_list(
+                    "projectgroup__project__code",
+                    "projectgroup__scope",
+                )
+                .distinct()
             )
-            .distinct()
-        ):
-            groups.append(
-                f"{project_action_scope['projectgroup__project__code']}[{project_action_scope['projectgroup__action']}][{project_action_scope['projectgroup__scope']}]",
-            )
+        ]
 
         print(
             *(f"{key}={val}" for key, val in attrs.items()),
-            f":".join(groups),
+            f":".join(project_groups),
             sep="\t",
         )
 
