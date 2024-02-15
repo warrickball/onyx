@@ -7,6 +7,7 @@ from utils.constraints import (
     ordering,
     non_futures,
     conditional_required,
+    conditional_value_required,
 )
 
 
@@ -57,15 +58,17 @@ class BaseTestModel(ProjectRecord):
     score = models.FloatField(null=True)
     start = models.IntegerField()
     end = models.IntegerField()
+    required_when_published = models.TextField(blank=True)
 
     class Meta:
         default_permissions = []
         indexes = [
             models.Index(fields=["created"]),
             models.Index(fields=["climb_id"]),
+            models.Index(fields=["is_published"]),
             models.Index(fields=["published_date"]),
-            models.Index(fields=["suppressed"]),
-            models.Index(fields=["site_restricted"]),
+            models.Index(fields=["is_suppressed"]),
+            models.Index(fields=["is_site_restricted"]),
             models.Index(fields=["sample_id", "run_name"]),
             models.Index(fields=["sample_id"]),
             models.Index(fields=["run_name"]),
@@ -74,33 +77,36 @@ class BaseTestModel(ProjectRecord):
         ]
         constraints = [
             unique_together(
-                model_name="basetestmodel",
                 fields=["sample_id", "run_name"],
             ),
             optional_value_group(
-                model_name="basetestmodel",
                 fields=["collection_month", "received_month"],
             ),
             optional_value_group(
-                model_name="basetestmodel",
                 fields=["text_option_1", "text_option_2"],
             ),
             ordering(
-                model_name="basetestmodel",
                 fields=("collection_month", "received_month"),
             ),
             ordering(
-                model_name="basetestmodel",
                 fields=("start", "end"),
             ),
             non_futures(
-                model_name="basetestmodel",
                 fields=["collection_month", "received_month", "submission_date"],
             ),
             conditional_required(
-                model_name="basetestmodel",
                 field="region",
                 required=["country"],
+            ),
+            conditional_value_required(
+                field="is_published",
+                value=True,
+                required=["published_date"],
+            ),
+            conditional_value_required(
+                field="is_published",
+                value=True,
+                required=["required_when_published"],
             ),
         ]
 
@@ -121,6 +127,7 @@ class TestModelRecord(BaseRecord):
     score_a = models.FloatField(null=True)
     score_b = models.FloatField(null=True)
     score_c = models.FloatField(null=True)
+    test_result = models.TextField(blank=True)
 
     class Meta:
         default_permissions = []
@@ -130,20 +137,21 @@ class TestModelRecord(BaseRecord):
         ]
         constraints = [
             unique_together(
-                model_name="testmodelrecord",
                 fields=["link", "test_id"],
             ),
             optional_value_group(
-                model_name="testmodelrecord",
                 fields=["score_a", "score_b"],
             ),
             ordering(
-                model_name="testmodelrecord",
                 fields=("test_start", "test_end"),
             ),
             conditional_required(
-                model_name="testmodelrecord",
                 field="score_c",
                 required=["score_a", "score_b"],
+            ),
+            conditional_value_required(
+                field="test_pass",
+                value=True,
+                required=["test_result"],
             ),
         ]
