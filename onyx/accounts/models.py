@@ -9,6 +9,7 @@ class Site(models.Model):
     code = LowerCharField(max_length=10, unique=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    projects = models.ManyToManyField("data.Project", related_name="sites")
 
 
 class User(AbstractUser):
