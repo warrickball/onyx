@@ -479,18 +479,8 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             exclude=self.exclude,
         )
 
-        # Nested fields that are returned or filtered will be prefetched
-        prefetch_fields = fields + [
-            onyx_field.field_path
-            for onyx_field in filter_fields.values()
-            if onyx_field.field_path not in fields
-        ]
-
-        # TODO: Prefetching is applied only when filtering on a related field.
-        # e.g. 'related__field' triggers prefetching of related, but 'related__isnull'
-        # does not. Performance tests have shown this not to be an issue,
-        # but should look more into this to see if optimisations can be made
-        qs = prefetch_nested(qs, unflatten_fields(prefetch_fields))
+        # Prefetch nested fields returned in response
+        qs = prefetch_nested(qs, unflatten_fields(fields))
 
         # If data was provided, then it has now been validated
         # So we form the Q object, and filter the queryset with it
