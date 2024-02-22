@@ -1,5 +1,6 @@
 from django.contrib.auth.models import Group
 from rest_framework import exceptions
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.views import APIView
@@ -97,13 +98,22 @@ class SiteUsersView(ListAPIView):
     serializer_class = ViewUserSerializer
 
     def get_queryset(self):
-        # Filter and return all active, approved users for the site
         assert isinstance(self.request.user, User)
-        return User.objects.filter(
+
+        # Filter and return all active, approved users for the site
+        # who have access to the same projects
+        projects = self.request.user.groups.values_list(
+            "projectgroup__project", flat=True
+        ).distinct()
+
+        users = User.objects.filter(
             is_active=True,
             is_approved=True,
             site=self.request.user.site,
+            groups__projectgroup__project__in=projects,
         ).order_by("-date_joined")
+
+        return users
 
 
 class AllUsersView(ListAPIView):
@@ -126,13 +136,12 @@ class ProjectUserView(KnoxLoginView):
 
     permission_classes = Admin
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args, **kwargs):
         # TODO: Change method back to POST
         raise exceptions.MethodNotAllowed(self.request.method)
 
-    def get(self, request, code, site_code, username):
+    def get(self, request: Request, code: str, site_code: str, username: str):
         # Get the analyst group for the requested project
-        # TODO: This is ad-hoc for CLIMB-TRE purposes and needs generalising
         try:
             analyst_group = Group.objects.get(
                 projectgroup__project__code=code,
@@ -141,19 +150,36 @@ class ProjectUserView(KnoxLoginView):
         except Group.DoesNotExist:
             raise ProjectNotFound
 
+        # Get the project
+        project = analyst_group.projectgroup.project  #  type: ignore
+
+        # Attempt to parse site code from username
+        # TODO: Sort out CLIMB configuration so this is not needed
+        try:
+            _, tenant = username.split(".")
+            site_code = tenant.split("-")[-2]
+        except Exception:
+            pass
+
         # Get the requested site
         try:
             site = Site.objects.get(code=site_code)
         except Site.DoesNotExist:
             raise SiteNotFound
 
+        # The site must have access to the project
+        if project not in site.projects.all():
+            raise exceptions.PermissionDenied(
+                {"detail": "This site does not have access to this project."}
+            )
+
         # Get the user, and check they have the correct creator and site
         # If the user does not exist, create them
         try:
             user = User.objects.get(username=username)
-            if user.creator != request.user:
+            if user.creator != request.user or user == request.user:
                 raise exceptions.PermissionDenied(
-                    {"detail": "This user cannot be modified."}
+                    {"detail": "You cannot modify this user."}
                 )
             if user.site != site:
                 raise exceptions.ValidationError(
