@@ -162,29 +162,22 @@ class FieldsView(ProjectAPIView):
         """
 
         # Get all accessible fields
-        field_names = self.handler.get_fields()
+        fields = self.handler.get_fields()
 
         # Get all actions for each field (excluding access)
         actions_map = {}
         for permission in request.user.get_all_permissions():
             _, action, project, field = parse_permission(permission)
 
-            if (
-                action != "access"
-                and project == self.project.code
-                and field in field_names
-            ):
+            if action != "access" and project == self.project.code and field in fields:
                 actions_map.setdefault(field, []).append(action)
 
         # Determine OnyxField objects for each field
-        onyx_fields = self.handler.resolve_fields(field_names)
+        onyx_fields = self.handler.resolve_fields(fields)
 
-        # Unflatten list of fields into nested dict
-        fields_dict = unflatten_fields(field_names)
-
-        # Generate field information into a nested structure
+        # Generate fields specification
         fields_spec = generate_fields_spec(
-            fields_dict=fields_dict,
+            unflatten_fields(fields),
             onyx_fields=onyx_fields,
             actions_map=actions_map,
             serializer=self.serializer_cls,
@@ -377,24 +370,11 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # Validate the include/exclude fields
         self.handler.resolve_fields(self.include + self.exclude)
 
-        # Get all viewable fields
-        fields = self.handler.get_fields()
-
         # Initial queryset
         qs = init_project_queryset(
             model=self.model,
             user=request.user,
-            fields=fields,
-        )
-
-        # Apply include/exclude rules to the fields
-        # Unflatten list of fields into nested fields_dict
-        fields_dict = unflatten_fields(
-            include_exclude_fields(
-                fields=fields,
-                include=self.include,
-                exclude=self.exclude,
-            )
+            fields=self.handler.get_fields(),
         )
 
         # Get the instance
@@ -404,10 +384,17 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         except self.model.DoesNotExist:
             raise ClimbIDNotFound
 
+        # Fields returned in response
+        fields = include_exclude_fields(
+            fields=self.handler.get_fields(),
+            include=self.include,
+            exclude=self.exclude,
+        )
+
         # Serialize the result
         serializer = self.serializer_cls(
             instance,
-            fields=fields_dict,
+            fields=unflatten_fields(fields),
         )
 
         # Return response with data
@@ -478,38 +465,32 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
         # And then checking the underlying form is valid
         validate_atoms(self.model, atoms, filter_fields)
 
-        # All viewable fields
-        v_fields = self.handler.get_fields()
-
-        # All viewable + filterable fields
-        vf_fields = v_fields + filter_handler.get_fields()
-
         # Initial queryset
         qs = init_project_queryset(
             model=self.model,
             user=request.user,
-            fields=v_fields,
+            fields=self.handler.get_fields(),
         )
 
-        # Apply include/exclude rules to the fields
-        # Unflatten list of fields into nested fields_dict
-        v_fields_dict = unflatten_fields(
-            include_exclude_fields(
-                fields=v_fields,
-                include=self.include,
-                exclude=self.exclude,
-            )
-        )
-        vf_fields_dict = unflatten_fields(
-            include_exclude_fields(
-                fields=vf_fields,
-                include=self.include,
-                exclude=self.exclude,
-            )
+        # Fields returned in response
+        fields = include_exclude_fields(
+            fields=self.handler.get_fields(),
+            include=self.include,
+            exclude=self.exclude,
         )
 
-        # Prefetch any nested fields within scope
-        qs = prefetch_nested(qs=qs, fields_dict=vf_fields_dict)
+        # Nested fields that are returned or filtered will be prefetched
+        prefetch_fields = fields + [
+            onyx_field.field_path
+            for onyx_field in filter_fields.values()
+            if onyx_field.field_path not in fields
+        ]
+
+        # TODO: Prefetching is applied only when filtering on a related field.
+        # e.g. 'related__field' triggers prefetching of related, but 'related__isnull'
+        # does not. Performance tests have shown this not to be an issue,
+        # but should look more into this to see if optimisations can be made
+        qs = prefetch_nested(qs, unflatten_fields(prefetch_fields))
 
         # If data was provided, then it has now been validated
         # So we form the Q object, and filter the queryset with it
@@ -560,7 +541,7 @@ class ProjectRecordsViewSet(ViewSetMixin, ProjectAPIView):
             serializer = self.serializer_cls(
                 result_page,
                 many=True,
-                fields=v_fields_dict,
+                fields=unflatten_fields(fields),
             )
 
         # Return response with either filtered set of data, or summarised values
