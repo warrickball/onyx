@@ -17,7 +17,7 @@ def create_site(
 ) -> None:
     """
     Create/update a site with the given code and description.
-    
+
     Args:
         code: The code of the site.
         description: The description of the site.
@@ -114,9 +114,9 @@ class Command(base.BaseCommand):
             try:
                 site = Site.objects.get(code=options["code"])
             except Site.DoesNotExist:
-                print(f"Site with code '{options["code"]}' does not exist.")
+                print(f"Site with code '{options['code']}' does not exist.")
                 exit()
-            
+
             print("Site:", site.code)
 
             if options["command"] == "roles":
@@ -131,7 +131,7 @@ class Command(base.BaseCommand):
                     print("Granted roles:")
                     for role in granted:
                         print(f"• {role}")
-                
+
                 if revoked:
                     print("Revoked roles:")
                     for role in revoked:
@@ -140,4 +140,4 @@ class Command(base.BaseCommand):
                 if not granted and not revoked:
                     print("Roles:")
                     for role in ROLES:
-                        print(f"• {role}: {getattr(site, role)}")       
+                        print(f"• {role}: {getattr(site, role)}")

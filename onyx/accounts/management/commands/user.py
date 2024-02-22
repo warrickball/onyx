@@ -16,7 +16,7 @@ def create_user(
     username: str,
     site: str,
     password: Optional[str] = None,
- ) -> None:
+) -> None:
     """
     Create a user with the given username, site and optional password.
 
@@ -28,7 +28,7 @@ def create_user(
         password: The password of the user.
     """
 
-    # TODO: Functionality for updating a user
+    # TODO: Functionality for updating a user
 
     if User.objects.filter(username=username).exists():
         print(f"User with username '{username}' already exists.")
@@ -65,10 +65,14 @@ def list_users() -> None:
             {
                 "username": user.username,
                 "site": user.site.code,
-                "site_projects" : ",".join(user.site.projects.values_list("code", flat=True)),
+                "site_projects": ",".join(
+                    user.site.projects.values_list("code", flat=True)
+                ),
                 "creator": user.creator.username if user.creator else None,
                 "date_joined": user.date_joined.strftime("%Y-%m-%d"),
-                "last_login": user.last_login.strftime("%Y-%m-%d") if user.last_login else None,
+                "last_login": (
+                    user.last_login.strftime("%Y-%m-%d") if user.last_login else None
+                ),
                 "is_active": user.is_active,
                 "is_approved": user.is_approved,
                 "is_staff": user.is_staff,
@@ -130,11 +134,11 @@ class Command(base.BaseCommand):
             try:
                 user = User.objects.get(username=options["user"])
             except User.DoesNotExist:
-                print(f"User with username '{options["user"]}' does not exist.")
+                print(f"User with username '{options['user']}' does not exist.")
                 exit()
 
             print("User:", user.username)
-            
+
             if options["command"] == "roles":
                 granted, revoked = manage_instance_roles(
                     user,
@@ -147,7 +151,7 @@ class Command(base.BaseCommand):
                     print("Granted roles:")
                     for role in granted:
                         print(f"• {role}")
-                
+
                 if revoked:
                     print("Revoked roles:")
                     for role in revoked:
