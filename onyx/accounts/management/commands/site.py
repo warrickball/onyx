@@ -11,6 +11,7 @@ ROLES = [
 
 
 def create_site(
+    self,
     code: str,
     description: Optional[str] = None,
     projects: Optional[list[str]] = None,
@@ -41,37 +42,19 @@ def create_site(
             try:
                 project_instance = Project.objects.get(code=project)
             except Project.DoesNotExist:
-                print(f"Project with code '{project}' does not exist.")
+                self.print(f"Project with code '{project}' does not exist.")
                 exit()
             project_instances.append(project_instance)
 
         site.projects.set(project_instances)
 
     if created:
-        print(f"Created site: {site.code}")
+        self.print(f"Created site: {site.code}")
     else:
-        print(f"Updated site: {site.code}")
+        self.print(f"Updated site: {site.code}")
 
-    print(f"• Description: {site.description}")
-    print(f"• Projects: {', '.join(site.projects.values_list('name', flat=True))}")
-
-
-def list_sites():
-    """
-    Print a table of all sites, with their roles.
-    """
-
-    list_instances(
-        [
-            {
-                "code": site.code,
-                "description": f"'{site.description.replace(' ', '+')}'",
-                "is_active": site.is_active,
-                "projects": ",".join(site.projects.values_list("code", flat=True)),
-            }
-            for site in Site.objects.all()
-        ]
-    )
+    self.print(f"• Description: {site.description}")
+    self.print(f"• Projects: {', '.join(site.projects.values_list('name', flat=True))}")
 
 
 class Command(base.BaseCommand):
@@ -81,6 +64,7 @@ class Command(base.BaseCommand):
         command = parser.add_subparsers(
             dest="command", metavar="{command}", required=True
         )
+        parser.add_argument("--quiet", action="store_true")
 
         # CREATE A SITE
         create_parser = command.add_parser("create", help="Create a site.")
@@ -99,25 +83,32 @@ class Command(base.BaseCommand):
             "list", help="Print a table of all sites, with their roles."
         )
 
+    def print(self, *args, **kwargs):
+        if not self.quiet:
+            print(*args, **kwargs)
+
     def handle(self, *args, **options):
+        self.quiet = options["quiet"]
+
         if options["command"] == "create":
             create_site(
+                self,
                 code=options["code"],
                 description=options["description"],
                 projects=options["projects"],
             )
 
         elif options["command"] == "list":
-            list_sites()
+            self.list_sites()
 
         else:
             try:
                 site = Site.objects.get(code=options["code"])
             except Site.DoesNotExist:
-                print(f"Site with code '{options['code']}' does not exist.")
+                self.print(f"Site with code '{options['code']}' does not exist.")
                 exit()
 
-            print("Site:", site.code)
+            self.print("Site:", site.code)
 
             if options["command"] == "roles":
                 granted, revoked = manage_instance_roles(
@@ -128,16 +119,33 @@ class Command(base.BaseCommand):
                 )
 
                 if granted:
-                    print("Granted roles:")
+                    self.print("Granted roles:")
                     for role in granted:
-                        print(f"• {role}")
+                        self.print(f"• {role}")
 
                 if revoked:
-                    print("Revoked roles:")
+                    self.print("Revoked roles:")
                     for role in revoked:
-                        print(f"• {role}")
+                        self.print(f"• {role}")
 
                 if not granted and not revoked:
-                    print("Roles:")
+                    self.print("Roles:")
                     for role in ROLES:
-                        print(f"• {role}: {getattr(site, role)}")
+                        self.print(f"• {role}: {getattr(site, role)}")
+
+    def list_sites(self):
+        """
+        Print a table of all sites, with their roles.
+        """
+
+        list_instances(
+            [
+                {
+                    "code": site.code,
+                    "description": f"'{site.description.replace(' ', '+')}'",
+                    "is_active": site.is_active,
+                    "projects": ",".join(site.projects.values_list("code", flat=True)),
+                }
+                for site in Site.objects.all()
+            ]
+        )

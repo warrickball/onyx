@@ -12,77 +12,6 @@ ROLES = [
 ]
 
 
-def create_user(
-    username: str,
-    site: str,
-    password: Optional[str] = None,
-) -> None:
-    """
-    Create a user with the given username, site and optional password.
-
-    If a password is not provided, the user is assigned a non-expiring token.
-
-    Args:
-        username: The username of the user.
-        site: The code of the site.
-        password: The password of the user.
-    """
-
-    # TODO: Functionality for updating a user
-
-    if User.objects.filter(username=username).exists():
-        print(f"User with username '{username}' already exists.")
-        exit()
-
-    if password:
-        user = User.objects.create_user(  # type: ignore
-            username=username,
-            password=password,
-            site=Site.objects.get(code=site),
-        )
-        print("Created user:", user.username)
-        print(f"• Site: {user.site.code}")
-    else:
-        user = User.objects.create_user(  # type: ignore
-            username=username,
-            site=Site.objects.get(code=site),
-        )
-        user.set_unusable_password()
-        user.save()
-        _, token = AuthToken.objects.create(user, None)  #  type: ignore
-        print("Created user:", user.username)
-        print(f"• Site: {user.site.code}")
-        print(f"• Token: {token}")
-
-
-def list_users() -> None:
-    """
-    Print a table of all users, with their roles and project groups.
-    """
-
-    list_instances(
-        [
-            {
-                "username": user.username,
-                "site": user.site.code,
-                "site_projects": ",".join(
-                    user.site.projects.values_list("code", flat=True)
-                ),
-                "creator": user.creator.username if user.creator else None,
-                "date_joined": user.date_joined.strftime("%Y-%m-%d"),
-                "last_login": (
-                    user.last_login.strftime("%Y-%m-%d") if user.last_login else None
-                ),
-                "is_active": user.is_active,
-                "is_approved": user.is_approved,
-                "is_staff": user.is_staff,
-                "groups": ",".join(user.groups.values_list("name", flat=True)),
-            }
-            for user in User.objects.all().order_by("-is_staff", "date_joined")
-        ]
-    )
-
-
 class Command(base.BaseCommand):
     help = "Manage users."
 
@@ -90,6 +19,7 @@ class Command(base.BaseCommand):
         command = parser.add_subparsers(
             dest="command", metavar="{command}", required=True
         )
+        parser.add_argument("--quiet", action="store_true")
 
         # CREATE A USER
         create_parser = command.add_parser("create", help="Create a user.")
@@ -121,23 +51,29 @@ class Command(base.BaseCommand):
             help="Print a table of all users, with their roles and project groups.",
         )
 
+    def print(self, *args, **kwargs):
+        if not self.quiet:
+            print(*args, **kwargs)
+
     def handle(self, *args, **options):
+        self.quiet = options["quiet"]
+
         if options["command"] == "create":
-            create_user(
+            self.create_user(
                 username=options["user"],
                 site=options["site"],
                 password=options["password"],
             )
         elif options["command"] == "list":
-            list_users()
+            self.list_users()
         else:
             try:
                 user = User.objects.get(username=options["user"])
             except User.DoesNotExist:
-                print(f"User with username '{options['user']}' does not exist.")
+                self.print(f"User with username '{options['user']}' does not exist.")
                 exit()
 
-            print("User:", user.username)
+            self.print("User:", user.username)
 
             if options["command"] == "roles":
                 granted, revoked = manage_instance_roles(
@@ -148,19 +84,19 @@ class Command(base.BaseCommand):
                 )
 
                 if granted:
-                    print("Granted roles:")
+                    self.print("Granted roles:")
                     for role in granted:
-                        print(f"• {role}")
+                        self.print(f"• {role}")
 
                 if revoked:
-                    print("Revoked roles:")
+                    self.print("Revoked roles:")
                     for role in revoked:
-                        print(f"• {role}")
+                        self.print(f"• {role}")
 
                 if not granted and not revoked:
-                    print("Roles:")
+                    self.print("Roles:")
                     for role in ROLES:
-                        print(f"• {role}: {getattr(user, role)}")
+                        self.print(f"• {role}: {getattr(user, role)}")
 
             elif options["command"] == "groups":
                 granted, revoked = manage_instance_groups(
@@ -172,16 +108,88 @@ class Command(base.BaseCommand):
                 )
 
                 if granted:
-                    print("Granted groups:")
+                    self.print("Granted groups:")
                     for group in granted:
-                        print(f"• {group}")
+                        self.print(f"• {group}")
 
                 if revoked:
-                    print("Revoked groups:")
+                    self.print("Revoked groups:")
                     for group in revoked:
-                        print(f"• {group}")
+                        self.print(f"• {group}")
 
                 if not granted and not revoked:
-                    print("Groups:")
+                    self.print("Groups:")
                     for group in user.groups.all():
-                        print(f"• {group.name}")
+                        self.print(f"• {group.name}")
+
+    def create_user(
+        self,
+        username: str,
+        site: str,
+        password: Optional[str] = None,
+    ) -> None:
+        """
+        Create a user with the given username, site and optional password.
+
+        If a password is not provided, the user is assigned a non-expiring token.
+
+        Args:
+            username: The username of the user.
+            site: The code of the site.
+            password: The password of the user.
+        """
+
+        # TODO: Functionality for updating a user
+
+        if User.objects.filter(username=username).exists():
+            self.print(f"User with username '{username}' already exists.")
+            exit()
+
+        if password:
+            user = User.objects.create_user(  # type: ignore
+                username=username,
+                password=password,
+                site=Site.objects.get(code=site),
+            )
+            self.print("Created user:", user.username)
+            self.print(f"• Site: {user.site.code}")
+        else:
+            user = User.objects.create_user(  # type: ignore
+                username=username,
+                site=Site.objects.get(code=site),
+            )
+            user.set_unusable_password()
+            user.save()
+            _, token = AuthToken.objects.create(user, None)  #  type: ignore
+            self.print("Created user:", user.username)
+            self.print(f"• Site: {user.site.code}")
+            self.print(f"• Token: {token}")
+
+    def list_users(self) -> None:
+        """
+        Print a table of all users, with their roles and project groups.
+        """
+
+        list_instances(
+            [
+                {
+                    "username": user.username,
+                    "site": user.site.code,
+                    "site_projects": ",".join(
+                        user.site.projects.values_list("code", flat=True)
+                    ),
+                    "creator": user.creator.username if user.creator else None,
+                    "date_joined": user.date_joined.strftime("%Y-%m-%d"),
+                    "last_login": (
+                        user.last_login.strftime("%Y-%m-%d")
+                        if user.last_login
+                        else None
+                    ),
+                    "is_active": user.is_active,
+                    "is_approved": user.is_approved,
+                    "is_staff": user.is_staff,
+                    "groups": ",".join(user.groups.values_list("name", flat=True)),
+                }
+                for user in User.objects.all().order_by("-is_staff", "date_joined")
+            ]
+        )
