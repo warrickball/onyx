@@ -18,7 +18,7 @@ class Project(models.Model):
     code = LowerCharField(max_length=50, unique=True)
     name = StrippedCharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
 
 
 class ProjectGroup(models.Model):
@@ -87,9 +87,9 @@ class BaseRecord(models.Model):
     history = HistoricalRecords(inherit=True)
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
     # TODO: Display sites again
-    # site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
+    # site = models.ForeignKey(Site, to_field="code", on_delete=models.PROTECT)
 
     class Meta:
         abstract = True
