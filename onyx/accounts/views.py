@@ -136,15 +136,11 @@ class ProjectUserView(KnoxLoginView):
 
     permission_classes = Admin
 
-    def post(self, request: Request, *args, **kwargs):
-        # TODO: Change method back to POST
-        raise exceptions.MethodNotAllowed(self.request.method)
-
-    def get(self, request: Request, code: str, site_code: str, username: str):
-        # Get the analyst group for the requested project
+    def post(self, request: Request, project_code: str, site_code: str, username: str):
+        # Get the analyst group for the project
         try:
             analyst_group = Group.objects.get(
-                projectgroup__project__code=code,
+                projectgroup__project__code=project_code,
                 projectgroup__scope="analyst",
             )
         except Group.DoesNotExist:
@@ -153,15 +149,7 @@ class ProjectUserView(KnoxLoginView):
         # Get the project
         project = analyst_group.projectgroup.project  #  type: ignore
 
-        # Attempt to parse site code from username
-        # TODO: Sort out CLIMB configuration so this is not needed
-        try:
-            _, tenant = username.split(".")
-            site_code = tenant.split("-")[-2]
-        except Exception:
-            pass
-
-        # Get the requested site
+        # Get the site
         try:
             site = Site.objects.get(code=site_code)
         except Site.DoesNotExist:
