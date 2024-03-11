@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.serializers import BooleanField
 from ..utils import OnyxTestCase, _test_record
-from ...models.projects.test import TestModel, TestModelRecord
+from projects.testproject.models import TestModel, TestModelRecord
 
 
 # TODO:
@@ -17,8 +17,8 @@ from ...models.projects.test import TestModel, TestModelRecord
 default_payload = {
     "sample_id": "sample-1234",
     "run_name": "run-5678",
-    "collection_month": "2023-01",
-    "received_month": "2023-02",
+    "collection_month": "2023-02",
+    "received_month": "2023-07",
     "char_max_length_20": "X" * 20,
     "text_option_1": "hi",
     "text_option_2": "bye",
@@ -58,9 +58,9 @@ class TestCreateView(OnyxTestCase):
         """
 
         super().setUp()
-        self.endpoint = reverse("data.project", kwargs={"code": "test"})
+        self.endpoint = reverse("project.testproject", kwargs={"code": "testproject"})
         self.user = self.setup_user(
-            "testuser", roles=["is_staff"], groups=["test.admin"]
+            "testuser", roles=["is_staff"], groups=["testproject.admin"]
         )
 
     def test_basic(self):
@@ -85,7 +85,8 @@ class TestCreateView(OnyxTestCase):
 
         payload = copy.deepcopy(default_payload)
         response = self.client.post(
-            reverse("data.project.test", kwargs={"code": "test"}), data=payload
+            reverse("project.testproject.test", kwargs={"code": "testproject"}),
+            data=payload,
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         assert TestModel.objects.count() == 0
@@ -685,9 +686,12 @@ class TestCreateView(OnyxTestCase):
         """
 
         good_yearmonths = [
-            ("2023-01", datetime(2023, 1, 1)),
+            ("2023-03", datetime(2023, 3, 1)),
+            ("2023-2", datetime(2023, 2, 1)),
             ("2022-12", datetime(2022, 12, 1)),
             (None, None),
+            ("", None),
+            (" ", None),
         ]
 
         bad_yearmonths = [
@@ -695,10 +699,9 @@ class TestCreateView(OnyxTestCase):
             "0000-01",
             "209999999999-01",
             "2023-01-01",
+            "2023-02-03",
             "2023-0",
             " 2023-01 ",
-            "",
-            " ",
             0,
             1,
             2.345,
@@ -712,8 +715,6 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["collection_month"] = good_yearmonth
             response = self.client.post(self.endpoint, data=payload)
-            if expected is not None:
-                payload["collection_month"] = expected.strftime("%Y-%m")
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
             instance = TestModel.objects.get(
@@ -721,6 +722,10 @@ class TestCreateView(OnyxTestCase):
             )
             payload["sample_id"] = response.json()["data"]["sample_id"]
             payload["run_name"] = response.json()["data"]["run_name"]
+            if expected is None:
+                payload["collection_month"] = None
+            else:
+                payload["collection_month"] = expected.strftime("%Y-%m")
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 
@@ -738,9 +743,13 @@ class TestCreateView(OnyxTestCase):
         """
 
         good_dates = [
-            ("2023-01-01", datetime(2023, 1, 1)),
+            ("2023-04-05", datetime(2023, 4, 5)),
+            ("2023-1-2", datetime(2023, 1, 2)),
+            ("2023-2-03", datetime(2023, 2, 3)),
             ("2022-12-31", datetime(2022, 12, 31)),
             (None, None),
+            ("", None),
+            (" ", None),
         ]
 
         bad_dates = [
@@ -748,9 +757,9 @@ class TestCreateView(OnyxTestCase):
             "0000-00-01",
             "209999999999-01-01",
             "2023-01",
+            "2023-09",
+            "2023-12",
             "2023-01-0",
-            "",
-            " ",
             0,
             1,
             2.345,
@@ -764,8 +773,6 @@ class TestCreateView(OnyxTestCase):
             payload = copy.deepcopy(default_payload)
             payload["submission_date"] = good_date
             response = self.client.post(self.endpoint, data=payload)
-            if expected is not None:
-                payload["submission_date"] = expected.strftime("%Y-%m-%d")
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             assert TestModel.objects.count() == 1
             instance = TestModel.objects.get(
@@ -773,6 +780,10 @@ class TestCreateView(OnyxTestCase):
             )
             payload["sample_id"] = response.json()["data"]["sample_id"]
             payload["run_name"] = response.json()["data"]["run_name"]
+            if expected is None:
+                payload["submission_date"] = None
+            else:
+                payload["submission_date"] = expected.strftime("%Y-%m-%d")
             _test_record(self, payload, instance, created=True)
             TestModel.objects.all().delete()
 

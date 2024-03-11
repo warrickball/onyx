@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.reverse import reverse
 from ..utils import OnyxTestCase, generate_test_data, _test_record
-from ...models.projects.test import TestModel
+from projects.testproject.models import TestModel
 
 
 class TestGetView(OnyxTestCase):
@@ -12,14 +12,15 @@ class TestGetView(OnyxTestCase):
 
         super().setUp()
         self.endpoint = lambda climb_id: reverse(
-            "data.project.climb_id", kwargs={"code": "test", "climb_id": climb_id}
+            "project.testproject.climb_id",
+            kwargs={"code": "testproject", "climb_id": climb_id},
         )
         self.user = self.setup_user(
-            "testuser", roles=["is_staff"], groups=["test.admin"]
+            "testuser", roles=["is_staff"], groups=["testproject.admin"]
         )
         response = self.client.post(
-            reverse("data.project", kwargs={"code": "test"}),
-            data=next(iter(generate_test_data(n=1))),
+            reverse("project.testproject", kwargs={"code": "testproject"}),
+            data=next(iter(generate_test_data(n=1, nested=True))),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.climb_id = response.json()["data"]["climb_id"]
@@ -74,7 +75,6 @@ class TestGetView(OnyxTestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotIn("climb_id", response.json()["data"])
-
         _test_record(
             self,
             response.json()["data"],

@@ -2,13 +2,11 @@ import os
 import random
 import logging
 from django.core.management import call_command
+from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework.test import APITestCase
 from accounts.models import User, Site
 from ..models import Project
-
-
-directory = os.path.dirname(os.path.abspath(__file__))
 
 
 class OnyxTestCase(APITestCase):
@@ -22,18 +20,24 @@ class OnyxTestCase(APITestCase):
         # Set up test project
         call_command(
             "project",
-            os.path.join(directory, "project.json"),
+            os.path.join(settings.BASE_DIR, "projects/testproject/project.json"),
             quiet=True,
         )
 
-        # Set up test site
+        # Set up test sites
         self.site = Site.objects.create(
-            code="TEST",
-            description="Department of Testing",
+            code="testsite_1",
+            description="Department of Testing 1",
         )
 
-        # Add test project to site
-        self.site.projects.add(Project.objects.get(code="test"))
+        self.extra_site = Site.objects.create(
+            code="testsite_2",
+            description="Department of Testing 2",
+        )
+
+        # Add test project to sites
+        self.site.projects.add(Project.objects.get(code="testproject"))
+        self.extra_site.projects.add(Project.objects.get(code="testproject"))
 
     def setup_user(self, username, roles=None, groups=None):
         """
@@ -57,7 +61,7 @@ class OnyxTestCase(APITestCase):
         return user
 
 
-def generate_test_data(n: int = 100):
+def generate_test_data(n: int = 100, nested: bool = False):
     """
     Generate test data.
     """
@@ -94,7 +98,7 @@ def generate_test_data(n: int = 100):
             "end": random.randint(6, 10),
             "required_when_published": "hello",
         }
-        if records:
+        if records or nested:
             x["records"] = [
                 {
                     "test_id": 1,
@@ -121,6 +125,9 @@ def _test_record(self, payload, instance, created: bool = False):
     """
     Test that a payload's values match an instance.
     """
+
+    # Assert the instance has the correct site
+    self.assertEqual(instance.site, self.site)
 
     # Assert that the instance has the correct values as the payload
     if not created:

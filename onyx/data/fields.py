@@ -7,6 +7,7 @@ from utils.fields import (
     UpperCharField,
     ChoiceField,
     YearMonthField,
+    SiteField,
 )
 from utils.functions import get_suggestions, get_permission, parse_permission
 from accounts.models import User
@@ -59,7 +60,7 @@ class OnyxField:
         }:
             self.onyx_type = OnyxType.TEXT
 
-        elif self.field_type == ChoiceField:
+        elif self.field_type in {ChoiceField, SiteField}:
             self.onyx_type = OnyxType.CHOICE
             self.choices = Choice.objects.filter(
                 project=self.project,
@@ -177,23 +178,28 @@ class FieldHandler:
 
         return self.fields
 
-    def unknown_field_suggestions(self, field) -> str:
+    def field_suggestions(self, field, message_prefix=None) -> str:
         """
-        Get a suggestions message for an unknown field.
+        Get a suggestions message for an unknown/invalid field.
 
         The suggestions are based on the fields that the user can action on.
 
         Args:
-            field: The unknown field.
+            field: The unknown/invalid field to get suggestions for.
+            message_prefix: The message prefix to use. Defaults to "This field is unknown."
 
         Returns:
             The suggestions message.
         """
 
+        if not message_prefix:
+            message_prefix = "This field is unknown."
+
         suggestions = get_suggestions(
             field,
             options=self.get_fields(),
-            message_prefix="This field is unknown.",
+            n=1,
+            message_prefix=message_prefix,
         )
 
         return suggestions
@@ -219,7 +225,7 @@ class FieldHandler:
 
         if not self.user.has_perm(field_access_permission):
             raise exceptions.ValidationError(
-                self.unknown_field_suggestions(onyx_field.field_path)
+                self.field_suggestions(onyx_field.field_path)
             )
 
         # Check the user's permission to perform action on the field
@@ -232,7 +238,12 @@ class FieldHandler:
         )
 
         if not self.user.has_perm(field_action_permission):
-            raise exceptions.ValidationError(f"You cannot {self.action} this field.")
+            raise exceptions.ValidationError(
+                self.field_suggestions(
+                    onyx_field.field_path,
+                    f"You cannot {self.action} this field.",
+                )
+            )
 
     def resolve_field(
         self,
@@ -256,7 +267,7 @@ class FieldHandler:
         # This is required because if a field ends in "__"
         # Splitting will result in some funky stuff
         if field.endswith("_"):
-            raise exceptions.ValidationError(self.unknown_field_suggestions(field))
+            raise exceptions.ValidationError(self.field_suggestions(field))
 
         # Base model for the project
         current_model = self.model
@@ -270,7 +281,7 @@ class FieldHandler:
             # If the current component is not known on the current model
             # Then add to unknown fields
             if component not in model_fields:
-                raise exceptions.ValidationError(self.unknown_field_suggestions(field))
+                raise exceptions.ValidationError(self.field_suggestions(field))
 
             # Corresponding field instance for the component
             component_instance = model_fields[component]
@@ -308,7 +319,7 @@ class FieldHandler:
                 # Otherwise, it is unknown
                 break
 
-        raise exceptions.ValidationError(self.unknown_field_suggestions(field))
+        raise exceptions.ValidationError(self.field_suggestions(field))
 
     def resolve_fields(
         self,
@@ -376,6 +387,7 @@ def generate_fields_spec(
     fields_spec = {}
 
     # Handle serializer fields
+    serializer_fields = serializer().get_fields()
     for field in serializer.Meta.fields:
         # Skip fields that are not in the fields_dict
         if field not in fields_dict:
@@ -391,11 +403,31 @@ def generate_fields_spec(
         onyx_type = onyx_fields[field_path].onyx_type
         field_instance = onyx_fields[field_path].field_instance
 
+        # Override the field's description from the serializer if it exists
+        description = serializer_fields[field].help_text
+        if not description:
+            description = onyx_fields[field_path].description
+
+        # If the field is required when is_published = True, override required status
+        for (f, v, d), reqs in serializer.OnyxMeta.conditional_value_required.items():
+            if f == "is_published" and v == True and field in reqs:
+                required = True
+                break
+        else:
+            # published_date doesn't have serializer is_published validation
+            # this is because published_date gets added after validation, on save
+            # but it does have the constraint so it is required on publish
+            # TODO: Add published_date addition to serializer so it can be validated?
+            if field == "published_date":
+                required = True
+            else:
+                required = onyx_fields[field_path].required
+
         # Generate initial spec for the field
         field_spec = {
-            "description": onyx_fields[field_path].description,
+            "description": description,
             "type": onyx_type.label,
-            "required": onyx_fields[field_path].required,
+            "required": required,
             "actions": [
                 action.value
                 for action in Actions
@@ -413,6 +445,7 @@ def generate_fields_spec(
 
         # Add additional restrictions
         restrictions = []
+
         if onyx_type == OnyxType.TEXT and field_instance.max_length:
             restrictions.append(f"Max length: {field_instance.max_length}")
 
@@ -421,6 +454,14 @@ def generate_fields_spec(
                 restrictions.append(
                     f"At least one required: {', '.join(optional_value_group)}"
                 )
+
+        for f, reqs in serializer.OnyxMeta.conditional_required.items():
+            if field == f:
+                restrictions.append(f"Requires: {', '.join(reqs)}")
+
+        for (f, v, d), reqs in serializer.OnyxMeta.conditional_value_required.items():
+            if f != "is_published" and field in reqs:
+                restrictions.append(f"Required when {f} is: {v}")
 
         if restrictions:
             field_spec["restrictions"] = restrictions

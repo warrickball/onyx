@@ -1,13 +1,15 @@
 from __future__ import annotations
+import hashlib
 from typing import Any
 from django.db import transaction, DatabaseError, models
 from rest_framework import serializers, exceptions
-from accounts.models import User, Site
+from accounts.models import User
 from utils.defaults import CurrentUserSiteDefault
-from utils.fieldserializers import YearMonthField
-from .. import validators
-from ..types import OnyxType
-from ..fields import OnyxField
+from utils.fieldserializers import DateField, SiteField
+from . import validators
+from .types import OnyxType
+from .fields import OnyxField
+from .models import Anonymiser
 
 
 # Mapping of OnyxType to Django REST Framework serializer field
@@ -16,8 +18,8 @@ FIELDS = {
     OnyxType.CHOICE: serializers.CharField,
     OnyxType.INTEGER: serializers.IntegerField,
     OnyxType.DECIMAL: serializers.FloatField,
-    OnyxType.DATE_YYYY_MM: YearMonthField,
-    OnyxType.DATE_YYYY_MM_DD: serializers.DateField,
+    OnyxType.DATE_YYYY_MM: lambda: DateField("%Y-%m", input_formats=["%Y-%m"]),
+    OnyxType.DATE_YYYY_MM_DD: lambda: DateField("%Y-%m-%d", input_formats=["%Y-%m-%d"]),
     OnyxType.DATETIME: serializers.DateTimeField,
     OnyxType.BOOLEAN: serializers.BooleanField,
 }
@@ -41,6 +43,7 @@ class IdentifierSerializer(serializers.Serializer):
     Serializer for input to the `data.project.identify` endpoint.
     """
 
+    site = SiteField(default=CurrentUserSiteDefault())
     value = serializers.CharField()
 
 
@@ -53,9 +56,6 @@ class BaseRecordSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), default=serializers.CurrentUserDefault()
     )
-    # site = serializers.PrimaryKeyRelatedField(
-    #     queryset=Site.objects.all(), default=CurrentUserSiteDefault()
-    # )
 
     def __init__(self, *args, fields: dict[str, Any] | None = None, **kwargs):
         """
@@ -149,7 +149,7 @@ class BaseRecordSerializer(serializers.ModelSerializer):
                 errors=errors,
                 data=data,
                 choice_constraints=self.OnyxMeta.choice_constraints,
-                project=self.context["project"],
+                project=self.context["project"].code,
                 instance=self.instance,
             )
 
@@ -184,7 +184,6 @@ class BaseRecordSerializer(serializers.ModelSerializer):
             "created",
             "last_modified",
             "user",
-            # "site",
         ]
 
     class OnyxMeta:
@@ -205,6 +204,7 @@ class ProjectRecordSerializer(BaseRecordSerializer):
     """
 
     climb_id = serializers.CharField(required=False)
+    site = SiteField(default=CurrentUserSiteDefault())
 
     class Meta:
         model: models.Model | None = None
@@ -213,16 +213,44 @@ class ProjectRecordSerializer(BaseRecordSerializer):
             "is_published",
             "published_date",
             "is_suppressed",
+            "site",
             "is_site_restricted",
         ]
 
     class OnyxMeta(BaseRecordSerializer.OnyxMeta):
-        action_success_fields: list[str] = ["climb_id"]
+        anonymised_fields: dict[str, str] = {}
+
+    def to_internal_value(self, data):
+        data = super().to_internal_value(data)
+
+        # Anonymise fields
+        if not self.instance:
+            # NOTE: This runs before unique_together checks, but AFTER unique checks
+            # TODO: This currently only allows anonymisation on create. Should it be this way?
+            for anonymised_field, prefix in self.OnyxMeta.anonymised_fields.items():
+                if data.get(anonymised_field):
+                    hasher = hashlib.sha256()
+                    hasher.update(
+                        data[anonymised_field].strip().lower().encode("utf-8")
+                    )
+                    hash = hasher.hexdigest()
+
+                    anonymiser, _ = Anonymiser.objects.get_or_create(
+                        project=self.context["project"],
+                        site=data["site"],
+                        field=anonymised_field,
+                        hash=hash,
+                        defaults={"prefix": prefix},
+                    )
+                    data[anonymised_field] = anonymiser.identifier
+
+        return data
 
 
 # TODO: Race condition testing + preventions.
 # E.g. could introduce model update_fields argument
 # This would mean only changed fields are updated, rather than whole instance
+# TODO: Investigate type: ignore statements in SerializerNode
 class SerializerNode:
     def __init__(
         self,
@@ -342,7 +370,7 @@ class SerializerNode:
 
             # Determine whether the provided identifiers are valid
             if not identifier_serializer.is_valid():
-                return False, identifier_serializer.errors
+                return False, identifier_serializer.errors  #  type: ignore
 
             # Obtain the valid identifiers
             valid_identifiers = identifier_serializer.validated_data
@@ -461,7 +489,7 @@ class SerializerNode:
             else:
                 node._save(link=instance)
 
-        return instance
+        return instance  #  type: ignore
 
     def save(self) -> models.Model:
         """

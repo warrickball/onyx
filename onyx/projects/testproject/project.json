@@ -1,8 +1,8 @@
 {
-    "code": "test",
+    "code": "testproject",
     "name": "Test Project",
     "description": "This is a test project",
-    "content_type": "data.testmodel",
+    "content_type": "testproject.testmodel",
     "groups": [
         {
             "scope": "admin",
@@ -11,6 +11,7 @@
                     "action": "add",
                     "fields": [
                         "is_published",
+                        "site",
                         "sample_id",
                         "run_name",
                         "collection_month",
@@ -48,6 +49,7 @@
                         "climb_id",
                         "is_published",
                         "published_date",
+                        "site",
                         "sample_id",
                         "run_name",
                         "collection_month",
@@ -119,6 +121,13 @@
         }
     ],
     "choices": [
+        {
+            "field": "site",
+            "options": [
+                "testsite_1",
+                "testsite_2"
+            ]
+        },
         {
             "field": "country",
             "options": [
