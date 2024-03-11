@@ -61,7 +61,7 @@ class OnyxTestCase(APITestCase):
         return user
 
 
-def generate_test_data(n: int = 100):
+def generate_test_data(n: int = 100, nested: bool = False):
     """
     Generate test data.
     """
@@ -98,7 +98,7 @@ def generate_test_data(n: int = 100):
             "end": random.randint(6, 10),
             "required_when_published": "hello",
         }
-        if records:
+        if records or nested:
             x["records"] = [
                 {
                     "test_id": 1,

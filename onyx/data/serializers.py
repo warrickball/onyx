@@ -5,7 +5,7 @@ from django.db import transaction, DatabaseError, models
 from rest_framework import serializers, exceptions
 from accounts.models import User
 from utils.defaults import CurrentUserSiteDefault
-from utils.fieldserializers import YearMonthField, SiteField
+from utils.fieldserializers import DateField, SiteField
 from . import validators
 from .types import OnyxType
 from .fields import OnyxField
@@ -18,8 +18,8 @@ FIELDS = {
     OnyxType.CHOICE: serializers.CharField,
     OnyxType.INTEGER: serializers.IntegerField,
     OnyxType.DECIMAL: serializers.FloatField,
-    OnyxType.DATE_YYYY_MM: YearMonthField,
-    OnyxType.DATE_YYYY_MM_DD: serializers.DateField,
+    OnyxType.DATE_YYYY_MM: lambda: DateField("%Y-%m", input_formats=["%Y-%m"]),
+    OnyxType.DATE_YYYY_MM_DD: lambda: DateField("%Y-%m-%d", input_formats=["%Y-%m-%d"]),
     OnyxType.DATETIME: serializers.DateTimeField,
     OnyxType.BOOLEAN: serializers.BooleanField,
 }

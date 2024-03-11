@@ -1,31 +1,23 @@
-from datetime import date
-from rest_framework import serializers, exceptions
+from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from data.models import Choice
 from accounts.models import Site
 from utils.functions import get_suggestions
 
 
-# TODO: Do we even need this?
-class YearMonthField(serializers.Field):
+class DateField(serializers.DateField):
+    def __init__(self, format: str, input_formats=None, **kwargs):
+        super().__init__(
+            format,  #  type: ignore
+            input_formats=input_formats,
+            **kwargs,
+        )
+
     def to_internal_value(self, data):
-        try:
-            year, month = str(data).split("-")
-            if not (len(year) == 4 and 1 <= len(month) <= 2):
-                raise ValueError
-            value = date(int(year), int(month), 1)
-        except ValueError:
-            raise exceptions.ValidationError("Enter a valid date in YYYY-MM format.")
+        if self.allow_null and not str(data).strip():
+            return None
 
-        return value
-
-    def to_representation(self, value):
-        try:
-            year, month, _ = str(value).split("-")
-        except ValueError:
-            raise exceptions.ValidationError("Must be in YYYY-MM-DD format.")
-
-        return year + "-" + month
+        return super().to_internal_value(data)
 
 
 class ChoiceField(serializers.ChoiceField):
