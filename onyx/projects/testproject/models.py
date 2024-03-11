@@ -1,5 +1,4 @@
 from django.db import models
-from ..models import BaseRecord, ProjectRecord, Anonymiser
 from utils.fields import YearMonthField, UpperCharField, ChoiceField
 from utils.constraints import (
     unique_together,
@@ -9,33 +8,10 @@ from utils.constraints import (
     conditional_required,
     conditional_value_required,
 )
+from data.models import BaseRecord, ProjectRecord
 
 
 __version__ = "0.1.0"
-
-
-class TestSampleID(Anonymiser):
-    @classmethod
-    def get_identifier_prefix(cls):
-        return "S"
-
-    class Meta:
-        default_permissions = []
-        indexes = [
-            models.Index(fields=["hash"]),
-        ]
-
-
-class TestRunName(Anonymiser):
-    @classmethod
-    def get_identifier_prefix(cls):
-        return "R"
-
-    class Meta:
-        default_permissions = []
-        indexes = [
-            models.Index(fields=["hash"]),
-        ]
 
 
 class BaseTestModel(ProjectRecord):
@@ -68,6 +44,7 @@ class BaseTestModel(ProjectRecord):
             models.Index(fields=["is_published"]),
             models.Index(fields=["published_date"]),
             models.Index(fields=["is_suppressed"]),
+            models.Index(fields=["site"]),
             models.Index(fields=["is_site_restricted"]),
             models.Index(fields=["sample_id", "run_name"]),
             models.Index(fields=["sample_id"]),

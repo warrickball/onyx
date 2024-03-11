@@ -1,8 +1,8 @@
-import hashlib
 from datetime import date
 from rest_framework import serializers, exceptions
 from django.utils.translation import gettext_lazy as _
-from data.models import Choice, Anonymiser
+from data.models import Choice
+from accounts.models import Site
 from utils.functions import get_suggestions
 
 
@@ -31,8 +31,7 @@ class YearMonthField(serializers.Field):
 class ChoiceField(serializers.ChoiceField):
     default_error_messages = {"invalid_choice": _("{suggestions}")}
 
-    def __init__(self, project, field, **kwargs):
-        self.project = project
+    def __init__(self, field, **kwargs):
         self.field = field
         super().__init__([], **kwargs)
 
@@ -41,7 +40,7 @@ class ChoiceField(serializers.ChoiceField):
 
         self.choices = list(
             Choice.objects.filter(
-                project_id=self.project,
+                project_id=self.context["project"],
                 field=self.field,
                 is_active=True,
             ).values_list(
@@ -71,19 +70,23 @@ class ChoiceField(serializers.ChoiceField):
             )
 
 
-class AnonymiserField(serializers.CharField):
-    def __init__(self, anonymiser_model: type[Anonymiser], **kwargs):
-        self.anonymiser_model = anonymiser_model
-        super().__init__(**kwargs)
+class SiteField(ChoiceField):
+    default_error_messages = {
+        "does_not_exist": _("Site with code={value} does not exist."),
+        "invalid": _("Invalid value."),
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__("site", **kwargs)
 
     def to_internal_value(self, data):
-        value = super().to_internal_value(data).strip().lower()
+        value = super().to_internal_value(data)
+        try:
+            return Site.objects.get(code=value)
+        except Site.DoesNotExist:
+            self.fail("does_not_exist", value=value)
+        except (TypeError, ValueError):
+            self.fail("invalid")
 
-        hasher = hashlib.sha256()
-        hasher.update(value.encode("utf-8"))
-        value = hasher.hexdigest()
-
-        anonymiser, _ = self.anonymiser_model.objects.get_or_create(hash=value)
-        value = anonymiser.identifier
-
-        return value
+    def to_representation(self, site):
+        return site.code
