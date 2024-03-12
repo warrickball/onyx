@@ -5,7 +5,6 @@
 .stuff
 **.log
 __pycache__
-migrations
 onyx/projects/*
 !onyx/projects/__init__.py
 !onyx/projects/testproject
