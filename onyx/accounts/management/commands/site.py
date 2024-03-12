@@ -35,9 +35,9 @@ def create_site(
         defaults=defaults,
     )
 
-    if projects:
-        project_instances = []
+    project_instances = []
 
+    if projects:
         for project in projects:
             try:
                 project_instance = Project.objects.get(code=project)
@@ -46,7 +46,7 @@ def create_site(
                 exit()
             project_instances.append(project_instance)
 
-        site.projects.set(project_instances)
+    site.projects.set(project_instances)
 
     if created:
         self.print(f"Created site: {site.code}")
