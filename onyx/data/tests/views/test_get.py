@@ -1,8 +1,7 @@
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.reverse import reverse
 from ..utils import OnyxTestCase, generate_test_data, _test_record
-from ...models.projects.test import TestModel
+from projects.testproject.models import TestModel
 
 
 class TestGetView(OnyxTestCase):
@@ -13,20 +12,18 @@ class TestGetView(OnyxTestCase):
 
         super().setUp()
         self.endpoint = lambda climb_id: reverse(
-            "data.project.climb_id", kwargs={"code": "test", "climb_id": climb_id}
+            "project.testproject.climb_id",
+            kwargs={"code": "testproject", "climb_id": climb_id},
         )
         self.user = self.setup_user(
-            "testuser", roles=["is_staff"], groups=["test.view.base"]
+            "testuser", roles=["is_staff"], groups=["testproject.admin"]
         )
-
-        self.user.groups.add(Group.objects.get(name="test.add.base"))
         response = self.client.post(
-            reverse("data.project", kwargs={"code": "test"}),
-            data=next(iter(generate_test_data(n=1))),
+            reverse("project.testproject", kwargs={"code": "testproject"}),
+            data=next(iter(generate_test_data(n=1, nested=True))),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.climb_id = response.json()["data"]["climb_id"]
-        self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
     def test_basic(self):
         """
@@ -54,14 +51,17 @@ class TestGetView(OnyxTestCase):
             self.endpoint(self.climb_id),
             data={"include": ["climb_id", "published_date"]},
         )
+        record = TestModel.objects.get(climb_id=self.climb_id)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.json()["data"],
             {
-                "climb_id": self.climb_id,
-                "published_date": TestModel.objects.get(
-                    climb_id=self.climb_id
-                ).published_date.strftime("%Y-%m-%d"),
+                "climb_id": record.climb_id,
+                "published_date": (
+                    record.published_date.strftime("%Y-%m-%d")
+                    if record.published_date
+                    else None
+                ),
             },
         )
 
@@ -75,7 +75,6 @@ class TestGetView(OnyxTestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotIn("climb_id", response.json()["data"])
-
         _test_record(
             self,
             response.json()["data"],
@@ -113,7 +112,7 @@ class TestGetView(OnyxTestCase):
         """
 
         instance = TestModel.objects.get(climb_id=self.climb_id)
-        instance.suppressed = True
+        instance.is_suppressed = True
         instance.save()
 
         response = self.client.get(self.endpoint(self.climb_id))

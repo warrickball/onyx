@@ -15,7 +15,7 @@ urlpatterns = [
     path("site/", views.SiteUsersView.as_view()),
     path("all/", views.AllUsersView.as_view()),
     re_path(
-        r"^projectuser/(?P<code>[a-zA-Z_]*)/(?P<site_code>[a-zA-Z]*)/(?P<username>[a-zA-Z0-9_\.\-]*)/$",
+        r"^projectuser/(?P<project_code>[a-zA-Z_\-]*)/(?P<site_code>[a-zA-Z_\-]*)/(?P<username>[a-zA-Z0-9_\.\-]*)/$",
         views.ProjectUserView.as_view(),
     ),
 ]

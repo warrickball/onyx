@@ -1,0 +1,204 @@
+{
+    "code": "testproject",
+    "name": "Test Project",
+    "description": "This is a test project",
+    "content_type": "testproject.testmodel",
+    "groups": [
+        {
+            "scope": "admin",
+            "permissions": [
+                {
+                    "action": "add",
+                    "fields": [
+                        "is_published",
+                        "site",
+                        "sample_id",
+                        "run_name",
+                        "collection_month",
+                        "received_month",
+                        "char_max_length_20",
+                        "text_option_1",
+                        "text_option_2",
+                        "submission_date",
+                        "country",
+                        "region",
+                        "concern",
+                        "tests",
+                        "score",
+                        "start",
+                        "end",
+                        "required_when_published",
+                        "records",
+                        "records__test_id",
+                        "records__test_pass",
+                        "records__test_start",
+                        "records__test_end",
+                        "records__score_a",
+                        "records__score_b",
+                        "records__score_c",
+                        "records__test_result"
+                    ]
+                },
+                {
+                    "action": [
+                        "get",
+                        "list",
+                        "filter"
+                    ],
+                    "fields": [
+                        "climb_id",
+                        "is_published",
+                        "published_date",
+                        "site",
+                        "sample_id",
+                        "run_name",
+                        "collection_month",
+                        "received_month",
+                        "char_max_length_20",
+                        "text_option_1",
+                        "text_option_2",
+                        "submission_date",
+                        "country",
+                        "region",
+                        "concern",
+                        "tests",
+                        "score",
+                        "start",
+                        "end",
+                        "required_when_published",
+                        "records",
+                        "records__test_id",
+                        "records__test_pass",
+                        "records__test_start",
+                        "records__test_end",
+                        "records__score_a",
+                        "records__score_b",
+                        "records__score_c",
+                        "records__test_result"
+                    ]
+                },
+                {
+                    "action": "identify",
+                    "fields": [
+                        "sample_id",
+                        "run_name"
+                    ]
+                },
+                {
+                    "action": "change",
+                    "fields": [
+                        "is_published",
+                        "collection_month",
+                        "received_month",
+                        "char_max_length_20",
+                        "text_option_1",
+                        "text_option_2",
+                        "submission_date",
+                        "country",
+                        "region",
+                        "concern",
+                        "tests",
+                        "score",
+                        "start",
+                        "end",
+                        "required_when_published",
+                        "records",
+                        "records__test_id",
+                        "records__test_pass",
+                        "records__test_start",
+                        "records__test_end",
+                        "records__score_a",
+                        "records__score_b",
+                        "records__score_c",
+                        "records__test_result"
+                    ]
+                },
+                {
+                    "action": "delete",
+                    "fields": []
+                }
+            ]
+        }
+    ],
+    "choices": [
+        {
+            "field": "site",
+            "options": [
+                "testsite_1",
+                "testsite_2"
+            ]
+        },
+        {
+            "field": "country",
+            "options": [
+                "eng",
+                "wales",
+                "scot",
+                "ni"
+            ]
+        },
+        {
+            "field": "region",
+            "options": [
+                "ne",
+                "nw",
+                "se",
+                "sw",
+                "other"
+            ]
+        }
+    ],
+    "choice_constraints": [
+        {
+            "field": "country",
+            "option": "eng",
+            "constraints": [
+                {
+                    "field": "region",
+                    "options": [
+                        "ne",
+                        "nw",
+                        "se",
+                        "sw"
+                    ]
+                }
+            ]
+        },
+        {
+            "field": "country",
+            "option": "wales",
+            "constraints": [
+                {
+                    "field": "region",
+                    "options": [
+                        "other"
+                    ]
+                }
+            ]
+        },
+        {
+            "field": "country",
+            "option": "scot",
+            "constraints": [
+                {
+                    "field": "region",
+                    "options": [
+                        "other"
+                    ]
+                }
+            ]
+        },
+        {
+            "field": "country",
+            "option": "ni",
+            "constraints": [
+                {
+                    "field": "region",
+                    "options": [
+                        "other"
+                    ]
+                }
+            ]
+        }
+    ]
+}

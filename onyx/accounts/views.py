@@ -1,5 +1,6 @@
 from django.contrib.auth.models import Group
 from rest_framework import exceptions
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.views import APIView
@@ -97,13 +98,22 @@ class SiteUsersView(ListAPIView):
     serializer_class = ViewUserSerializer
 
     def get_queryset(self):
-        # Filter and return all active, approved users for the site
         assert isinstance(self.request.user, User)
-        return User.objects.filter(
+
+        # Filter and return all active, approved users for the site
+        # who have access to the same projects
+        projects = self.request.user.groups.values_list(
+            "projectgroup__project", flat=True
+        ).distinct()
+
+        users = User.objects.filter(
             is_active=True,
             is_approved=True,
             site=self.request.user.site,
+            groups__projectgroup__project__in=projects,
         ).order_by("-date_joined")
+
+        return users
 
 
 class AllUsersView(ListAPIView):
@@ -126,33 +136,38 @@ class ProjectUserView(KnoxLoginView):
 
     permission_classes = Admin
 
-    def post(self, request, *args, **kwargs):
-        raise exceptions.MethodNotAllowed(self.request.method)
-
-    def get(self, request, code, site_code, username):
-        # Get the base view group for the requested project
+    def post(self, request: Request, project_code: str, site_code: str, username: str):
+        # Get the analyst group for the project
         try:
-            view_group = Group.objects.get(
-                projectgroup__project__code=code,
-                projectgroup__action="view",
-                projectgroup__scope="base",
+            analyst_group = Group.objects.get(
+                projectgroup__project__code=project_code,
+                projectgroup__scope="analyst",
             )
         except Group.DoesNotExist:
             raise ProjectNotFound
 
-        # Get the requested site
+        # Get the project
+        project = analyst_group.projectgroup.project  #  type: ignore
+
+        # Get the site
         try:
             site = Site.objects.get(code=site_code)
         except Site.DoesNotExist:
             raise SiteNotFound
 
+        # The site must have access to the project
+        if project not in site.projects.all():
+            raise exceptions.PermissionDenied(
+                {"detail": "This site does not have access to this project."}
+            )
+
         # Get the user, and check they have the correct creator and site
         # If the user does not exist, create them
         try:
             user = User.objects.get(username=username)
-            if user.creator != request.user:
+            if user.creator != request.user or user == request.user:
                 raise exceptions.PermissionDenied(
-                    {"detail": "This user cannot be modified."}
+                    {"detail": "You cannot modify this user."}
                 )
             if user.site != site:
                 raise exceptions.ValidationError(
@@ -168,7 +183,8 @@ class ProjectUserView(KnoxLoginView):
             user.set_unusable_password()
             user.save()
 
-        user.groups.add(view_group)
+        # Add the user to the analyst group
+        user.groups.add(analyst_group)
 
         request.user = user
         return super().post(request)

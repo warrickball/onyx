@@ -1,12 +1,12 @@
 from utils.validators import OnyxUniqueTogetherValidator
-from ..serializers import BaseRecordSerializer, ProjectRecordSerializer
-from ...models.projects.test import BaseTestModel, TestModel, TestModelRecord
-from utils.fieldserializers import ChoiceField, YearMonthField
+from utils.fieldserializers import DateField, ChoiceField
+from data.serializers import BaseRecordSerializer, ProjectRecordSerializer
+from .models import BaseTestModel, TestModel, TestModelRecord
 
 
 class TestModelRecordSerializer(BaseRecordSerializer):
-    test_start = YearMonthField()
-    test_end = YearMonthField()
+    test_start = DateField("%Y-%m", input_formats=["%Y-%m"])
+    test_end = DateField("%Y-%m", input_formats=["%Y-%m"])
 
     class Meta:
         model = TestModelRecord
@@ -18,6 +18,7 @@ class TestModelRecordSerializer(BaseRecordSerializer):
             "score_a",
             "score_b",
             "score_c",
+            "test_result",
         ]
 
     class OnyxMeta(BaseRecordSerializer.OnyxMeta):
@@ -31,13 +32,33 @@ class TestModelRecordSerializer(BaseRecordSerializer):
         conditional_required = BaseRecordSerializer.OnyxMeta.conditional_required | {
             "score_c": ["score_a", "score_b"]
         }
+        conditional_value_required = (
+            BaseRecordSerializer.OnyxMeta.conditional_value_required
+            | {("test_pass", True, None): ["test_result"]}
+        )
 
 
 class BaseTestModelSerializer(ProjectRecordSerializer):
-    collection_month = YearMonthField(required=False, allow_null=True)
-    received_month = YearMonthField(required=False, allow_null=True)
-    country = ChoiceField("test", "country", required=False, allow_blank=True)
-    region = ChoiceField("test", "region", required=False, allow_blank=True)
+    collection_month = DateField(
+        "%Y-%m",
+        input_formats=["%Y-%m"],
+        required=False,
+        allow_null=True,
+    )
+    received_month = DateField(
+        "%Y-%m",
+        input_formats=["%Y-%m"],
+        required=False,
+        allow_null=True,
+    )
+    submission_date = DateField(
+        "%Y-%m-%d",
+        input_formats=["%Y-%m-%d"],
+        required=False,
+        allow_null=True,
+    )
+    country = ChoiceField("country", required=False, allow_blank=True)
+    region = ChoiceField("region", required=False, allow_blank=True)
 
     class Meta:
         model = BaseTestModel
@@ -46,6 +67,7 @@ class BaseTestModelSerializer(ProjectRecordSerializer):
             "run_name",
             "collection_month",
             "received_month",
+            "char_max_length_20",
             "text_option_1",
             "text_option_2",
             "submission_date",
@@ -56,6 +78,7 @@ class BaseTestModelSerializer(ProjectRecordSerializer):
             "score",
             "start",
             "end",
+            "required_when_published",
         ]
         validators = [
             OnyxUniqueTogetherValidator(
@@ -87,13 +110,25 @@ class BaseTestModelSerializer(ProjectRecordSerializer):
         conditional_required = ProjectRecordSerializer.OnyxMeta.conditional_required | {
             "region": ["country"]
         }
+        conditional_value_required = (
+            ProjectRecordSerializer.OnyxMeta.conditional_value_required
+            | {
+                ("is_published", True, True): [
+                    "required_when_published",
+                ]
+            }
+        )
+        anonymised_fields = ProjectRecordSerializer.OnyxMeta.anonymised_fields | {
+            "sample_id": "S-",
+            "run_name": "R-",
+        }
 
 
 class TestModelSerializer(BaseTestModelSerializer):
     class Meta:
         model = TestModel
         fields = BaseTestModelSerializer.Meta.fields
-        # NOTE: Just like fields, validators must be inherited
+        # NOTE: Just like fields, validators must be inherited, IF they exist in the parent class.
         validators = BaseTestModelSerializer.Meta.validators
 
     class OnyxMeta(BaseTestModelSerializer.OnyxMeta):

@@ -1,8 +1,7 @@
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.reverse import reverse
 from ..utils import OnyxTestCase, generate_test_data
-from ...models.projects.test import TestModel
+from projects.testproject.models import TestModel
 
 
 # TODO: Tests for update endpoint
@@ -14,20 +13,18 @@ class TestUpdateView(OnyxTestCase):
 
         super().setUp()
         self.endpoint = lambda climb_id: reverse(
-            "data.project.climb_id", kwargs={"code": "test", "climb_id": climb_id}
+            "project.testproject.climb_id",
+            kwargs={"code": "testproject", "climb_id": climb_id},
         )
         self.user = self.setup_user(
-            "testuser", roles=["is_staff"], groups=["test.change.base"]
+            "testuser", roles=["is_staff"], groups=["testproject.admin"]
         )
-
-        self.user.groups.add(Group.objects.get(name="test.add.base"))
         response = self.client.post(
-            reverse("data.project", kwargs={"code": "test"}),
+            reverse("project.testproject", kwargs={"code": "testproject"}),
             data=next(iter(generate_test_data(n=1))),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.climb_id = response.json()["data"]["climb_id"]
-        self.user.groups.remove(Group.objects.get(name="test.add.base"))
 
     def test_basic(self):
         """
@@ -65,8 +62,8 @@ class TestUpdateView(OnyxTestCase):
         }
         response = self.client.patch(
             reverse(
-                "data.project.test.climb_id",
-                kwargs={"code": "test", "climb_id": self.climb_id},
+                "project.testproject.test.climb_id",
+                kwargs={"code": "testproject", "climb_id": self.climb_id},
             ),
             data=updated_values,
         )

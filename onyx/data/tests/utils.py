@@ -2,12 +2,11 @@ import os
 import random
 import logging
 from django.core.management import call_command
+from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework.test import APITestCase
 from accounts.models import User, Site
-
-
-directory = os.path.dirname(os.path.abspath(__file__))
+from ..models import Project
 
 
 class OnyxTestCase(APITestCase):
@@ -18,16 +17,27 @@ class OnyxTestCase(APITestCase):
 
         logging.disable(logging.CRITICAL)
 
-        # Set up site and test project
-        self.site = Site.objects.create(
-            code="TEST",
-            description="Department of Testing",
-        )
+        # Set up test project
         call_command(
             "project",
-            os.path.join(directory, "project.json"),
+            os.path.join(settings.BASE_DIR, "projects/testproject/project.json"),
             quiet=True,
         )
+
+        # Set up test sites
+        self.site = Site.objects.create(
+            code="testsite_1",
+            description="Department of Testing 1",
+        )
+
+        self.extra_site = Site.objects.create(
+            code="testsite_2",
+            description="Department of Testing 2",
+        )
+
+        # Add test project to sites
+        self.site.projects.add(Project.objects.get(code="testproject"))
+        self.extra_site.projects.add(Project.objects.get(code="testproject"))
 
     def setup_user(self, username, roles=None, groups=None):
         """
@@ -51,7 +61,7 @@ class OnyxTestCase(APITestCase):
         return user
 
 
-def generate_test_data(n=100):
+def generate_test_data(n: int = 100, nested: bool = False):
     """
     Generate test data.
     """
@@ -69,6 +79,7 @@ def generate_test_data(n=100):
             "run_name": f"run-{random.randint(1, 3)}",
             "collection_month": f"2022-{random.randint(1, 12)}",
             "received_month": f"2023-{random.randint(1, 6)}",
+            "char_max_length_20": "X" * 20,
             "text_option_1": random.choice(["hi", ""]),
             "text_option_2": "bye",
             "submission_date": f"2023-{random.randint(1, 6)}-{random.randint(1, 25)}",
@@ -85,8 +96,9 @@ def generate_test_data(n=100):
             "score": random.random() * 42,
             "start": random.randint(1, 5),
             "end": random.randint(6, 10),
+            "required_when_published": "hello",
         }
-        if records:
+        if records or nested:
             x["records"] = [
                 {
                     "test_id": 1,
@@ -94,6 +106,7 @@ def generate_test_data(n=100):
                     "test_start": f"2022-{random.randint(1, 12)}",
                     "test_end": f"2023-{random.randint(1, 6)}",
                     "score_a": random.random() * 42,
+                    "test_result": "details",
                 },
                 {
                     "test_id": 2,
@@ -101,47 +114,65 @@ def generate_test_data(n=100):
                     "test_start": f"2022-{random.randint(1, 12)}",
                     "test_end": f"2023-{random.randint(1, 6)}",
                     "score_b": random.random() * 42,
+                    "test_result": "details",
                 },
             ]
         data.append(x)
     return data
 
 
-def _test_record(self, payload, instance, created=False):
+def _test_record(self, payload, instance, created: bool = False):
     """
     Test that a payload's values match an instance.
     """
+
+    # Assert the instance has the correct site
+    self.assertEqual(instance.site, self.site)
 
     # Assert that the instance has the correct values as the payload
     if not created:
         self.assertEqual(payload.get("climb_id", ""), instance.climb_id)
         self.assertEqual(
-            payload.get("published_date"), instance.published_date.strftime("%Y-%m-%d")
+            payload.get("published_date"),
+            (
+                instance.published_date.strftime("%Y-%m-%d")
+                if instance.published_date
+                else None
+            ),
         )
 
     self.assertEqual(payload.get("sample_id", ""), instance.sample_id)
     self.assertEqual(payload.get("run_name", ""), instance.run_name)
     self.assertEqual(
         payload.get("collection_month"),
-        instance.collection_month.strftime("%Y-%m")
-        if instance.collection_month
-        else None,
+        (
+            instance.collection_month.strftime("%Y-%m")
+            if instance.collection_month
+            else None
+        ),
     )
     self.assertEqual(
         payload.get("received_month"),
         instance.received_month.strftime("%Y-%m") if instance.received_month else None,
     )
+    self.assertEqual(payload.get("char_max_length_20", ""), instance.char_max_length_20)
+    self.assertEqual(payload.get("text_option_1", ""), instance.text_option_1)
+    self.assertEqual(payload.get("text_option_2", ""), instance.text_option_2)
     self.assertEqual(
         payload.get("submission_date"),
-        instance.submission_date.strftime("%Y-%m-%d")
-        if instance.submission_date
-        else None,
+        (
+            instance.submission_date.strftime("%Y-%m-%d")
+            if instance.submission_date
+            else None
+        ),
     )
     self.assertEqual(payload.get("country", ""), instance.country)
     self.assertEqual(payload.get("region", ""), instance.region)
     self.assertEqual(payload.get("concern"), instance.concern)
     self.assertEqual(payload.get("tests"), instance.tests)
     self.assertEqual(payload.get("score"), instance.score)
+    self.assertEqual(payload.get("start"), instance.start)
+    self.assertEqual(payload.get("end"), instance.end)
 
     # If the payload has nested records, check the correctness of these
     if payload.get("records"):
@@ -153,15 +184,19 @@ def _test_record(self, payload, instance, created=False):
             self.assertEqual(subrecord.get("test_pass"), subinstance.test_pass)
             self.assertEqual(
                 subrecord.get("test_start"),
-                subinstance.test_start.strftime("%Y-%m")
-                if subinstance.test_start
-                else None,
+                (
+                    subinstance.test_start.strftime("%Y-%m")
+                    if subinstance.test_start
+                    else None
+                ),
             )
             self.assertEqual(
                 subrecord.get("test_end"),
-                subinstance.test_end.strftime("%Y-%m")
-                if subinstance.test_end
-                else None,
+                (
+                    subinstance.test_end.strftime("%Y-%m")
+                    if subinstance.test_end
+                    else None
+                ),
             )
             self.assertEqual(subrecord.get("score_a"), subinstance.score_a)
             self.assertEqual(subrecord.get("score_b"), subinstance.score_b)

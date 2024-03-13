@@ -1,5 +1,6 @@
 from typing import Any
 import uuid
+from datetime import datetime
 from secrets import token_hex
 from django.db import models
 from django.contrib.auth.models import Group
@@ -7,23 +8,19 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import checks
 from django.core.checks.messages import CheckMessage
 from accounts.models import Site, User
-from utils.fields import StrippedCharField, LowerCharField, UpperCharField
+from utils.fields import StrippedCharField, LowerCharField, UpperCharField, SiteField
 from utils.constraints import unique_together
 from simple_history.models import HistoricalRecords
-from ..types import ALL_LOOKUPS
+from .types import ALL_LOOKUPS
 
 
 class Project(models.Model):
     code = LowerCharField(max_length=50, unique=True)
     name = StrippedCharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
 
 
-# TODO: Finalise and test
-# This is just on the brink of exactly what I was after: a singular model for linking project, action, scope, group.
-# Assuming speed not a problem, from this we can search groups by scope, action, project, without needing a group naming convention
-# We do have the issue though that deleting a project will not cascade delete the groups, but I guess this is not an issue (?)
 class ProjectGroup(models.Model):
     group = models.OneToOneField(
         Group,
@@ -31,17 +28,13 @@ class ProjectGroup(models.Model):
         primary_key=True,
     )
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    action = LowerCharField(
-        max_length=10,
-        choices=[(x, x) for x in ["add", "view", "change", "delete"]],
-    )
-    scope = LowerCharField(max_length=50, default="base")
+    scope = LowerCharField(max_length=50)
+    actions = models.TextField(blank=True)
 
     class Meta:
         constraints = [
             unique_together(
-                model_name="projectgroup",
-                fields=["project", "scope", "action"],
+                fields=["project", "scope"],
             ),
         ]
 
@@ -62,7 +55,6 @@ class Choice(models.Model):
         ]
         constraints = [
             unique_together(
-                model_name="choice",
                 fields=["project", "field", "choice"],
             ),
         ]
@@ -95,9 +87,7 @@ class BaseRecord(models.Model):
     history = HistoricalRecords(inherit=True)
     created = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    # TODO: Display sites again
-    # site = models.ForeignKey(Site, to_field="code", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
 
     class Meta:
         abstract = True
@@ -126,17 +116,27 @@ class ProjectRecord(BaseRecord):
     climb_id = UpperCharField(
         max_length=12,
         unique=True,
-        help_text="Unique identifier for a project record. Set by Onyx.",
+        help_text="Unique identifier for a project record in Onyx.",
+    )
+    is_published = models.BooleanField(
+        default=True,
+        help_text="Indicator for whether a project record has been published.",
     )
     published_date = models.DateField(
-        auto_now_add=True,
-        help_text="The date the project record was published. Set by Onyx.",
+        null=True,
+        help_text="The date the project record was published in Onyx.",
     )
-    suppressed = models.BooleanField(
+    is_suppressed = models.BooleanField(
         default=False,
         help_text="Indicator for whether a project record has been hidden from users.",
     )
-    site_restricted = models.BooleanField(
+    site = SiteField(
+        Site,
+        to_field="code",
+        on_delete=models.PROTECT,
+        help_text="Site that uploaded the record.",
+    )
+    is_site_restricted = models.BooleanField(
         default=False,
         help_text="Indicator for whether a project record has been hidden from users not within the record's site.",
     )
@@ -149,37 +149,55 @@ class ProjectRecord(BaseRecord):
             climb_id = ClimbID.objects.create()
             self.climb_id = climb_id.climb_id
 
+        if self.published_date is None and self.is_published:
+            self.published_date = datetime.today().date()
+
         super().save(*args, **kwargs)
 
 
 class Anonymiser(models.Model):
-    hash = models.TextField(unique=True)
-    identifier = UpperCharField(unique=True, max_length=12)
+    project = models.ForeignKey(Project, on_delete=models.PROTECT)
+    site = models.ForeignKey(Site, on_delete=models.PROTECT)
+    field = LowerCharField(max_length=100)
+    prefix = UpperCharField(max_length=5)
+    hash = models.TextField()
+    identifier = UpperCharField(unique=True, max_length=20)
 
     class Meta:
-        abstract = True
+        indexes = [
+            models.Index(
+                fields=[
+                    "project",
+                    "site",
+                    "field",
+                    "hash",
+                ]
+            ),
+        ]
+        constraints = [
+            unique_together(
+                fields=[
+                    "project",
+                    "site",
+                    "field",
+                    "hash",
+                ],
+            ),
+        ]
 
-    @classmethod
-    def get_identifier_prefix(cls) -> str:
+    def generate_identifier(self) -> str:
         """
-        Get the prefix for the identifier.
-        """
-        raise NotImplementedError("A prefix is required.")
+        Generate a random unique identifier.
 
-    @classmethod
-    def generate_identifier(cls) -> str:
-        """
-        Generate a random new identifier on the given `model`.
+        The identifier consists of the instance's `prefix`, followed by 10 random hexadecimal numbers.
 
-        The identifier consists of the given `prefix`, followed by a `-`, followed by 10 random hexadecimal numbers.
-
-        This means there are `16^10 = 1,099,511,627,776` identifiers to choose from for a given `model` and `prefix`.
+        This means there are `16^10 = 1,099,511,627,776` identifiers to choose from.
         """
 
-        identifier = cls.get_identifier_prefix() + "-" + "".join(token_hex(5).upper())
+        identifier = self.prefix + token_hex(5).upper()
 
-        if cls.objects.filter(identifier=identifier).exists():
-            identifier = cls.generate_identifier()
+        if Anonymiser.objects.filter(identifier=identifier).exists():
+            identifier = self.generate_identifier()
 
         return identifier
 

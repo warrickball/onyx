@@ -7,10 +7,14 @@ from django.contrib.contenttypes.models import ContentType
 from ...models import Project, ProjectGroup, Choice
 
 
-class GroupConfig(BaseModel):
-    action: str
-    scope: str
+class PermissionConfig(BaseModel):
+    action: str | List[str]
     fields: List[str]
+
+
+class GroupConfig(BaseModel):
+    scope: str
+    permissions: List[PermissionConfig]
 
 
 class ChoiceConfig(BaseModel):
@@ -28,7 +32,7 @@ class ProjectConfig(BaseModel):
     code: str
     name: Optional[str]
     description: Optional[str]
-    content_type: Optional[str]
+    content_type: str
     groups: Optional[List[GroupConfig]]
     choices: Optional[List[ChoiceConfig]]
     choice_constraints: Optional[List[ChoiceConstraintConfig]]
@@ -60,24 +64,21 @@ class Command(base.BaseCommand):
         Create/update the project.
         """
 
-        # If a {app}.{model} was provided, use it to get the content_type
-        # Otherwise, assume that app = data and that the model has the same name as the project
-        if project_config.content_type:
-            app, _, model = project_config.content_type.partition(".")
-        else:
-            app, model = "data", project_config.code
+        # Get the app and model from the content type
+        app, _, model = project_config.content_type.partition(".")
 
+        # Create or retrieve the project
         self.project, p_created = Project.objects.update_or_create(
             code=project_config.code,
             defaults={
                 # If no name was provided, use the code
-                "name": project_config.name
-                if project_config.name
-                else project_config.code,
+                "name": (
+                    project_config.name if project_config.name else project_config.code
+                ),
                 # If no description was provided, set as empty
-                "description": project_config.description
-                if project_config.description
-                else "",
+                "description": (
+                    project_config.description if project_config.description else ""
+                ),
                 "content_type": ContentType.objects.get(app_label=app, model=model),
             },
         )
@@ -97,13 +98,13 @@ class Command(base.BaseCommand):
             self.set_choice_constraints(project_config.choice_constraints)
 
         if p_created:
-            self.print(f"Successfully created project: {self.project.code}")
+            self.print(f"Created project: {self.project.code}")
         else:
-            self.print(f"Successfully updated project: {self.project.code}")
+            self.print(f"Updated project: {self.project.code}")
 
-        self.print("Name:", self.project.name)
-        self.print("Description:", self.project.description)
-        self.print("Model:", self.project.content_type.model_class())
+        self.print("• Name:", self.project.name)
+        self.print("• Description:", self.project.description)
+        self.print("• Model:", self.project.content_type.model_class())
 
     def set_groups(self, group_configs: List[GroupConfig]):
         """
@@ -114,8 +115,8 @@ class Command(base.BaseCommand):
 
         for group_config in group_configs:
             # Create or retrieve underlying permissions group
-            # This is based on project code, action and scope
-            name = f"{self.project.code}.{group_config.action}.{group_config.scope}"
+            # This is based on project code and scope
+            name = f"{self.project.code}.{group_config.scope}"
             group, g_created = Group.objects.get_or_create(name=name)
 
             if g_created:
@@ -125,77 +126,160 @@ class Command(base.BaseCommand):
 
             # Create or retrieve permissions for the group from the fields within the data
             permissions = []
-            for field in group_config.fields:
-                codename = f"{group_config.action}_{self.project.code}__{field}"
-                permission, p_created = Permission.objects.get_or_create(
+
+            # Permission to access project
+            access_project_codename = f"access_{self.project.code}"
+            access_project_permission, access_project_created = (
+                Permission.objects.get_or_create(
                     content_type=self.project.content_type,
-                    codename=codename,
-                    name=f"Can {group_config.action} {self.project.code}{' ' + field if field else ''}",
+                    codename=access_project_codename,
+                    defaults={
+                        "name": f"Can access {self.project.code}",
+                    },
                 )
-                if p_created:
-                    self.print("Created permission:", permission)
+            )
+            if access_project_created:
+                self.print("Created permission:", access_project_permission)
+            permissions.append(access_project_permission)
 
-                permissions.append(permission)
+            group_actions = ["access"]
+            for permission_config in group_config.permissions:
+                if isinstance(permission_config.action, str):
+                    actions = [permission_config.action]
+                else:
+                    actions = permission_config.action
 
-            # Set permissions for the group, and print them if they exist
+                group_actions.extend(actions)
+
+                for action in actions:
+                    # Permission to action on project
+                    action_project_codename = f"{action}_{self.project.code}"
+                    action_project_permission, action_project_created = (
+                        Permission.objects.get_or_create(
+                            content_type=self.project.content_type,
+                            codename=action_project_codename,
+                            defaults={
+                                "name": f"Can {action} {self.project.code}",
+                            },
+                        )
+                    )
+                    if action_project_created:
+                        self.print("Created permission:", action_project_permission)
+                    permissions.append(action_project_permission)
+
+                    # Field permissions for the action
+                    for field in permission_config.fields:
+                        assert field, "Field cannot be empty."
+
+                        # Permission to access field
+                        access_field_codename = f"access_{self.project.code}__{field}"
+                        access_field_permission, access_field_created = (
+                            Permission.objects.get_or_create(
+                                content_type=self.project.content_type,
+                                codename=access_field_codename,
+                                defaults={
+                                    "name": f"Can access {self.project.code} {field}",
+                                },
+                            )
+                        )
+                        if access_field_created:
+                            self.print("Created permission:", access_field_permission)
+                        permissions.append(access_field_permission)
+
+                        # Permission to action on field
+                        action_field_codename = f"{action}_{self.project.code}__{field}"
+                        action_field_permission, action_field_created = (
+                            Permission.objects.get_or_create(
+                                content_type=self.project.content_type,
+                                codename=action_field_codename,
+                                defaults={
+                                    "name": f"Can {action} {self.project.code} {field}",
+                                },
+                            )
+                        )
+                        if action_field_created:
+                            self.print("Created permission:", action_field_permission)
+                        permissions.append(action_field_permission)
+
+            # Set permissions for the group
             group.permissions.set(permissions)
+
+            # Print permissions for the group
             if permissions:
                 self.print(f"Permissions for {name}:")
                 for perm in group.permissions.all():
-                    self.print(f"\t{perm}")
+                    self.print(f"• {perm}")
             else:
                 self.print(f"Group {name} has no permissions.")
 
             # Add the group to the groups structure
-            groups[(group_config.action, group_config.scope)] = group
+            groups[group_config.scope] = (group, group_actions)
 
-        # Create/update the corresponding project group for each group
-        for (action, scope), group in groups.items():
+        # Create/update the corresponding projectgroup for each group
+        for scope, (group, group_actions) in groups.items():
             projectgroup, pg_created = ProjectGroup.objects.update_or_create(
                 group=group,
-                defaults={"project": self.project, "action": action, "scope": scope},
+                defaults={
+                    "project": self.project,
+                    "scope": scope,
+                    "actions": ",".join(group_actions),
+                },
             )
             if pg_created:
                 self.print(
-                    f"Created project group: {self.project.code} | {projectgroup.action} | {projectgroup.scope}"
+                    f"Created project group: {projectgroup.project.code} | {projectgroup.scope}"
                 )
             else:
                 self.print(
-                    f"Updated project group: {self.project.code} | {projectgroup.action} | {projectgroup.scope}"
+                    f"Updated project group: {projectgroup.project.code} | {projectgroup.scope}"
                 )
+            self.print(f"• Actions: {' | '.join(group_actions)}")
 
     def set_choices(self, choice_configs: List[ChoiceConfig]):
         """
         Create/update the choices for the project.
         """
 
-        # TODO: Issue with reactivate/deactivate choices if you provide them in uppercase in the json
-        # Upgrade Choices management command to DELETE inactive choices if a new one comes in with the same characters but a different case
-        # E.g. if a new choice Swab comes in, DELETE the old choice swab
-        # TL:DR we need case insensitivity in handling
-
         for choice_config in choice_configs:
             # Create new choices if required
             for option in choice_config.options:
-                instance, created = Choice.objects.get_or_create(
-                    project_id=self.project.code,
-                    field=choice_config.field,
-                    choice=option,
-                )
+                try:
+                    instance = Choice.objects.get(
+                        project_id=self.project.code,
+                        field=choice_config.field,
+                        choice__iexact=option,
+                    )
 
-                if created:
+                    if not instance.is_active:
+                        # The choice was previously deactivated
+                        instance.is_active = True
+                        instance.save()
+                        self.print(
+                            f"Reactivated choice: {self.project.code} | {instance.field} | {instance.choice}",
+                        )
+                    else:
+                        self.print(
+                            f"Active choice: {self.project.code} | {instance.field} | {instance.choice}",
+                        )
+
+                    if instance.choice != option:
+                        # The case of the choice has changed
+                        # e.g. lowercase -> uppercase
+                        old = instance.choice
+                        instance.choice = option
+                        instance.save()
+                        self.print(
+                            f"Renamed choice: {self.project.code} | {instance.field} | {old} -> {instance.choice}"
+                        )
+
+                except Choice.DoesNotExist:
+                    instance = Choice.objects.create(
+                        project_id=self.project.code,
+                        field=choice_config.field,
+                        choice=option,
+                    )
                     self.print(
                         f"Created choice: {self.project.code} | {instance.field} | {instance.choice}",
-                    )
-                elif not instance.is_active:
-                    instance.is_active = True
-                    instance.save()
-                    self.print(
-                        f"Reactivated choice: {self.project.code} | {instance.field} | {instance.choice}",
-                    )
-                else:
-                    self.print(
-                        f"Active choice: {self.project.code} | {instance.field} | {instance.choice}",
                     )
 
             # Deactivate choices no longer in the set
@@ -220,8 +304,6 @@ class Command(base.BaseCommand):
         Create/update the choice constraints for the project.
         """
 
-        # TODO: Case insensitivity in constraint handling
-
         # Empty constraints for the project
         for choice in Choice.objects.filter(project_id=self.project.code):
             choice.constraints.clear()
@@ -230,7 +312,7 @@ class Command(base.BaseCommand):
             choice_instance = Choice.objects.get(
                 project_id=self.project.code,
                 field=choice_constraint_config.field,
-                choice=choice_constraint_config.option,
+                choice__iexact=choice_constraint_config.option,
             )
 
             for constraint in choice_constraint_config.constraints:
@@ -239,7 +321,7 @@ class Command(base.BaseCommand):
                     Choice.objects.get(
                         project_id=self.project.code,
                         field=constraint.field,
-                        choice=constraint_option,
+                        choice__iexact=constraint_option,
                     )
                     for constraint_option in constraint.options
                 ]
