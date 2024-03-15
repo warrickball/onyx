@@ -51,3 +51,9 @@ jobs:
       run: |
         poetry run coverage run --source='.' manage.py test -v 2
         poetry run coverage report
+        poetry run coverage html
+    - name: Upload HTML coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: html-coverage-report-${{ matrix.python-version }}
+        path: onyx/htmlcov
